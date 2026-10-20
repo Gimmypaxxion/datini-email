@@ -3,7 +3,9 @@
   // Ricerca al centro, poi impostazioni (vista nuova), guida e account.
   import Icon from '../lib/Icon.svelte';
   import { store } from '../lib/store.svelte';
-  import { ME } from '../lib/mock';
+  import { initials } from '../lib/format';
+
+  const me = $derived(store.currentAccount);
 
   let searchEl: HTMLInputElement | undefined = $state();
 
@@ -24,18 +26,18 @@
         class="ph"
         type="search"
         value={store.q}
-        oninput={(e) => store.search(e.currentTarget.value)}
+        oninput={(e) => void store.search(e.currentTarget.value)}
         onkeydown={(e) => {
           if (e.key === 'Escape' && store.q) {
             e.stopPropagation();
-            store.clearSearch();
+            void store.clearSearch();
           }
         }}
         placeholder="Cerca"
         title="Cerca (Ctrl+E)"
       />
       {#if store.q}
-        <button class="ibtn btn clear" onclick={() => store.clearSearch()} aria-label="Cancella ricerca"><Icon name="x" size={16} /></button>
+        <button class="ibtn btn clear" onclick={() => void store.clearSearch()} aria-label="Cancella ricerca"><Icon name="x" size={16} /></button>
       {/if}
     </label>
   </div>
@@ -43,8 +45,12 @@
     {#if store.prefs.entry === 'ingranaggio'}
       <button class="hbtn" onclick={() => store.openSettings('aspetto')} aria-label="Impostazioni" title="Impostazioni"><Icon name="settings" size={20} /></button>
     {/if}
-    <button class="hbtn" aria-label="Guida" title="Guida (F1)"><Icon name="help-circle" size={20} /></button>
-    <button class="me" aria-label="Account di {ME.name}" title={ME.email}>{ME.initials}</button>
+    <button class="hbtn" aria-label="Guida" title="Guida (F1)" onclick={() => (store.ribbonTab = 'aiuto')}><Icon name="help-circle" size={20} /></button>
+    {#if me}
+      <button class="me" aria-label="Account {me.email}" title="{me.name}&#10;{me.email}" onclick={() => { store.acctSel = me.id; store.openSettings('account'); }}>{initials(me.name || me.email)}</button>
+    {:else}
+      <button class="me none" aria-label="Aggiungi account" title="Aggiungi account" onclick={() => store.openWizard(false)}><Icon name="user-plus" size={17} /></button>
+    {/if}
   </div>
 </header>
 
@@ -60,5 +66,6 @@
   .clear { position: absolute; right: 3px; top: 3px; width: 26px; height: 26px; }
   .me { width: 32px; height: 32px; margin-left: 8px; border: 0; border-radius: 50%; background: var(--av1-bg); color: var(--av1-fg); font-size: 12.5px; font-weight: 600; }
   .me:focus-visible { outline-color: var(--on-head); }
+  .me.none { display: grid; place-items: center; background: var(--head-hover); color: var(--on-head); }
   @media (max-width: 760px) { .side:not(.right), .search-wrap { display: none; } }
 </style>

@@ -1,10 +1,38 @@
 // Stato dell'interfaccia e azioni dell'utente.
-// È la traduzione in Svelte 5 della logica del prototipo (Main.dc.html).
-// Le preferenze di aspetto e il completamento del primo avvio restano salvati
-// sul computer; i messaggi per ora sono quelli di esempio di mock.ts.
+// I dati arrivano dal motore (backend.ts): quello vero nell'app installata,
+// quello di esempio nel browser e nei test. Le preferenze di aspetto restano
+// salvate sul computer.
 
-import { seedMessages, demoDraft, ME, type Draft, type FolderKey, type Message } from './mock';
-import { clock, cleanSubject } from './format';
+import type { Backend, Tab } from './backend';
+import { TauriBackend } from './backend';
+import { MockBackend } from './mockBackend';
+import { inTauri } from './platform';
+import {
+  clock,
+  cleanSubject,
+  longDate,
+  parseRecipient,
+  personFull,
+  peopleText,
+  randomKey,
+  sameAddress,
+  validEmail,
+} from './format';
+import {
+  errorKind,
+  errorMessage,
+  type Account,
+  type Draft,
+  type EngineEvent,
+  type Folder,
+  type MessageDetail,
+  type MessageSummary,
+  type NewAccount,
+  type OutboxItem,
+  type Person,
+  type Role,
+  type SyncOptions,
+} from './types';
 
 export type RibbonMode = 'estesa' | 'compatta';
 export type EntryMode = 'file' | 'ingranaggio';
@@ -14,6 +42,7 @@ export type StyleName = 'classico' | 'nuovo';
 export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inserisci';
 export type WinTab = 'messaggio' | 'inserisci';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
+export type RecipientField = 'to' | 'cc' | 'bcc';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -27,35 +56,49 @@ export const PRESETS: Record<StyleName, Prefs> = {
   nuovo: { ribbon: 'compatta', entry: 'ingranaggio', compose: 'pannello', replyWin: false },
 };
 
-export const FOLDER_NAMES: Record<FolderKey, string> = {
+export const ROLE_NAMES: Record<Role, string> = {
   inbox: 'Posta in arrivo',
   sent: 'Posta inviata',
   drafts: 'Bozze',
   archive: 'Archivio',
   junk: 'Posta indesiderata',
-  deleted: 'Elementi eliminati',
-  clienti: 'Clienti',
-  fornitori: 'Fornitori',
-  amministrazione: 'Amministrazione',
-  ordini: 'Posta in arrivo',
+  deleted: 'Posta eliminata',
 };
 
-export const GROUPS = ['Oggi', 'Ieri', 'Questa settimana'] as const;
+/** Ordine delle cartelle nel riquadro, come in Outlook. */
+export const ROLE_ORDER: Role[] = ['inbox', 'drafts', 'sent', 'deleted', 'archive', 'junk'];
 
-interface Toast {
-  kind: 'sent' | 'draft';
-  id: number;
+export function folderLabel(f: Folder | null | undefined): string {
+  if (!f) return '';
+  return f.role ? ROLE_NAMES[f.role] : f.name;
 }
+
+export function sortFolders(list: Folder[]): Folder[] {
+  const rank = (f: Folder) => (f.role ? ROLE_ORDER.indexOf(f.role) : ROLE_ORDER.length);
+  return [...list].sort((a, b) => rank(a) - rank(b) || a.path.localeCompare(b.path, 'it'));
+}
+
+const PAGE = 300;
+const AUTOSAVE_MS = 2500;
+
+export interface Toast {
+  kind: 'sent' | 'draft' | 'error' | 'info';
+  id: number;
+  text: string;
+  outboxId?: number;
+}
+
 interface LastSent {
-  msg: Message;
-  c: Draft;
+  key: string;
   win: boolean;
 }
+
 interface Saved {
   prefs: Prefs;
   onboardingDone: boolean;
   themeChoice: ThemeChoice;
   showFolders: boolean;
+  collapsed?: Record<string, boolean>;
 }
 
 const STORAGE_KEY = 'datini.interfaccia.v1';
@@ -71,22 +114,33 @@ function readSaved(): Partial<Saved> | null {
 
 let toastSeq = 0;
 
+export type AddResult = { ok: true; account: Account } | { ok: false; kind: string; message: string };
+
 export class MailStore {
-  private base: Message[] = seedMessages();
+  backend: Backend;
+  /** "principale" o "messaggio" (finestra separata per scrivere). */
+  mode: 'principale' | 'messaggio' = 'principale';
+
+  ready = $state(false);
+  accounts = $state<Account[]>([]);
+  folders = $state<Folder[]>([]);
+  outbox = $state<OutboxItem[]>([]);
 
   // Navigazione
-  folder = $state<FolderKey>('inbox');
-  folderSel = $state('fav-inbox');
-  tab = $state<'prio' | 'altre'>('prio');
-  sel = $state<string | null>('m1');
+  folderId = $state<number | null>(null);
+  folderSel = $state('');
+  view = $state<'cartella' | 'uscita'>('cartella');
+  tab = $state<Tab>('prio');
   q = $state('');
-
-  // Modifiche locali ai messaggi di esempio
-  rd = $state<Record<string, boolean>>({ m1: true });
-  fl = $state<Record<string, boolean>>({});
-  mv = $state<Record<string, FolderKey | 'gone'>>({});
-  sent = $state<Message[]>([]);
-  drafts = $state<Message[]>([]);
+  list = $state<MessageSummary[]>([]);
+  listLoading = $state(false);
+  listEnd = $state(true);
+  sel = $state<number | null>(null);
+  detail = $state<MessageDetail | null>(null);
+  detailLoading = $state(false);
+  detailError = $state('');
+  remoteOk = $state<Record<number, boolean>>({});
+  collapsed = $state<Record<string, boolean>>({});
 
   // Aspetto
   prefs = $state<Prefs>({ ...PRESETS.classico });
@@ -96,17 +150,16 @@ export class MailStore {
   ribbonTab = $state<RibbonTab>('home');
   winTab = $state<WinTab>('messaggio');
 
-  // Pannelli e finestre
+  // Pannelli
   onboarding = $state(true);
   obChoice = $state<StyleName>('classico');
   backstage = $state(false);
   bsPage = $state<'info' | 'apri' | 'about'>('info');
   settings = $state(false);
   setPage = $state<'aspetto' | 'account' | 'info'>('aspetto');
-  acctSel = $state<'imap' | 'pop'>('imap');
-  acct2Open = $state(false);
-  sync = $state({ imapWindow: '3m', attach: 'apertura', popKeep: '14' });
-  offline = $state(false);
+  acctSel = $state<string | null>(null);
+  wizard = $state<{ open: boolean; first: boolean }>({ open: false, first: false });
+  netOffline = $state(false);
 
   // Scrittura
   c = $state<Draft | null>(null);
@@ -115,14 +168,25 @@ export class MailStore {
   winMin = $state(false);
   toInput = $state('');
   ccInput = $state('');
+  bccInput = $state('');
+  showBcc = $state(false);
   err = $state('');
+  savedAt = $state('');
+  sending = $state(false);
   toast = $state<Toast | null>(null);
-  lastSent = $state<LastSent | null>(null);
+  private lastSent: LastSent | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
+  private saveTimer: ReturnType<typeof setTimeout> | undefined;
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  private listToken = 0;
+  private detailToken = 0;
   private persist: boolean;
+  private unsubscribe: (() => void) | null = null;
 
-  constructor(opts: { persist?: boolean } = {}) {
+  constructor(opts: { persist?: boolean; backend?: Backend } = {}) {
     this.persist = opts.persist ?? true;
+    this.backend = opts.backend ?? (inTauri ? new TauriBackend() : new MockBackend());
     if (this.persist) {
       const saved = readSaved();
       if (saved) {
@@ -130,12 +194,16 @@ export class MailStore {
         if (saved.onboardingDone) this.onboarding = false;
         if (saved.themeChoice) this.themeChoice = saved.themeChoice;
         if (typeof saved.showFolders === 'boolean') this.showFolders = saved.showFolders;
+        if (saved.collapsed) this.collapsed = saved.collapsed;
       }
     }
     if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
-      this.offline = navigator.onLine === false;
-      window.addEventListener('online', () => (this.offline = false));
-      window.addEventListener('offline', () => (this.offline = true));
+      this.netOffline = navigator.onLine === false;
+      window.addEventListener('online', () => {
+        this.netOffline = false;
+        void this.backend.syncNow(null);
+      });
+      window.addEventListener('offline', () => (this.netOffline = true));
     }
     const mq = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
     if (mq) {
@@ -151,12 +219,109 @@ export class MailStore {
       onboardingDone: !this.onboarding,
       themeChoice: this.themeChoice,
       showFolders: this.showFolders,
+      collapsed: { ...this.collapsed },
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       /* archivio non disponibile: le preferenze valgono solo per questa sessione */
     }
+  }
+
+  // ---------- Avvio ----------
+
+  async init() {
+    this.unsubscribe?.();
+    this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
+    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox()]);
+    if (this.mode === 'principale') {
+      const inbox = this.defaultInbox();
+      if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
+      if (!this.onboarding && this.backend.real && !this.accounts.length) this.openWizard(true);
+    }
+    this.ready = true;
+  }
+
+  dispose() {
+    this.unsubscribe?.();
+    clearTimeout(this.saveTimer);
+    clearTimeout(this.refreshTimer);
+    clearTimeout(this.toastTimer);
+  }
+
+  private defaultInbox(): Folder | undefined {
+    for (const a of this.accounts) {
+      const f = this.folders.find((x) => x.accountId === a.id && x.role === 'inbox');
+      if (f) return f;
+    }
+    return this.folders[0];
+  }
+
+  private onEvent(e: EngineEvent) {
+    switch (e.type) {
+      case 'changed':
+        this.scheduleRefresh();
+        break;
+      case 'status': {
+        const a = this.accounts.find((x) => x.id === e.accountId);
+        if (a) a.status = e.status;
+        break;
+      }
+      case 'accounts':
+        void this.reloadAccounts().then(() => this.reloadFolders());
+        break;
+      case 'outbox':
+        void this.reloadOutbox();
+        if (this.mode !== 'principale') break;
+        if (e.state === 'attesa') {
+          this.flash({ kind: 'sent', text: 'Messaggio inviato', outboxId: e.outboxId }, 7000);
+        } else if (e.state === 'annullato' && this.toast?.outboxId === e.outboxId) {
+          this.toast = null;
+        } else if (e.state === 'errore') {
+          this.flash({ kind: 'error', text: `Messaggio non inviato. ${e.error ?? ''}`.trim(), outboxId: e.outboxId }, 12000);
+        }
+        break;
+    }
+  }
+
+  private scheduleRefresh() {
+    clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => void this.refresh(), 200);
+  }
+
+  async refresh() {
+    await this.reloadFolders();
+    await this.loadList(false);
+    if (this.sel !== null && this.detail && this.detail.id === this.sel) {
+      const s = this.list.find((m) => m.id === this.sel);
+      if (s) Object.assign(this.detail, { unread: s.unread, flagged: s.flagged, answered: s.answered });
+    }
+  }
+
+  async reloadAccounts() {
+    this.accounts = await this.backend.accounts();
+    if (!this.acctSel || !this.accounts.some((a) => a.id === this.acctSel)) this.acctSel = this.accounts[0]?.id ?? null;
+  }
+
+  async reloadFolders() {
+    this.folders = await this.backend.folders();
+    if (this.folderId !== null && !this.folders.some((f) => f.id === this.folderId)) {
+      const inbox = this.defaultInbox();
+      if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
+      else {
+        this.folderId = null;
+        this.list = [];
+        this.sel = null;
+        this.detail = null;
+      }
+    } else if (this.folderId === null && this.mode === 'principale') {
+      const inbox = this.defaultInbox();
+      if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
+    }
+  }
+
+  async reloadOutbox() {
+    this.outbox = await this.backend.outbox();
   }
 
   // ---------- Valori derivati ----------
@@ -166,50 +331,41 @@ export class MailStore {
     return this.themeChoice;
   }
 
-  private eff(m: Message): Message {
-    const o = { ...m };
-    if (this.rd[m.id] !== undefined) o.unread = !this.rd[m.id];
-    if (this.fl[m.id] !== undefined) o.flagged = this.fl[m.id];
-    const moved = this.mv[m.id];
-    if (moved) o.folder = moved as FolderKey;
-    return o;
+  get currentFolder(): Folder | null {
+    return this.folders.find((f) => f.id === this.folderId) ?? null;
   }
 
-  all = $derived.by(() => [...this.sent, ...this.drafts, ...this.base].map((m) => this.eff(m)));
-
-  filterList(folder: FolderKey, tab: 'prio' | 'altre', q: string): Message[] {
-    const qq = q.trim().toLowerCase();
-    return this.all.filter((m) => {
-      if (m.folder !== folder) return false;
-      if (qq) return `${m.from} ${m.subject} ${m.preview}`.toLowerCase().includes(qq);
-      if (folder === 'inbox' && m.tab !== tab) return false;
-      return true;
-    });
+  get currentAccount(): Account | null {
+    const f = this.currentFolder;
+    return (f && this.accounts.find((a) => a.id === f.accountId)) || this.accounts[0] || null;
   }
 
-  list = $derived.by(() => this.filterList(this.folder, this.tab, this.q));
-
-  selected = $derived.by(() => {
-    if (!this.sel) return null;
-    return this.all.find((m) => m.id === this.sel && m.folder === this.folder) ?? null;
-  });
-
-  find(id: string): Message | null {
-    return this.all.find((m) => m.id === id) ?? null;
+  get isInbox(): boolean {
+    return this.currentFolder?.role === 'inbox';
   }
 
-  count(folder: FolderKey, unreadOnly: boolean): number {
-    return this.all.filter((m) => m.folder === folder && (!unreadOnly || m.unread)).length;
+  get selected(): MessageSummary | null {
+    return this.list.find((m) => m.id === this.sel) ?? null;
+  }
+
+  get offline(): boolean {
+    if (this.netOffline) return true;
+    const remote = this.accounts.filter((a) => a.kind !== 'local');
+    return remote.length > 0 && remote.every((a) => a.status.state === 'offline');
+  }
+
+  get syncing(): boolean {
+    return this.accounts.some((a) => a.status.state === 'sincronizzazione');
   }
 
   get paneCompose(): boolean {
-    return !!this.c && !this.cWin;
+    return !!this.c && !this.cWin && this.mode === 'principale';
   }
   get winOpen(): boolean {
-    return !!this.c && this.cWin && !this.winMin;
+    return !!this.c && this.cWin && !this.winMin && this.mode === 'principale';
   }
   get winMinimized(): boolean {
-    return !!this.c && this.cWin && this.winMin;
+    return !!this.c && this.cWin && this.winMin && this.mode === 'principale';
   }
 
   get ribbonTabs(): RibbonTab[] {
@@ -229,93 +385,263 @@ export class MailStore {
   }
 
   get listTitle(): string {
-    return this.q.trim() ? 'Risultati della ricerca' : FOLDER_NAMES[this.folder];
+    if (this.q.trim()) return 'Risultati della ricerca';
+    if (this.view === 'uscita') return 'Posta in uscita';
+    return folderLabel(this.currentFolder);
+  }
+
+  foldersOf(accountId: string): Folder[] {
+    return sortFolders(this.folders.filter((f) => f.accountId === accountId));
+  }
+
+  roleFolder(accountId: string | undefined, role: Role): Folder | undefined {
+    return this.folders.find((f) => f.accountId === accountId && f.role === role);
+  }
+
+  count(folderId: number, unreadOnly: boolean): number {
+    const f = this.folders.find((x) => x.id === folderId);
+    if (!f) return 0;
+    return unreadOnly ? f.unread : f.total;
+  }
+
+  canSend(a: Account | null | undefined): boolean {
+    return !!a && a.kind !== 'local' && !!a.outgoing;
   }
 
   // ---------- Navigazione ----------
 
-  private selectFirst(list: Message[], skipDrafts = false) {
-    const first = list.length && !skipDrafts ? list[0].id : null;
-    this.sel = first;
-    if (first) this.rd[first] = true;
-  }
-
-  pickFolder(key: FolderKey, id: string) {
-    this.stashPaneDraft();
-    this.folder = key;
-    this.folderSel = id;
+  async pickFolder(folderId: number, selId: string) {
+    await this.stashPaneDraft();
+    this.view = 'cartella';
+    this.folderId = folderId;
+    this.folderSel = selId;
     this.tab = 'prio';
     this.q = '';
     this.err = '';
-    this.selectFirst(this.filterList(key, 'prio', ''), key === 'drafts');
+    this.sel = null;
+    this.detail = null;
+    this.detailError = '';
+    await this.loadList(true);
+    if (this.currentFolder?.role !== 'drafts' && this.list.length) await this.pickMsg(this.list[0].id);
   }
 
-  pickTab(tab: 'prio' | 'altre') {
-    this.stashPaneDraft();
+  async pickOutbox(selId: string) {
+    await this.stashPaneDraft();
+    this.view = 'uscita';
+    this.folderSel = selId;
+    this.q = '';
+    this.sel = null;
+    this.detail = null;
+    this.list = [];
+    await this.reloadOutbox();
+  }
+
+  async pickTab(tab: Tab) {
+    await this.stashPaneDraft();
     this.tab = tab;
     this.err = '';
-    this.selectFirst(this.filterList(this.folder, tab, ''));
+    this.sel = null;
+    this.detail = null;
+    await this.loadList(true);
+    if (this.list.length) await this.pickMsg(this.list[0].id);
   }
 
+  /** Ricerca mentre si scrive, con una breve attesa tra un tasto e l'altro. */
   search(value: string) {
     this.q = value;
-    const l = this.filterList(this.folder, this.tab, value);
-    this.sel = l.length ? l[0].id : null;
+    clearTimeout(this.searchTimer);
+    return new Promise<void>((resolve) => {
+      this.searchTimer = setTimeout(
+        async () => {
+          await this.loadList(true);
+          if (this.list.length) await this.pickMsg(this.list[0].id, false);
+          else {
+            this.sel = null;
+            this.detail = null;
+          }
+          resolve();
+        },
+        this.backend.real ? 180 : 0,
+      );
+    });
   }
 
-  clearSearch() {
+  async clearSearch() {
+    clearTimeout(this.searchTimer);
     this.q = '';
-    const l = this.filterList(this.folder, this.tab, '');
-    if (!l.some((m) => m.id === this.sel)) this.sel = l.length ? l[0].id : null;
+    await this.loadList(true);
+    if (!this.list.some((m) => m.id === this.sel)) {
+      this.sel = null;
+      this.detail = null;
+      if (this.list.length) await this.pickMsg(this.list[0].id, false);
+    }
   }
 
-  pickMsg(id: string) {
-    const m = this.find(id);
-    if (!m) return;
-    if (m.draft) {
-      this.reopenDraft(m);
+  /** Carica l'elenco. Con `reset` torna all'inizio, altrimenti aggiorna le righe già caricate. */
+  async loadList(reset: boolean) {
+    const token = ++this.listToken;
+    if (this.view === 'uscita') {
+      await this.reloadOutbox();
       return;
     }
-    this.stashPaneDraft();
+    const q = this.q.trim();
+    const limit = reset ? PAGE : Math.max(PAGE, this.list.length);
+    this.listLoading = true;
+    try {
+      let items: MessageSummary[];
+      if (q) items = await this.backend.search(q, this.currentAccount?.id ?? null);
+      else if (this.folderId === null) items = [];
+      else items = await this.backend.messages(this.folderId, this.isInbox ? this.tab : null, 0, limit);
+      if (token !== this.listToken) return;
+      this.list = items;
+      this.listEnd = !!q || items.length < limit;
+      if (this.sel !== null && !items.some((m) => m.id === this.sel) && !reset) {
+        this.sel = null;
+        this.detail = null;
+      }
+    } catch (e) {
+      if (token === this.listToken) this.flash({ kind: 'error', text: errorMessage(e) });
+    } finally {
+      if (token === this.listToken) this.listLoading = false;
+    }
+  }
+
+  async loadMore() {
+    if (this.listEnd || this.listLoading || this.q.trim() || this.folderId === null) return;
+    this.listLoading = true;
+    const token = ++this.listToken;
+    try {
+      const more = await this.backend.messages(this.folderId, this.isInbox ? this.tab : null, this.list.length, PAGE);
+      if (token !== this.listToken) return;
+      const known = new Set(this.list.map((m) => m.id));
+      this.list = [...this.list, ...more.filter((m) => !known.has(m.id))];
+      this.listEnd = more.length < PAGE;
+    } finally {
+      if (token === this.listToken) this.listLoading = false;
+    }
+  }
+
+  async pickMsg(id: number, markRead = true) {
+    const m = this.list.find((x) => x.id === id);
+    if (!m) return;
+    if (m.draft && this.currentFolder?.role === 'drafts' && !this.q.trim()) {
+      await this.reopenDraft(m.id);
+      return;
+    }
+    await this.stashPaneDraft();
     this.sel = id;
-    this.rd[id] = true;
     this.err = '';
+    if (markRead && m.unread) {
+      m.unread = false;
+      this.bumpFolder(m.folderId, -1);
+      void this.backend.setFlags([id], true, null).catch((e) => this.flash({ kind: 'error', text: errorMessage(e) }));
+    }
+    await this.loadDetail(id);
+  }
+
+  async loadDetail(id: number) {
+    const token = ++this.detailToken;
+    this.detailLoading = true;
+    this.detailError = '';
+    if (this.detail?.id !== id) this.detail = null;
+    try {
+      const d = await this.backend.message(id, !!this.remoteOk[id]);
+      if (token !== this.detailToken) return;
+      const s = this.list.find((x) => x.id === id);
+      this.detail = s ? { ...d, unread: s.unread, flagged: s.flagged } : d;
+    } catch (e) {
+      if (token === this.detailToken) this.detailError = errorMessage(e);
+    } finally {
+      if (token === this.detailToken) this.detailLoading = false;
+    }
+  }
+
+  async showRemoteImages() {
+    if (this.sel === null) return;
+    this.remoteOk[this.sel] = true;
+    await this.loadDetail(this.sel);
+  }
+
+  private bumpFolder(folderId: number, delta: number) {
+    const f = this.folders.find((x) => x.id === folderId);
+    if (f) f.unread = Math.max(0, f.unread + delta);
   }
 
   /** Sposta la selezione al messaggio precedente o successivo dell'elenco (frecce). */
-  moveSelection(step: 1 | -1) {
+  async moveSelection(step: 1 | -1) {
     const l = this.list;
     if (!l.length) return;
     const i = l.findIndex((m) => m.id === this.sel);
     const next = l[Math.min(Math.max(i + step, 0), l.length - 1)];
-    if (next && !next.draft) this.pickMsg(next.id);
+    if (next && next.id !== this.sel && !next.draft) await this.pickMsg(next.id);
   }
 
-  moveMsg(id: string | null, dest: FolderKey) {
-    if (!id) return;
+  /** Toglie un messaggio dall'elenco e seleziona il successivo, come Outlook. */
+  private dropFromList(ids: number[]) {
     const l = this.list;
-    const i = l.findIndex((m) => m.id === id);
-    this.mv[id] = dest;
-    if (this.sel === id) {
-      const rest = l.filter((m) => m.id !== id);
+    const i = l.findIndex((m) => m.id === this.sel);
+    const gone = new Set(ids);
+    for (const m of l) if (gone.has(m.id) && m.unread) this.bumpFolder(m.folderId, -1);
+    this.list = l.filter((m) => !gone.has(m.id));
+    if (this.sel !== null && gone.has(this.sel)) {
+      const rest = this.list;
       const next = rest.length ? rest[Math.min(Math.max(i, 0), rest.length - 1)] : null;
-      this.sel = next ? next.id : null;
-      if (next) this.rd[next.id] = true;
+      this.sel = null;
+      this.detail = null;
+      if (next && !next.draft) void this.pickMsg(next.id);
     }
   }
 
-  toggleFlag(id: string | null) {
-    const m = id ? this.find(id) : null;
-    if (m) this.fl[m.id] = !m.flagged;
+  private async act(fn: () => Promise<void>) {
+    try {
+      await fn();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+      this.scheduleRefresh();
+    }
   }
 
-  toggleRead(id: string | null) {
-    const m = id ? this.find(id) : null;
-    if (m) this.rd[m.id] = m.unread;
+  async moveMsg(id: number | null, role: Role) {
+    if (id === null) return;
+    const m = this.list.find((x) => x.id === id);
+    if (m && this.currentFolder?.role === role && !this.q.trim()) return;
+    this.dropFromList([id]);
+    await this.act(() => this.backend.moveToRole([id], role));
   }
 
-  setRead(id: string | null, read: boolean) {
-    if (id && this.find(id)) this.rd[id] = read;
+  async moveToFolder(id: number | null, folderId: number) {
+    if (id === null || folderId === this.folderId) return;
+    this.dropFromList([id]);
+    await this.act(() => this.backend.moveMessages([id], folderId));
+  }
+
+  async deleteMsg(id: number | null) {
+    if (id === null) return;
+    this.dropFromList([id]);
+    await this.act(() => this.backend.deleteMessages([id]));
+  }
+
+  async toggleFlag(id: number | null) {
+    const m = id === null ? null : this.list.find((x) => x.id === id);
+    if (!m) return;
+    m.flagged = !m.flagged;
+    if (this.detail?.id === m.id) this.detail.flagged = m.flagged;
+    await this.act(() => this.backend.setFlags([m.id], null, m.flagged));
+  }
+
+  async toggleRead(id: number | null) {
+    const m = id === null ? null : this.list.find((x) => x.id === id);
+    if (!m) return;
+    await this.setRead(m.id, m.unread);
+  }
+
+  async setRead(id: number | null, read: boolean) {
+    const m = id === null ? null : this.list.find((x) => x.id === id);
+    if (!m || m.unread === !read) return;
+    m.unread = !read;
+    this.bumpFolder(m.folderId, read ? -1 : 1);
+    if (this.detail?.id === m.id) this.detail.unread = m.unread;
+    await this.act(() => this.backend.setFlags([m.id], read, null));
   }
 
   toggleFolders() {
@@ -323,74 +649,90 @@ export class MailStore {
     this.save();
   }
 
+  toggleSection(accountId: string) {
+    this.collapsed[accountId] = !this.collapsed[accountId];
+    this.save();
+  }
+
+  syncNow() {
+    void this.backend.syncNow(null);
+  }
+
   // ---------- Scrittura ----------
 
-  private msgFromDraft(c: Draft, folder: 'sent' | 'drafts'): Message {
-    const k = clock();
-    const first = c.to[0] || 'Nessun destinatario';
-    const paras = String(c.body || '')
-      .split(/\n\s*\n/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-    return {
-      id: `${folder[0]}${k.stamp}-${++toastSeq}`,
-      folder,
-      tab: 'prio',
-      group: 'Oggi',
-      from: first,
-      email: '',
-      time: k.hhmm,
-      dateLong: k.long,
-      hhmm: k.hhmm,
-      subject: c.subj || '(nessun oggetto)',
-      preview: (paras[0] || '').replace(/\n/g, ' ').slice(0, 120),
-      body: paras,
-      sig: '',
-      atts: c.atts.slice(),
-      unread: false,
-      flagged: false,
-      to: c.to.join('; '),
-      cc: c.cc.join('; '),
-      cat: '',
-      sent: folder === 'sent',
-      draft: folder === 'drafts',
-    };
+  private composeAccount(prefer?: string): Account | null {
+    const p = this.accounts.find((a) => a.id === prefer);
+    if (this.canSend(p)) return p!;
+    const cur = this.currentAccount;
+    if (this.canSend(cur)) return cur;
+    return this.accounts.find((a) => this.canSend(a)) ?? null;
+  }
+
+  private emptyDraft(accountId: string): Draft {
+    return { key: randomKey(), accountId, to: [], cc: [], bcc: [], subject: '', body: '', attachments: [], inReplyTo: null, references: [], replyToMessage: null };
+  }
+
+  static isEmpty(d: Draft): boolean {
+    return !d.to.length && !d.cc.length && !d.bcc.length && !d.subject.trim() && !d.body.trim() && !d.attachments.length;
+  }
+
+  private snapshot(): Draft | null {
+    return this.c ? ($state.snapshot(this.c) as Draft) : null;
   }
 
   private closeCompose() {
+    clearTimeout(this.saveTimer);
     this.c = null;
     this.cWin = false;
     this.winMin = false;
     this.winMax = false;
-  }
-
-  private isEmptyDraft(c: Draft) {
-    return !c.to.length && !c.subj && !String(c.body).trim();
+    this.savedAt = '';
+    this.toInput = '';
+    this.ccInput = '';
+    this.bccInput = '';
+    this.showBcc = false;
   }
 
   /** Chiude il messaggio in scrittura salvandolo in Bozze, se contiene qualcosa. */
-  private stashDraft() {
-    const c = this.c;
-    if (!c) return;
+  private async stashDraft(): Promise<boolean> {
+    const d = this.snapshot();
+    if (!d) return false;
     this.closeCompose();
-    if (this.isEmptyDraft(c)) return;
-    this.drafts = [this.msgFromDraft(c, 'drafts'), ...this.drafts];
+    if (MailStore.isEmpty(d)) {
+      await this.backend.discardDraft(d.accountId, d.key).catch(() => {});
+      return false;
+    }
+    try {
+      await this.backend.closeDraft(d);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+    return true;
   }
 
-  private stashPaneDraft() {
-    if (this.c && !this.cWin) this.stashDraft();
+  private async stashPaneDraft() {
+    if (this.c && !this.cWin && this.mode === 'principale') await this.stashDraft();
   }
 
-  private flash(kind: Toast['kind'], ms = 6000) {
+  private flash(t: Omit<Toast, 'id'>, ms = 6000) {
     clearTimeout(this.toastTimer);
     const id = ++toastSeq;
-    this.toast = { kind, id };
+    this.toast = { ...t, id };
     this.toastTimer = setTimeout(() => {
       if (this.toast?.id === id) this.toast = null;
     }, ms);
   }
 
-  private startCompose(c: Draft, inWindow: boolean) {
+  dismissToast() {
+    this.toast = null;
+  }
+
+  /** Comandi già al loro posto ma non ancora pronti. */
+  soon(label: string) {
+    this.flash({ kind: 'info', text: `${label}: arriverà in una prossima versione.` }, 4000);
+  }
+
+  startCompose(c: Draft, inWindow: boolean) {
     this.c = c;
     this.cWin = inWindow;
     this.winMin = false;
@@ -398,160 +740,425 @@ export class MailStore {
     this.winTab = 'messaggio';
     this.toInput = '';
     this.ccInput = '';
+    this.bccInput = '';
+    this.showBcc = c.bcc.length > 0;
     this.err = '';
-    if (!inWindow) this.ribbonTab = 'messaggio';
+    this.savedAt = '';
+    if (!inWindow && this.mode === 'principale') this.ribbonTab = 'messaggio';
   }
 
-  private reopenDraft(m: Message) {
-    this.stashDraft();
-    this.mv[m.id] = 'gone';
-    this.drafts = this.drafts.filter((d) => d.id !== m.id);
-    this.sel = null;
-    this.startCompose(
-      {
-        to: m.to ? m.to.split('; ').filter(Boolean) : [],
-        cc: m.cc ? m.cc.split('; ').filter(Boolean) : [],
-        subj: m.subject === '(nessun oggetto)' ? '' : m.subject,
-        body: m.body.join('\n\n'),
-        atts: m.atts.slice(),
-        saved: m.hhmm || '',
-      },
-      this.prefs.compose === 'finestra',
-    );
+  private async present(d: Draft, inWindow: boolean) {
+    if (inWindow && this.backend.real && this.mode === 'principale') {
+      try {
+        if (await this.backend.openComposeWindow(d)) return;
+      } catch (e) {
+        this.flash({ kind: 'error', text: errorMessage(e) });
+      }
+    }
+    this.startCompose(d, inWindow);
   }
 
-  openCompose(kind: ComposeKind) {
+  private async reopenDraft(id: number) {
+    try {
+      const d = await this.backend.openDraft(id);
+      await this.stashDraft();
+      this.sel = null;
+      this.detail = null;
+      await this.present(d, this.prefs.compose === 'finestra');
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Testo citato sotto la risposta, nel formato di Outlook. */
+  static quote(m: MessageDetail): string {
+    const lines = [`Da: ${personFull(m.from)}`, `Inviato: ${longDate(m.date)}`];
+    if (m.to.length) lines.push(`A: ${peopleText(m.to)}`);
+    if (m.cc.length) lines.push(`Cc: ${peopleText(m.cc)}`);
+    lines.push(`Oggetto: ${m.subject}`);
+    return `\n\n\n________________________________\n${lines.join('\n')}\n\n${m.text.trim()}`;
+  }
+
+  /** Bozza per Rispondi, Rispondi a tutti o Inoltra, dal messaggio aperto. */
+  draftFrom(kind: Exclude<ComposeKind, 'new'>, m: MessageDetail, acct: Account): Draft {
+    const d = this.emptyDraft(acct.id);
+    const me: Person = { name: acct.name, email: acct.email };
+    const clean = cleanSubject(m.subject);
+    d.body = MailStore.quote(m);
+    if (kind === 'reply' || kind === 'replyAll') {
+      d.to = (m.replyTo.length ? m.replyTo : [m.from]).filter((p) => p.email || p.name);
+      if (d.to.length && sameAddress(d.to[0], me) && m.to.length) d.to = [...m.to];
+      d.subject = `Re: ${clean}`;
+      d.replyToMessage = m.id;
+    }
+    if (kind === 'replyAll') {
+      const seen = [...d.to];
+      d.cc = [...m.to, ...m.cc].filter((p) => {
+        if (sameAddress(p, me) || seen.some((s) => sameAddress(s, p) || (!p.email && s.name === p.name))) return false;
+        seen.push(p);
+        return true;
+      });
+    }
+    if (kind === 'forward') {
+      d.subject = `I: ${clean}`;
+      d.attachments = m.attachments.filter((a) => !a.inline).map((a) => ({ name: a.name, size: a.size, mime: a.mime, source: { messageId: m.id, index: a.index } }));
+    }
+    if (m.messageId) {
+      d.inReplyTo = kind === 'forward' ? null : m.messageId;
+      d.references = [...m.references, m.messageId];
+    }
+    return d;
+  }
+
+  async openCompose(kind: ComposeKind) {
     const P = this.prefs;
-    let m: Message | null = null;
+    let m: MessageDetail | null = null;
     if (kind !== 'new') {
-      m = this.selected;
+      m = this.detail && this.detail.id === this.sel ? this.detail : null;
       if (!m) return;
     }
-    const c: Draft = { to: [], cc: [], subj: '', body: '', atts: [], saved: '' };
-    if (m) {
-      const clean = cleanSubject(m.subject);
-      c.body =
-        `\n\n\nDa: ${m.from}${m.email ? ` <${m.email}>` : ''}\nInviato: ${m.dateLong}\nOggetto: ${m.subject}\n\n` +
-        m.body.join('\n\n');
-      if (kind === 'reply' || kind === 'replyAll') {
-        c.to = [m.from];
-        c.subj = `Re: ${clean}`;
-      }
-      if (kind === 'replyAll') {
-        c.cc = `${m.to}; ${m.cc}`
-          .split('; ')
-          .map((n) => n.trim())
-          .filter((n) => n && n !== ME.name && n !== m!.from);
-      }
-      if (kind === 'forward') {
-        c.subj = `I: ${clean}`;
-        c.atts = m.atts.slice();
-      }
+    const acct = this.composeAccount(m?.accountId);
+    if (!acct) {
+      this.openWizard(false);
+      return;
     }
+    const d = m ? this.draftFrom(kind as Exclude<ComposeKind, 'new'>, m, acct) : this.emptyDraft(acct.id);
     const inWindow = kind === 'new' ? P.compose === 'finestra' : P.compose === 'finestra' && P.replyWin;
-    this.stashDraft();
-    this.startCompose(c, inWindow);
+    await this.stashDraft();
+    await this.present(d, inWindow);
+  }
+
+  /** Scrivere a un indirizzo cliccato nel testo di un messaggio (mailto:). */
+  async composeTo(email: string) {
+    const acct = this.composeAccount();
+    if (!acct) return;
+    const d = this.emptyDraft(acct.id);
+    d.to = [{ name: '', email }];
+    await this.stashDraft();
+    await this.present(d, this.prefs.compose === 'finestra');
+  }
+
+  /** Ogni modifica: salvataggio automatico in Bozze dopo una breve pausa. */
+  private touch() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => void this.autosave(), AUTOSAVE_MS);
+  }
+
+  async autosave() {
+    const d = this.snapshot();
+    if (!d || MailStore.isEmpty(d)) return;
+    try {
+      const r = await this.backend.saveDraft(d);
+      if (this.c && this.c.key === d.key) {
+        const same = this.c.attachments.length === d.attachments.length && this.c.attachments.every((a, i) => a.name === d.attachments[i].name);
+        if (same) this.c.attachments = r.attachments;
+        this.savedAt = clock().hhmm;
+      }
+    } catch (e) {
+      this.err = errorMessage(e);
+    }
   }
 
   setSubject(v: string) {
-    if (this.c) {
-      this.c.subj = v;
-      this.c.saved = clock().hhmm;
-    }
+    if (!this.c) return;
+    this.c.subject = v;
+    this.touch();
   }
 
   setBody(v: string) {
-    if (this.c) {
-      this.c.body = v;
-      this.c.saved = clock().hhmm;
-    }
+    if (!this.c) return;
+    this.c.body = v;
+    this.touch();
   }
 
-  addRecipient(key: 'to' | 'cc') {
-    const input = key === 'to' ? this.toInput : this.ccInput;
-    const v = String(input || '').replace(/[,;]+$/, '').trim();
-    if (!v || !this.c) return;
-    this.c[key] = [...this.c[key], v];
-    if (key === 'to') this.toInput = '';
-    else this.ccInput = '';
+  setAccount(accountId: string) {
+    if (!this.c) return;
+    this.c.accountId = accountId;
+    this.touch();
+  }
+
+  private inputOf(key: RecipientField): string {
+    return key === 'to' ? this.toInput : key === 'cc' ? this.ccInput : this.bccInput;
+  }
+
+  private setInput(key: RecipientField, v: string) {
+    if (key === 'to') this.toInput = v;
+    else if (key === 'cc') this.ccInput = v;
+    else this.bccInput = v;
+  }
+
+  addRecipient(key: RecipientField, person?: Person) {
+    if (!this.c) return;
+    const p = person ?? parseRecipient(this.inputOf(key));
+    if (!p) return;
+    if (!this.c[key].some((x) => sameAddress(x, p) && p.email)) this.c[key] = [...this.c[key], p];
+    this.setInput(key, '');
     this.err = '';
+    this.touch();
   }
 
-  removeRecipient(key: 'to' | 'cc', index: number) {
+  removeRecipient(key: RecipientField, index: number) {
     if (!this.c) return;
     this.c[key] = this.c[key].filter((_, j) => j !== index);
+    this.touch();
   }
 
-  recipientInput(key: 'to' | 'cc', value: string) {
-    if (key === 'to') {
-      this.toInput = value;
-      this.err = '';
-    } else {
-      this.ccInput = value;
-    }
+  recipientInput(key: RecipientField, value: string) {
+    this.setInput(key, value);
+    if (key === 'to') this.err = '';
     if (/[,;]$/.test(value)) this.addRecipient(key);
   }
 
-  recipientKey(key: 'to' | 'cc', e: KeyboardEvent) {
-    const input = key === 'to' ? this.toInput : this.ccInput;
+  recipientKey(key: RecipientField, e: KeyboardEvent) {
+    const input = this.inputOf(key);
     if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+      if (!input.trim()) return;
       e.preventDefault();
       this.addRecipient(key);
       return;
     }
     if (e.key === 'Backspace' && !input && this.c && this.c[key].length) {
       this.c[key] = this.c[key].slice(0, -1);
+      this.touch();
     }
   }
 
-  send() {
+  /** Destinatari scritti ma non ancora confermati con Invio o punto e virgola. */
+  private commitInputs() {
+    for (const key of ['to', 'cc', 'bcc'] as RecipientField[]) if (this.inputOf(key).trim()) this.addRecipient(key);
+  }
+
+  async addFiles() {
     if (!this.c) return;
-    const to = this.c.to.slice();
-    const pending = String(this.toInput || '').replace(/[,;]+$/, '').trim();
-    if (pending) to.push(pending);
-    if (!to.length) {
-      this.err = 'Aggiungi almeno un destinatario.';
-      return;
+    try {
+      const files = await this.backend.pickFiles();
+      if (files.length && this.c) {
+        this.c.attachments = [...this.c.attachments, ...files];
+        this.touch();
+      }
+    } catch (e) {
+      this.err = errorMessage(e);
     }
-    const c: Draft = { ...this.c, to, cc: this.c.cc.slice(), atts: this.c.atts.slice() };
-    const msg = this.msgFromDraft(c, 'sent');
-    const win = this.cWin;
-    this.sent = [msg, ...this.sent];
-    this.closeCompose();
-    this.toInput = '';
-    this.err = '';
-    this.lastSent = { msg, c, win };
-    this.flash('sent', 6000);
   }
 
-  undoSend() {
-    const ls = this.lastSent;
-    if (!ls) return;
-    this.sent = this.sent.filter((m) => m.id !== ls.msg.id);
-    this.lastSent = null;
+  removeAttachment(index: number) {
+    if (!this.c) return;
+    this.c.attachments = this.c.attachments.filter((_, i) => i !== index);
+    this.touch();
+  }
+
+  async send(): Promise<boolean> {
+    if (!this.c || this.sending) return false;
+    this.commitInputs();
+    const d = this.snapshot()!;
+    const all = [...d.to, ...d.cc, ...d.bcc];
+    if (!all.length) {
+      this.err = 'Aggiungi almeno un destinatario.';
+      return false;
+    }
+    const bad = all.find((p) => !validEmail(p.email));
+    if (bad) {
+      this.err = `L’indirizzo “${bad.email || bad.name}” non è valido. Scrivi l’indirizzo email completo.`;
+      return false;
+    }
+    clearTimeout(this.saveTimer);
+    this.sending = true;
+    try {
+      const win = this.cWin;
+      await this.backend.send(d);
+      this.lastSent = { key: d.key, win };
+      this.closeCompose();
+      this.err = '';
+      return true;
+    } catch (e) {
+      this.err = errorMessage(e);
+      return false;
+    } finally {
+      this.sending = false;
+    }
+  }
+
+  async undoSend() {
+    const t = this.toast;
+    if (!t?.outboxId) return;
     this.toast = null;
-    this.startCompose(ls.c, ls.win);
+    try {
+      const d = await this.backend.cancelSend(t.outboxId);
+      if (!d) {
+        this.flash({ kind: 'info', text: 'Il messaggio è già partito.' });
+        return;
+      }
+      const win = this.lastSent?.key === d.key ? this.lastSent.win : this.prefs.compose === 'finestra';
+      await this.stashDraft();
+      await this.present(d, win);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
   }
 
-  closeWin() {
-    const c = this.c;
-    if (!c) return;
-    const had = !this.isEmptyDraft(c);
-    this.stashDraft();
-    if (had) this.flash('draft', 5000);
+  /** Riapre un messaggio rimasto nella posta in uscita (per esempio dopo un errore). */
+  async openOutboxItem(id: number) {
+    if (this.toast?.outboxId === id) this.toast = null;
+    try {
+      const d = await this.backend.outboxTake(id);
+      if (!d) return;
+      await this.stashDraft();
+      await this.present(d, this.prefs.compose === 'finestra');
+      await this.reloadOutbox();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  async closeWin() {
+    const d = this.snapshot();
+    if (!d) return;
+    const had = !MailStore.isEmpty(d);
+    await this.stashDraft();
+    if (had) this.flash({ kind: 'draft', text: 'Bozza salvata in Bozze' }, 5000);
     else this.toast = null;
   }
 
-  discard() {
+  async discard() {
+    const d = this.snapshot();
     this.closeCompose();
     this.err = '';
+    if (d) await this.backend.discardDraft(d.accountId, d.key).catch(() => {});
   }
 
   popOut() {
+    const d = this.snapshot();
+    if (!d) return;
+    if (this.backend.real) {
+      this.closeCompose();
+      void this.present(d, true);
+      return;
+    }
     this.cWin = true;
     this.winMin = false;
     this.winMax = false;
     this.winTab = 'messaggio';
+  }
+
+  async contacts(prefix: string): Promise<Person[]> {
+    if (prefix.trim().length < 2) return [];
+    try {
+      return await this.backend.contacts(prefix.trim());
+    } catch {
+      return [];
+    }
+  }
+
+  // ---------- Allegati ed esportazione ----------
+
+  async openAttachment(index: number) {
+    if (this.sel === null) return;
+    await this.act(() => this.backend.openAttachment(this.sel!, index));
+  }
+
+  async saveAttachment(index: number, name: string) {
+    if (this.sel === null) return;
+    await this.act(async () => {
+      if (await this.backend.saveAttachment(this.sel!, index, name)) this.flash({ kind: 'info', text: `Allegato salvato: ${name}` });
+    });
+  }
+
+  async saveMessageAs() {
+    const m = this.detail;
+    if (!m) return;
+    await this.act(async () => {
+      const name = (m.subject || 'Messaggio').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+      if (await this.backend.exportEml(m.id, name)) this.flash({ kind: 'info', text: 'Messaggio salvato.' });
+    });
+  }
+
+  async exportFolder() {
+    const f = this.currentFolder;
+    if (!f) return;
+    await this.act(async () => {
+      const n = await this.backend.exportMbox(f.id, folderLabel(f));
+      if (n !== null) this.flash({ kind: 'info', text: n === 1 ? 'Esportato 1 messaggio.' : `Esportati ${n} messaggi.` });
+    });
+  }
+
+  async importArchive(kind: 'pst' | 'mbox') {
+    await this.act(async () => {
+      const a = await this.backend.importArchive(kind);
+      if (!a) return;
+      await this.reloadAccounts();
+      await this.reloadFolders();
+      this.backstage = false;
+      const first = this.foldersOf(a.id).find((f) => f.total > 0) ?? this.foldersOf(a.id)[0];
+      if (first) await this.pickFolder(first.id, `acc-${first.id}`);
+      this.flash({ kind: 'info', text: `File di dati aperto: ${a.name}` });
+    });
+  }
+
+  async openLink(url: string) {
+    if (url.toLowerCase().startsWith('mailto:')) {
+      const email = decodeURIComponent(url.slice(7).split('?')[0]);
+      if (email) await this.composeTo(email);
+      return;
+    }
+    await this.act(() => this.backend.openLink(url));
+  }
+
+  // ---------- Account ----------
+
+  openWizard(first = false) {
+    this.wizard = { open: true, first };
+    this.settings = false;
+    this.backstage = false;
+  }
+
+  closeWizard() {
+    this.wizard = { open: false, first: false };
+  }
+
+  async addAccount(input: NewAccount): Promise<AddResult> {
+    try {
+      const account = await this.backend.addAccount(input);
+      await this.reloadAccounts();
+      await this.reloadFolders();
+      const inbox = this.roleFolder(account.id, 'inbox');
+      if (inbox && (this.accounts.length === 1 || this.folderId === null)) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
+      return { ok: true, account };
+    } catch (e) {
+      return { ok: false, kind: errorKind(e), message: errorMessage(e) };
+    }
+  }
+
+  async updateSync(accountId: string, patch: Partial<SyncOptions>) {
+    const a = this.accounts.find((x) => x.id === accountId);
+    if (!a) return;
+    a.sync = { ...a.sync, ...patch };
+    await this.act(() => this.backend.updateAccount($state.snapshot(a) as Account));
+  }
+
+  async renameAccount(accountId: string, name: string) {
+    const a = this.accounts.find((x) => x.id === accountId);
+    if (!a || !name.trim()) return;
+    a.name = name.trim();
+    await this.act(() => this.backend.updateAccount($state.snapshot(a) as Account));
+  }
+
+  async setPassword(accountId: string, password: string): Promise<boolean> {
+    try {
+      await this.backend.setPassword(accountId, password);
+      this.flash({ kind: 'info', text: 'Password aggiornata.' });
+      return true;
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+      return false;
+    }
+  }
+
+  async removeAccount(accountId: string) {
+    await this.act(async () => {
+      await this.backend.removeAccount(accountId);
+      await this.reloadAccounts();
+      await this.reloadFolders();
+    });
   }
 
   // ---------- Preferenze ----------
@@ -586,6 +1193,7 @@ export class MailStore {
     this.prefs = { ...PRESETS[this.obChoice] };
     this.onboarding = false;
     this.save();
+    if (this.backend.real && !this.accounts.length) this.openWizard(true);
   }
 
   openSettings(page: 'aspetto' | 'account' | 'info' = 'aspetto') {
@@ -601,11 +1209,11 @@ export class MailStore {
   // ---------- Viste dimostrative ----------
 
   /**
-   * Porta l'interfaccia in uno degli stati mostrati nel prototipo.
-   * Serve per le schermate di prova e per i test; non salva nulla.
+   * Porta l'interfaccia in uno degli stati del prototipo, per le schermate di
+   * prova. Va chiamata dopo init(); non salva nulla.
    */
-  applyDemo(opts: { stile?: StyleName; view?: string; tema?: ThemeChoice; avvio?: boolean; offline?: boolean }) {
-    if (opts.offline !== undefined) this.offline = opts.offline;
+  async applyDemo(opts: { stile?: StyleName; view?: string; tema?: ThemeChoice; avvio?: boolean; offline?: boolean }) {
+    if (opts.offline !== undefined) this.netOffline = opts.offline;
     if (opts.stile) this.prefs = { ...PRESETS[opts.stile] };
     if (opts.tema) this.themeChoice = opts.tema;
     if (opts.avvio !== undefined) {
@@ -613,16 +1221,26 @@ export class MailStore {
       this.obChoice = opts.stile ?? 'classico';
     }
     const v = opts.view;
-    if (v === 'composizione') {
+    const acct = this.composeAccount();
+    if ((v === 'composizione' || v === 'inviato') && acct) {
       const win = this.prefs.compose === 'finestra';
-      this.startCompose(demoDraft(win), win);
-    } else if (v === 'inviato') {
-      const win = this.prefs.compose === 'finestra';
-      const c = demoDraft(win);
-      const msg = this.msgFromDraft(c, 'sent');
-      this.sent = [msg];
-      this.lastSent = { msg, c, win };
-      this.toast = { kind: 'sent', id: ++toastSeq };
+      const d = this.emptyDraft(acct.id);
+      d.to = [{ name: 'Davide Orlandi', email: 'd.orlandi@studiorlandi.it' }];
+      d.cc = [{ name: 'Marco Ventura', email: 'm.ventura@valliarredi.it' }];
+      if (win) {
+        d.subject = 'Campioni del rovere per Bassano';
+        d.body = 'Ciao Davide,\n\nil cliente vuole vedere i campioni del rovere prima di firmare il preventivo. Riesci a portarli giovedì in sede? Bastano il naturale e lo spazzolato.\n\nA presto,\nChiara';
+      } else if (this.detail) {
+        Object.assign(d, this.draftFrom('reply', this.detail, acct));
+        d.body = 'Ciao Davide,\n\ngrazie, la revisione va bene. Il cliente vuole però vedere i campioni del rovere prima di firmare: riesci a portarli giovedì in sede?\n\nA presto,\nChiara' + d.body;
+      }
+      if (v === 'composizione') {
+        this.startCompose(d, win);
+        this.savedAt = '09:04';
+      } else {
+        this.lastSent = { key: d.key, win };
+        await this.backend.send(d);
+      }
     } else if (v === 'file') {
       this.backstage = true;
       this.bsPage = 'info';
@@ -632,6 +1250,12 @@ export class MailStore {
       this.openSettings('account');
     } else if (v === 'informazioni') {
       this.openSettings('info');
+    } else if (v === 'aggiungi') {
+      this.openWizard(false);
+    } else if (v === 'newsletter') {
+      await this.pickTab('altre');
+    } else if (v === 'uscita') {
+      await this.pickOutbox('uscita');
     }
   }
 }

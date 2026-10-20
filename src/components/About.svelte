@@ -3,7 +3,8 @@
   // File (vista classica) e le Impostazioni (vista nuova).
   import Icon from '../lib/Icon.svelte';
   import Wordmark from './Wordmark.svelte';
-  import { appVersion } from '../lib/platform';
+  import { appVersion, REPO_URL } from '../lib/platform';
+  import { store } from '../lib/store.svelte';
 
   let version = $state('');
   $effect(() => {
@@ -17,9 +18,9 @@
   <p class="lead">Datini è un programma di posta libero e open source. La posta viaggia direttamente tra il tuo computer e il server del tuo provider.</p>
   <p class="story">Porta il nome di Francesco Datini, mercante di Prato del Trecento. Il suo archivio conserva circa 143.000 lettere d’affari scambiate con quasi trecento città.</p>
   <div class="links">
-    <button class="btn obtn"><Icon name="code" size={17} style="color:var(--brand-ink)" />Codice sorgente</button>
-    <button class="btn obtn"><Icon name="file-text" size={17} style="color:var(--brand-ink)" />Licenza</button>
-    <button class="btn obtn"><Icon name="bug" size={17} style="color:var(--danger)" />Segnala un problema</button>
+    <button class="btn obtn" onclick={() => store.openLink(REPO_URL)}><Icon name="code" size={17} style="color:var(--brand-ink)" />Codice sorgente</button>
+    <button class="btn obtn" onclick={() => store.openLink(`${REPO_URL}#licenza`)}><Icon name="file-text" size={17} style="color:var(--brand-ink)" />Licenza</button>
+    <button class="btn obtn" onclick={() => store.openLink(`${REPO_URL}/issues`)}><Icon name="bug" size={17} style="color:var(--danger)" />Segnala un problema</button>
   </div>
 </div>
 

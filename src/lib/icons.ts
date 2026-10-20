@@ -1,6 +1,23 @@
 // Registro delle icone usate dall'interfaccia. Tutte vengono da Tabler Icons
 // (licenza MIT, https://tabler.io/icons). Si importano una per una, così
 // nell'app finiscono solo quelle usate.
+import CircleCheck from '@tabler/icons-svelte/icons/circle-check';
+import CloudOff from '@tabler/icons-svelte/icons/cloud-off';
+import Database from '@tabler/icons-svelte/icons/database';
+import Download from '@tabler/icons-svelte/icons/download';
+import Eye from '@tabler/icons-svelte/icons/eye';
+import EyeOff from '@tabler/icons-svelte/icons/eye-off';
+import File from '@tabler/icons-svelte/icons/file';
+import FileTypeDoc from '@tabler/icons-svelte/icons/file-type-doc';
+import FileTypeJpg from '@tabler/icons-svelte/icons/file-type-jpg';
+import FileTypePpt from '@tabler/icons-svelte/icons/file-type-ppt';
+import FileTypeXls from '@tabler/icons-svelte/icons/file-type-xls';
+import Loader2 from '@tabler/icons-svelte/icons/loader-2';
+import Lock from '@tabler/icons-svelte/icons/lock';
+import MailUp from '@tabler/icons-svelte/icons/mail-up';
+import PhotoOff from '@tabler/icons-svelte/icons/photo-off';
+import ShieldLock from '@tabler/icons-svelte/icons/shield-lock';
+import MailExclamation from '@tabler/icons-svelte/icons/mail-exclamation';
 import AlertCircle from '@tabler/icons-svelte/icons/alert-circle';
 import AlertTriangle from '@tabler/icons-svelte/icons/alert-triangle';
 import AppWindow from '@tabler/icons-svelte/icons/app-window';
@@ -87,6 +104,23 @@ import WifiOff from '@tabler/icons-svelte/icons/wifi-off';
 import X from '@tabler/icons-svelte/icons/x';
 
 export const icons = {
+  'circle-check': CircleCheck,
+  'cloud-off': CloudOff,
+  database: Database,
+  download: Download,
+  eye: Eye,
+  'eye-off': EyeOff,
+  file: File,
+  'file-type-doc': FileTypeDoc,
+  'file-type-jpg': FileTypeJpg,
+  'file-type-ppt': FileTypePpt,
+  'file-type-xls': FileTypeXls,
+  'loader-2': Loader2,
+  lock: Lock,
+  'mail-up': MailUp,
+  'photo-off': PhotoOff,
+  'shield-lock': ShieldLock,
+  'mail-exclamation': MailExclamation,
   'alert-circle': AlertCircle,
   'alert-triangle': AlertTriangle,
   'app-window': AppWindow,

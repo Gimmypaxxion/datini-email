@@ -7,7 +7,7 @@ import { store } from './store.svelte';
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
 }
 
 export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }): void {
@@ -15,7 +15,7 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   const ctrl = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   const typing = isTyping(e.target);
-  const overlay = store.settings || store.backstage;
+  const overlay = store.settings || store.backstage || store.wizard.open;
 
   // La webview ricarica la pagina con Ctrl+R e F5, e apre la ricerca con Ctrl+F:
   // in un programma di posta questi tasti hanno altri significati.
@@ -28,9 +28,14 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   }
   if (overlay) return;
 
+  if (e.key === 'F9') {
+    e.preventDefault();
+    store.syncNow();
+    return;
+  }
   if (ctrl && !e.shiftKey && key === 'n') {
     e.preventDefault();
-    store.openCompose('new');
+    void store.openCompose('new');
     return;
   }
   if (ctrl && key === 'e') {
@@ -41,24 +46,24 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   if (typing) return;
 
   if (ctrl && key === 'r') {
-    store.openCompose(e.shiftKey ? 'replyAll' : 'reply');
+    void store.openCompose(e.shiftKey ? 'replyAll' : 'reply');
   } else if (ctrl && key === 'f') {
-    store.openCompose('forward');
+    void store.openCompose('forward');
   } else if (ctrl && key === 'q') {
     e.preventDefault();
-    store.setRead(store.sel, true);
+    void store.setRead(store.sel, true);
   } else if (ctrl && key === 'u') {
     e.preventDefault();
-    store.setRead(store.sel, false);
+    void store.setRead(store.sel, false);
   } else if (!ctrl && e.key === 'Delete') {
-    store.moveMsg(store.sel, 'deleted');
+    void store.deleteMsg(store.sel);
   } else if (!ctrl && e.key === 'Backspace') {
     e.preventDefault();
-    store.moveMsg(store.sel, 'archive');
+    void store.moveMsg(store.sel, 'archive');
   } else if (!ctrl && e.key === 'Insert') {
-    store.toggleFlag(store.sel);
+    void store.toggleFlag(store.sel);
   } else if (!ctrl && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
     e.preventDefault();
-    store.moveSelection(e.key === 'ArrowDown' ? 1 : -1);
+    void store.moveSelection(e.key === 'ArrowDown' ? 1 : -1);
   }
 }

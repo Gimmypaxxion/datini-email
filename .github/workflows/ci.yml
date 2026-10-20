@@ -1,5 +1,6 @@
-# Controlli a ogni modifica: tipi, test della logica, build dell'interfaccia
-# e compilazione del motore Rust.
+# Controlli a ogni modifica: tipi, test della logica, build dell'interfaccia,
+# test del motore Rust e collaudo completo contro un server di posta di prova
+# (Dovecot + SMTP) avviato sulla macchina di GitHub.
 name: Controlli
 
 on:
@@ -33,5 +34,16 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
-      - name: Compilazione Rust
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Test del motore
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Server di posta di prova
+        run: |
+          sudo apt-get install -y dovecot-imapd dovecot-pop3d dovecot-lmtpd
+          sudo pip install aiosmtpd || sudo pip install --break-system-packages aiosmtpd
+          sudo tools/posta-di-prova/avvia.sh
+
+      - name: Collaudo IMAP, SMTP e POP3
+        env:
+          DATINI_SERVER_PROVA: '1'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --test server_prova -- --test-threads=1

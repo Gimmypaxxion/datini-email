@@ -245,6 +245,47 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 [data-on="si"] .dot { box-shadow: inset 0 0 0 5.5px var(--brand); }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 680px; }
 
+/* Campi dei moduli: etichetta sopra, errore sotto */
+.tf { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tf > span { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.tf input, .tf select { height: 34px; box-sizing: border-box; padding: 0 10px; border: 0; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -1px 0 var(--ink-3); color: var(--ink); font: inherit; font-size: 14px; }
+.tf input:focus, .tf select:focus { outline: none; box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -2px 0 var(--brand); }
+.tf input:disabled, .tf select:disabled { opacity: .6; }
+.tf .hint { font-size: 12.5px; color: var(--ink-3); font-weight: 400; }
+.tf[data-bad="si"] input { box-shadow: inset 0 0 0 1px var(--danger), inset 0 -2px 0 var(--danger); }
+.primary-btn { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 0; border-radius: 4px; background: var(--brand); color: var(--on-brand); font-size: 14px; font-weight: 600; white-space: nowrap; transition: filter .15s ease-out; }
+.primary-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.primary-btn:active:not(:disabled) { transform: translateY(1px); }
+.sec-btn { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 0; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2); color: var(--ink); font-size: 14px; white-space: nowrap; }
+.sec-btn:hover:not(:disabled) { background: var(--rail); }
+.danger-btn { color: var(--danger); }
+
+/* Menu a comparsa (Sposta in, Altre azioni) */
+.menu { position: fixed; z-index: 40; min-width: 220px; max-width: 320px; max-height: min(420px, calc(100vh - 24px)); overflow: auto; padding: 4px; border-radius: 6px; background: var(--sheet); box-shadow: var(--win-shadow), 0 0 0 1px var(--rule-2); }
+.menu-it { width: 100%; min-height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; }
+.menu-it:hover:not(:disabled), .menu-it:focus-visible { background: var(--hover); outline: none; }
+.menu-it svg.i { color: var(--ink-2); }
+.menu-it .lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-sep { height: 1px; margin: 4px 6px; background: var(--rule); }
+.menu-h { padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+
+/* Caricamento: scheletri della stessa forma del contenuto */
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.skel { border-radius: 4px; background: linear-gradient(90deg, var(--rail) 0%, var(--rail-2) 50%, var(--rail) 100%) 0 0 / 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .9s linear infinite; }
+@keyframes indet { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.progress { position: relative; height: 3px; overflow: hidden; border-radius: 2px; background: var(--brand-soft); }
+.progress::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: 2px; background: var(--brand); animation: indet 1.2s cubic-bezier(.4, 0, .2, 1) infinite; }
+
+/* Avvisi in linea */
+.note-bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; font-size: 13.5px; line-height: 1.4; }
+.note-bar .t { flex: 1; min-width: 0; }
+.note-bar.info { background: var(--brand-soft); }
+.note-bar.warn { background: var(--warn-soft); }
+.note-bar .act { flex: none; height: 30px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.note-bar .act:hover { background: var(--hover); }
+
 /* Movimento */
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes win-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
@@ -253,7 +294,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .win-in { animation: win-in .22s cubic-bezier(.2, .8, .2, 1) both; }
 .fade-in { animation: fade .16s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .rise, .win-in, .fade-in { animation: none; }
+  .rise, .win-in, .fade-in, .skel, .spin { animation: none; }
+  .progress::after { animation-duration: 3s; }
   .btn, .primary, .rb, .hbtn, .row .row-main, .dot, .opt, .obc { transition: none; }
 }
 

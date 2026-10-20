@@ -8,8 +8,10 @@
   import Backstage from './components/Backstage.svelte';
   import Settings from './components/Settings.svelte';
   import Onboarding from './components/Onboarding.svelte';
+  import AccountWizard from './components/AccountWizard.svelte';
+  import StatusBar from './components/StatusBar.svelte';
   import Icon from './lib/Icon.svelte';
-  import { store, FOLDER_NAMES } from './lib/store.svelte';
+  import { store } from './lib/store.svelte';
   import { setWindowTitle } from './lib/platform';
   import { handleShortcut } from './lib/shortcuts';
 
@@ -20,9 +22,9 @@
     document.documentElement.dataset.theme = store.theme;
   });
 
-  // Titolo della finestra del sistema, come in Outlook.
+  // Titolo della finestra del sistema, come in Outlook: "Posta in arrivo - Datini".
   $effect(() => {
-    const where = store.c && store.cWin ? store.c.subj || 'Nuovo messaggio' : FOLDER_NAMES[store.folder];
+    const where = store.c && store.cWin ? store.c.subject || 'Nuovo messaggio' : store.listTitle || 'Posta';
     setWindowTitle(`${where} - Datini`);
   });
 
@@ -48,6 +50,7 @@
           aria-label={a.label}
           aria-current={a.current ? 'page' : undefined}
           title="{a.label} ({a.key})"
+          onclick={() => !a.current && store.soon(a.label)}
         >
           <Icon name={a.icon} size={20} stroke={a.current ? 1.7 : 1.6} />
         </button>
@@ -57,9 +60,11 @@
     <MessageList />
     <ReadingPane />
   </div>
+  <StatusBar />
   <ComposeWindow />
   <Backstage />
   <Settings />
+  <AccountWizard />
   <Onboarding />
 </div>
 

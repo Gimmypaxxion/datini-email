@@ -34,7 +34,7 @@
     title?: string;
     cls?: string;
     pressed?: boolean;
-    onclick?: () => void;
+    onclick?: (e: MouseEvent) => void;
   } = $props();
 </script>
 

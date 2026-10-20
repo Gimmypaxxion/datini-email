@@ -1,6 +1,9 @@
 // Collegamento con Tauri. Se l'interfaccia gira in un normale browser
 // (sviluppo, test, anteprime), le funzioni non fanno nulla e non si rompono.
 
+/** Repository pubblico del progetto. */
+export const REPO_URL = 'https://github.com/Gimmypaxxion/datini-email';
+
 export const inTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export async function appVersion(): Promise<string> {

@@ -1,13 +1,13 @@
 <script lang="ts">
-  // Messaggio in una finestra separata (vista classica).
-  // Fase 1: è una finestra interna all'app. Nella fase 4 diventerà una vera
-  // finestra del sistema operativo, come in Outlook classico.
+  // Messaggio in una finestra interna all'app. Nell'app installata i messaggi
+  // si aprono in una vera finestra del sistema (ComposeApp.svelte): questa
+  // resta per l'anteprima nel browser.
   import Icon from '../lib/Icon.svelte';
   import Composer from './Composer.svelte';
   import RibbonCompose from './RibbonCompose.svelte';
   import { store } from '../lib/store.svelte';
 
-  const title = $derived(store.c?.subj || 'Nuovo messaggio');
+  const title = $derived(store.c?.subject || 'Nuovo messaggio');
 </script>
 
 {#if store.winOpen}
