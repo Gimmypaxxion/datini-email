@@ -59,6 +59,11 @@ sed "s#@CONF@#$CONF#g; s#@DATI@#$DATI#g; s#@RUN@#$RUN#g" "$QUI/dovecot.conf" > "
 chown -R vmail:vmail "$DATI"
 
 ferma
+# Il Dovecot di sistema (avviato dall'installazione del pacchetto) occupa le
+# stesse porte: va fermato.
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet dovecot 2>/dev/null; then
+  systemctl stop dovecot
+fi
 sleep 0.5
 dovecot -c "$CONF/dovecot.conf"
 nohup python3 "$QUI/smtp_prova.py" "$CONF" >/var/log/smtp-prova.log 2>&1 </dev/null &

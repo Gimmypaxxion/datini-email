@@ -7,6 +7,7 @@ use std::time::SystemTime;
 
 use lettre::message::header::{ContentType, HeaderName, HeaderValue};
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
+use base64::Engine;
 use mail_parser::{Address, HeaderValue as PHeader, Message, MessageParser, MimeHeaders};
 
 use crate::db::{Envelope, NewMessage};
@@ -14,6 +15,9 @@ use crate::error::{Error, Result};
 use crate::model::*;
 
 pub const DRAFT_HEADER: &str = "X-Datini-Draft-Id";
+/// Destinatari di una bozza scritti in modo incompleto (per esempio solo un
+/// nome): non sono indirizzi validi, ma la bozza deve conservarli.
+pub const PENDING_HEADER: &str = "X-Datini-Draft-Pending";
 
 /// Identificativo casuale (non crittografico) per Message-ID e bozze.
 pub fn random_id() -> String {
@@ -239,7 +243,15 @@ impl Parsed<'_> {
 
     /// Ricostruisce una bozza da un messaggio salvato.
     pub fn to_draft(&self, account_id: &str, local_id: i64) -> Draft {
-        let rc = self.recipients();
+        let mut rc = self.recipients();
+        if let Some(p) = self.msg.header_raw(PENDING_HEADER) {
+            let compact: String = p.split_whitespace().collect();
+            if let Some(extra) = base64::engine::general_purpose::STANDARD.decode(compact).ok().and_then(|b| serde_json::from_slice::<Recipients>(&b).ok()) {
+                rc.to.extend(extra.to);
+                rc.cc.extend(extra.cc);
+                rc.bcc.extend(extra.bcc);
+            }
+        }
         let attachments = self
             .attachments()
             .into_iter()
@@ -277,6 +289,21 @@ impl lettre::message::header::Header for DraftIdHeader {
     }
     fn parse(s: &str) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         Ok(DraftIdHeader(s.to_string()))
+    }
+    fn display(&self) -> HeaderValue {
+        HeaderValue::new(Self::name(), self.0.clone())
+    }
+}
+
+#[derive(Clone)]
+struct PendingHeader(String);
+
+impl lettre::message::header::Header for PendingHeader {
+    fn name() -> HeaderName {
+        HeaderName::new_from_ascii_str(PENDING_HEADER)
+    }
+    fn parse(s: &str) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(PendingHeader(s.to_string()))
     }
     fn display(&self) -> HeaderValue {
         HeaderValue::new(Self::name(), self.0.clone())
@@ -349,6 +376,29 @@ pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_dra
     let domain = account.email.split('@').nth(1).unwrap_or("datini.local").to_string();
     let message_id = format!("{}@{}", random_id(), domain);
 
+    // In una bozza gli indirizzi non validi non fermano il salvataggio:
+    // si conservano a parte e si ritrovano quando la bozza si riapre.
+    let mut pending = Recipients::default();
+    let valid = |list: &[Person], out: &mut Vec<Person>| -> Result<Vec<Mailbox>> {
+        let mut v = Vec::new();
+        for p in list {
+            match mailbox(p) {
+                Ok(m) => v.push(m),
+                Err(e) if !as_draft => return Err(e),
+                Err(_) => out.push(p.clone()),
+            }
+        }
+        Ok(v)
+    };
+    let to = valid(&d.to, &mut pending.to)?;
+    let cc = valid(&d.cc, &mut pending.cc)?;
+    let bcc = valid(&d.bcc, &mut pending.bcc)?;
+    let pending_json = if pending.to.is_empty() && pending.cc.is_empty() && pending.bcc.is_empty() {
+        None
+    } else {
+        Some(base64::engine::general_purpose::STANDARD.encode(serde_json::to_vec(&pending).unwrap_or_default()))
+    };
+
     let make = |keep_bcc: bool| -> Result<Vec<u8>> {
         let mut b = lettre::Message::builder()
             .from(from.clone())
@@ -356,14 +406,14 @@ pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_dra
             .message_id(Some(format!("<{message_id}>")))
             .date(SystemTime::now())
             .header(XMailer);
-        for p in &d.to {
-            b = b.to(mailbox(p)?);
+        for m in &to {
+            b = b.to(m.clone());
         }
-        for p in &d.cc {
-            b = b.cc(mailbox(p)?);
+        for m in &cc {
+            b = b.cc(m.clone());
         }
-        for p in &d.bcc {
-            b = b.bcc(mailbox(p)?);
+        for m in &bcc {
+            b = b.bcc(m.clone());
         }
         if let Some(irt) = &d.in_reply_to {
             b = b.in_reply_to(format!("<{}>", irt.trim_matches(|c| c == '<' || c == '>')));
@@ -374,6 +424,9 @@ pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_dra
         }
         if as_draft {
             b = b.header(DraftIdHeader(d.key.clone()));
+            if let Some(p) = &pending_json {
+                b = b.header(PendingHeader(p.clone()));
+            }
         }
         if keep_bcc {
             b = b.keep_bcc();
@@ -486,6 +539,18 @@ mod tests {
         assert!(!parse(raw).unwrap().to_new_message(0, true, 0).focused);
         let raw = b"From: Davide <d.orlandi@studiorlandi.it>\r\nSubject: Preventivo\r\n\r\nciao\r\n";
         assert!(parse(raw).unwrap().to_new_message(0, true, 0).focused);
+    }
+
+    #[test]
+    fn drafts_keep_incomplete_recipients() {
+        let mut d = draft();
+        d.to.push(Person::new("Mario Rossi", ""));
+        d.bcc = vec![Person::new("", "non-valido")];
+        let b = build(&account(), &d, &[], true).unwrap();
+        let back = parse(&b.copy).unwrap().to_draft("a", 1);
+        assert_eq!(back.to, d.to);
+        assert_eq!(back.bcc, d.bcc);
+        assert!(build(&account(), &d, &[], false).is_err());
     }
 
     #[test]

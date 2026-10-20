@@ -176,7 +176,9 @@
   <textarea bind:this={bodyEl} id="body-{uid}" class="ph bare scroll body" value={c.body} oninput={(e) => store.setBody(e.currentTarget.value)} placeholder="Scrivi il messaggio"></textarea>
   <div class="foot">
     <button class="btn attach" onclick={() => store.addFiles()}><Icon name="paperclip" size={17} style="color:var(--brand-ink)" />Allega file</button>
-    <span class="status" aria-live="polite">{store.savedAt ? `Bozza salvata alle ${store.savedAt}` : 'Bozza non ancora salvata'}</span>
+    <span class="status" class:bad={!!store.saveError} aria-live="polite" title={store.saveError || undefined}>
+      {store.saveError ? 'Bozza non salvata: riprovo alla prossima modifica' : store.savedAt ? `Bozza salvata alle ${store.savedAt}` : 'Bozza non ancora salvata'}
+    </span>
     <button class="btn discard" onclick={() => store.discard()}><Icon name="trash" size={17} style="color:var(--ink-2)" />Elimina bozza</button>
   </div>
 </div>
@@ -208,4 +210,5 @@
   .foot { display: flex; align-items: center; gap: 12px; padding: 8px 14px 10px 18px; box-shadow: inset 0 1px 0 var(--rule); }
   .attach, .discard { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border: 0; border-radius: 4px; background: transparent; font-size: 13.5px; }
   .status { flex: 1; font-size: 12.5px; color: var(--ink-3); text-align: right; }
+  .status.bad { color: var(--danger); }
 </style>

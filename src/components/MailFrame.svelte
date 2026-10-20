@@ -13,13 +13,30 @@
   function setup() {
     const doc = frame?.contentDocument;
     if (!doc) return;
+    // Le email pensate per 600-700 pixel si rimpiccioliscono per entrare nel
+    // riquadro, invece di essere tagliate a destra.
     const measure = () => {
-      height = Math.max(doc.documentElement?.scrollHeight ?? 0, doc.body?.scrollHeight ?? 0, 40) + 4;
+      const body = doc.body;
+      if (!body || !frame) return;
+      body.style.transform = '';
+      body.style.width = '';
+      doc.documentElement.style.overflowX = '';
+      const avail = frame.clientWidth;
+      const natural = Math.max(doc.documentElement.scrollWidth, body.scrollWidth);
+      const scale = natural > avail + 4 ? Math.max(0.55, avail / natural) : 1;
+      if (scale < 1) {
+        body.style.transformOrigin = '0 0';
+        body.style.transform = `scale(${scale})`;
+        body.style.width = `${natural}px`;
+        doc.documentElement.style.overflowX = 'hidden';
+      }
+      height = Math.ceil(Math.max(body.scrollHeight, 40) * scale) + 6;
     };
     measure();
     observer?.disconnect();
-    observer = new ResizeObserver(measure);
-    observer.observe(doc.documentElement);
+    observer = new ResizeObserver(() => measure());
+    observer.observe(frame!);
+    if (doc.body) observer.observe(doc.body);
     for (const img of doc.querySelectorAll('img')) img.addEventListener('load', measure);
     for (const a of doc.querySelectorAll('a[href]')) {
       // L'indirizzo vero si vede passandoci sopra: aiuta a riconoscere i collegamenti ingannevoli.

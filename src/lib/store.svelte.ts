@@ -172,6 +172,7 @@ export class MailStore {
   showBcc = $state(false);
   err = $state('');
   savedAt = $state('');
+  saveError = $state('');
   sending = $state(false);
   toast = $state<Toast | null>(null);
   private lastSent: LastSent | null = null;
@@ -687,6 +688,7 @@ export class MailStore {
     this.winMin = false;
     this.winMax = false;
     this.savedAt = '';
+    this.saveError = '';
     this.toInput = '';
     this.ccInput = '';
     this.bccInput = '';
@@ -853,9 +855,11 @@ export class MailStore {
         const same = this.c.attachments.length === d.attachments.length && this.c.attachments.every((a, i) => a.name === d.attachments[i].name);
         if (same) this.c.attachments = r.attachments;
         this.savedAt = clock().hhmm;
+        this.saveError = '';
       }
     } catch (e) {
-      this.err = errorMessage(e);
+      // Il salvataggio automatico non interrompe chi scrive: lo segnala nel piede.
+      this.saveError = errorMessage(e);
     }
   }
 
