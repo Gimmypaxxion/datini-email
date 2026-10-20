@@ -1,9 +1,13 @@
 <script lang="ts">
-  // Impostazioni: Aspetto, Account e sincronizzazione, Informazioni su Datini.
+  // Impostazioni: Aspetto, Account e sincronizzazione, Composizione e
+  // risposta (firme e carattere), Informazioni su Datini.
   import Icon from '../lib/Icon.svelte';
   import About from './About.svelte';
+  import RichEditor from './RichEditor.svelte';
+  import LinkDialog from './LinkDialog.svelte';
   import { store, type Prefs, type ThemeChoice } from '../lib/store.svelte';
-  import type { ServerConfig, SyncOptions } from '../lib/types';
+  import { EditorCtl, FONTS, SIZES, fontStack } from '../lib/editor.svelte';
+  import type { ServerConfig, Signature, SyncOptions } from '../lib/types';
 
   interface Opt {
     on: boolean;
@@ -53,6 +57,7 @@
   const nav = [
     ['aspetto', 'Aspetto'],
     ['account', 'Account e sincronizzazione'],
+    ['composizione', 'Composizione e risposta'],
     ['info', 'Informazioni su Datini'],
   ] as const;
 
@@ -75,6 +80,77 @@
     confirmRemove = false;
     newPw = '';
   });
+
+  // ---------- Firme ----------
+  const sigEd = new EditorCtl();
+  const senders = $derived(store.accounts.filter((a) => store.canSend(a)));
+  let sigSel = $state<string | null>(null);
+  let sigName = $state('');
+  let sigHtml = $state('');
+  let sigDirty = $state(false);
+  let sigNote = $state('');
+  let sigVersion = $state(0);
+  let sigConfirm = $state(false);
+  let linkBtn: HTMLButtonElement | undefined = $state();
+  let linkOpen = $state(false);
+  let sigImg: HTMLInputElement | undefined = $state();
+
+  /** La prima firma parte già scritta: nome e indirizzo dell'account, da completare. */
+  function starterSignature(): string {
+    const a = senders[0];
+    if (!a) return '';
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const name = a.name && a.name.trim() && a.name !== a.email ? `<div><b>${esc(a.name.trim())}</b></div>` : '';
+    return `${name}<div>${esc(a.email)}</div>`;
+  }
+
+  function pickSig(s: Signature | null) {
+    sigSel = s?.id ?? null;
+    sigName = s?.name ?? (store.signatures.length ? '' : 'Firma');
+    sigHtml = s?.html ?? (store.signatures.length ? '' : starterSignature());
+    sigDirty = false;
+    sigNote = '';
+    sigConfirm = false;
+    sigVersion++;
+  }
+
+  // All'apertura della pagina: la prima firma, oppure una nuova da scrivere.
+  let sigInit = false;
+  $effect(() => {
+    if (store.settings && store.setPage === 'composizione') {
+      if (!sigInit) {
+        sigInit = true;
+        pickSig(store.signatures[0] ?? null);
+      }
+    } else {
+      sigInit = false;
+    }
+  });
+
+  async function saveSig() {
+    const first = !store.signatures.length;
+    const saved = await store.saveSignature({ id: sigSel ?? '', name: sigName.trim() || 'Firma', html: sigHtml });
+    if (!saved) return;
+    sigSel = saved.id;
+    sigName = saved.name;
+    sigDirty = false;
+    sigNote = first && senders.length ? 'Firma salvata. Da ora viene aggiunta da sola ai nuovi messaggi e alle risposte: puoi cambiarlo qui sotto.' : 'Firma salvata.';
+  }
+
+  async function removeSig() {
+    if (!sigSel) return;
+    await store.deleteSignature(sigSel);
+    pickSig(store.signatures[0] ?? null);
+  }
+
+  function sigImages(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+    input.value = '';
+    if (files.length) void sigEd.insertImageFiles(files);
+  }
+
+  const sizeText = (s: number) => String(s).replace('.', ',');
 
   async function savePw() {
     if (!acct || !newPw) return;
@@ -247,6 +323,125 @@
               </div>
             {/if}
           </div>
+        {:else if store.setPage === 'composizione'}
+          <h3>Composizione e risposta</h3>
+          <p class="intro">La firma in fondo ai messaggi e il carattere del testo che scrivi.</p>
+
+          <div class="group-a">
+            <h4 class="tight">Firma e-mail</h4>
+            {#if store.signatures.length}
+              <p class="hint">Scrivila qui sotto oppure incollala da un documento o da un sito: testo formattato e logo compresi.</p>
+            {:else}
+              <p class="hint">Nome e indirizzo sono già scritti: aggiungi ruolo, azienda e telefono, poi Salva. Puoi anche incollare la firma che usi oggi, copiandola da un messaggio inviato, logo compreso.</p>
+            {/if}
+            <div class="sig-grid">
+              <div class="sig-list" role="listbox" aria-label="Firme">
+                {#each store.signatures as s (s.id)}
+                  {@const on = sigSel === s.id}
+                  <button class="btn fold sig-it" role="option" aria-selected={on} data-sel={on ? 'si' : 'no'} onclick={() => pickSig(s)}><Icon name="signature" size={16} />{s.name}</button>
+                {/each}
+                {#if !store.signatures.length}<p class="sig-empty">Non hai ancora una firma.</p>{/if}
+                <button class="btn add" onclick={() => pickSig(null)}><Icon name="plus" size={16} />Nuova firma</button>
+              </div>
+              <div class="sig-edit">
+                <label class="tf" style="max-width:320px">
+                  <span>Nome della firma <span class="hint">serve solo a te, per riconoscerla</span></span>
+                  <input bind:value={sigName} oninput={() => { sigDirty = true; sigNote = ''; }} placeholder="Per esempio: Firma ufficio" />
+                </label>
+                <div class="sig-box">
+                  <div class="sig-bar" role="toolbar" aria-label="Formato della firma">
+                    <select class="sig-sel" aria-label="Tipo di carattere" value={sigEd.font} onchange={(e) => sigEd.setFont(e.currentTarget.value)} disabled={!sigEd.ready} style:width="118px">
+                      {#if sigEd.font && !FONTS.some((f) => f.name === sigEd.font)}<option value={sigEd.font}>{sigEd.font}</option>{/if}
+                      {#each FONTS as f (f.name)}<option value={f.name}>{f.name}</option>{/each}
+                    </select>
+                    <select class="sig-sel" aria-label="Dimensione carattere" value={String(sigEd.size ?? store.font.size)} onchange={(e) => sigEd.setSize(Number(e.currentTarget.value))} disabled={!sigEd.ready} style:width="58px">
+                      {#if sigEd.size && !SIZES.includes(sigEd.size)}<option value={String(sigEd.size)}>{sizeText(sigEd.size)}</option>{/if}
+                      {#each SIZES as sz (sz)}<option value={String(sz)}>{sizeText(sz)}</option>{/each}
+                    </select>
+                    <span class="sig-sep"></span>
+                    <button class="rb ico lt" aria-label="Grassetto" title="Grassetto (Ctrl+G)" aria-pressed={sigEd.bold} onmousedown={(e) => e.preventDefault()} onclick={() => sigEd.toggleBold()}><span style="font-weight:700">G</span></button>
+                    <button class="rb ico lt" aria-label="Corsivo" title="Corsivo (Ctrl+I)" aria-pressed={sigEd.italic} onmousedown={(e) => e.preventDefault()} onclick={() => sigEd.toggleItalic()}><span style="font-style:italic;font-family:Georgia,serif">C</span></button>
+                    <button class="rb ico lt" aria-label="Sottolineato" title="Sottolineato (Ctrl+S)" aria-pressed={sigEd.underline} onmousedown={(e) => e.preventDefault()} onclick={() => sigEd.toggleUnderline()}><span style="text-decoration:underline;text-underline-offset:2px">S</span></button>
+                    <label class="rb ico sig-color" title="Colore carattere">
+                      <Icon name="text-color" /><span class="bar" style:background={sigEd.lastColor}></span>
+                      <input type="color" aria-label="Colore carattere" value={sigEd.lastColor.toLowerCase()} onchange={(e) => sigEd.setColor(e.currentTarget.value.toUpperCase())} />
+                    </label>
+                    <span class="sig-sep"></span>
+                    <button class="rb ico" bind:this={linkBtn} aria-label="Collegamento" title="Inserisci collegamento (Ctrl+K)" aria-pressed={sigEd.link} onmousedown={(e) => e.preventDefault()} onclick={() => (linkOpen = true)}><Icon name="link" /></button>
+                    <button class="rb ico" aria-label="Immagine" title="Inserisci un'immagine, per esempio il logo" onmousedown={(e) => e.preventDefault()} onclick={() => sigImg?.click()}><Icon name="photo" /></button>
+                    <button class="rb ico" aria-label="Cancella formattazione" title="Cancella formattazione" onmousedown={(e) => e.preventDefault()} onclick={() => sigEd.clearFormat()}><Icon name="clear-formatting" /></button>
+                    <input bind:this={sigImg} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onchange={sigImages} />
+                  </div>
+                  <div class="sig-area">
+                    <RichEditor
+                      ctl={sigEd}
+                      docKey="firma-{sigVersion}"
+                      html={sigHtml}
+                      font={store.font}
+                      label="Testo della firma"
+                      placeholder="Per esempio: nome, ruolo, azienda, telefono"
+                      onchange={(h, t) => { sigHtml = t || /<img/i.test(h) ? h : ''; sigDirty = true; sigNote = ''; }}
+                      onlink={() => (linkOpen = true)}
+                      fetchImage={(u) => store.backend.fetchImage(u)}
+                    />
+                  </div>
+                </div>
+                {#if linkOpen && linkBtn}
+                  <LinkDialog ctl={sigEd} anchor={linkBtn} onclose={() => (linkOpen = false)} />
+                {/if}
+                <div class="sig-acts">
+                  <button class="primary-btn" onclick={saveSig} disabled={!sigHtml || (!sigDirty && !!sigSel)}><Icon name="device-floppy" size={17} />Salva</button>
+                  {#if sigSel}
+                    {#if sigConfirm}
+                      <span class="sig-q">Eliminare “{sigName}”?</span>
+                      <button class="sec-btn danger-btn" onclick={removeSig}>Elimina</button>
+                      <button class="sec-btn" onclick={() => (sigConfirm = false)}>Annulla</button>
+                    {:else}
+                      <button class="sec-btn" onclick={() => (sigConfirm = true)}><Icon name="trash" size={16} />Elimina</button>
+                    {/if}
+                  {/if}
+                  <span class="sig-note" role="status">{sigNote || (sigDirty && sigHtml ? 'Modifiche non ancora salvate' : '')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="group-a">
+            <h4 class="tight">Firma predefinita</h4>
+            <p class="hint">Quale firma aggiungere da sola. Puoi sempre metterne un'altra dal pulsante Firma mentre scrivi.</p>
+            {#if !senders.length}
+              <p class="hint">Aggiungi un account di posta per scegliere la sua firma.</p>
+            {:else}
+              <div class="defs">
+                <span class="dh">Account</span><span class="dh">Nuovi messaggi</span><span class="dh">Risposte e inoltri</span>
+                {#each senders as a (a.id)}
+                  <span class="da">{a.email}</span>
+                  <select class="sig-sel" aria-label="Firma per i nuovi messaggi da {a.email}" value={a.signatureNew ?? ''} onchange={(e) => store.setAccountSignature(a.id, 'new', e.currentTarget.value || null)}>
+                    <option value="">(nessuna)</option>
+                    {#each store.signatures as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+                  </select>
+                  <select class="sig-sel" aria-label="Firma per risposte e inoltri da {a.email}" value={a.signatureReply ?? ''} onchange={(e) => store.setAccountSignature(a.id, 'reply', e.currentTarget.value || null)}>
+                    <option value="">(nessuna)</option>
+                    {#each store.signatures as s (s.id)}<option value={s.id}>{s.name}</option>{/each}
+                  </select>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <div class="group-a">
+            <h4 class="tight">Carattere dei nuovi messaggi</h4>
+            <p class="hint">Vale per i messaggi che scrivi, le risposte e gli inoltri.</p>
+            <div class="font-row">
+              <select class="sig-sel" aria-label="Tipo di carattere predefinito" value={store.font.family} onchange={(e) => store.setFont({ ...store.font, family: e.currentTarget.value })} style:width="180px">
+                {#each FONTS as f (f.name)}<option value={f.name}>{f.name}</option>{/each}
+              </select>
+              <select class="sig-sel" aria-label="Dimensione predefinita" value={String(store.font.size)} onchange={(e) => store.setFont({ ...store.font, size: Number(e.currentTarget.value) })} style:width="72px">
+                {#each SIZES as sz (sz)}<option value={String(sz)}>{sizeText(sz)}</option>{/each}
+              </select>
+            </div>
+            <p class="preview" style:font-family={fontStack(store.font.family)} style:font-size="{store.font.size}pt">Gentile cliente, le invio il preventivo aggiornato.</p>
+          </div>
         {:else}
           <h3>Informazioni su Datini</h3>
           <div style="margin-top:30px"><About /></div>
@@ -296,5 +491,31 @@
   .rm-acts { display: flex; gap: 8px; }
   .noacc { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--ink-2); }
   .noacc p { margin: 0; }
+  .sig-grid { margin-top: 4px; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .sig-list { display: flex; flex-direction: column; gap: 4px; }
+  .sig-it { height: 36px; gap: 8px; padding: 0 12px; font-size: 13.5px; }
+  .sig-it :global(svg) { color: var(--brand-ink); flex: none; }
+  .sig-empty { margin: 4px 12px 2px; font-size: 13.5px; color: var(--ink-2); }
+  .sig-edit { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .sig-box { border: 1px solid var(--rule-2); border-radius: 4px; overflow: hidden; }
+  .sig-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px 6px; background: var(--rail); box-shadow: inset 0 -1px 0 var(--rule-2); }
+  .sig-bar .rb { height: 30px; }
+  .sig-bar .rb.ico { width: 30px; }
+  .sig-sep { width: 1px; height: 20px; margin: 0 3px; background: var(--rule-2); }
+  .sig-sel { height: 30px; box-sizing: border-box; padding: 0 6px; border: 0; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2); color: var(--ink); font: inherit; font-size: 13.5px; }
+  .sig-sel:focus { outline: none; box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -2px 0 var(--brand); }
+  .sig-area { height: 210px; display: flex; flex-direction: column; background: #ffffff; }
+  .lt span { font-size: 15px; line-height: 1; color: var(--ink); }
+  .sig-color { position: relative; cursor: pointer; }
+  .sig-color .bar { position: absolute; left: 7px; right: 7px; bottom: 4px; height: 3px; border-radius: 1px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent); }
+  .sig-color input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+  .sig-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sig-q { font-size: 13.5px; }
+  .sig-note { flex: 1; min-width: 180px; font-size: 13px; color: var(--ink-2); }
+  .defs { display: grid; grid-template-columns: minmax(0, 1fr) 190px 190px; column-gap: 12px; row-gap: 8px; align-items: center; max-width: 640px; }
+  .dh { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+  .da { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+  .font-row { display: flex; gap: 8px; }
+  .preview { margin: 14px 0 0; padding: 12px 14px; border-radius: 4px; background: #ffffff; color: #000000; box-shadow: inset 0 0 0 1px var(--rule-2); max-width: 520px; }
   .note { margin-top: 22px; display: flex; gap: 12px; padding: 12px 14px; border-radius: 4px; background: var(--warn-soft); font-size: 13.5px; line-height: 1.5; }
 </style>

@@ -22,6 +22,11 @@
   let el: HTMLDivElement | undefined = $state();
   let pos = $state({ left: 0, top: 0 });
 
+  // In fondo alla pagina, così la posizione è sempre quella dello schermo.
+  $effect(() => {
+    if (el && el.parentElement !== document.body) document.body.appendChild(el);
+  });
+
   $effect(() => {
     const r = anchor.getBoundingClientRect();
     const w = el?.offsetWidth ?? 240;
@@ -46,8 +51,9 @@
     const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
     if (e.key === 'Escape') {
       e.stopPropagation();
+      const a = anchor;
       onclose();
-      anchor.focus();
+      a?.focus();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       buttons[(i + 1) % buttons.length]?.focus();

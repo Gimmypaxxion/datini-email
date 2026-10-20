@@ -29,6 +29,30 @@ use crate::db::Db;
 use crate::engine::Engine;
 use crate::secrets::{Keyring, Memory, Secrets};
 
+/// Le prime versioni salvavano i dati in una cartella con un altro
+/// identificativo dell'app: se c'è ancora, diventa la cartella di Datini.
+fn migrate_old_data_dir(dir: &std::path::Path) {
+    const OLD_ID: &str = "com.paxxion.datini";
+    let Some(parent) = dir.parent() else { return };
+    let old = parent.join(OLD_ID);
+    if old == dir || !old.join("datini.db").exists() || dir.join("datini.db").exists() {
+        return;
+    }
+    // La cartella nuova può esistere già (il sistema ci mette i dati della
+    // finestra): si spostano i file uno per uno, senza toccare quelli presenti.
+    if std::fs::create_dir_all(dir).is_err() {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(&old) else { return };
+    for e in entries.flatten() {
+        let dest = dir.join(e.file_name());
+        if !dest.exists() {
+            let _ = std::fs::rename(e.path(), dest);
+        }
+    }
+    let _ = std::fs::remove_dir(&old);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     net::install_crypto();
@@ -36,7 +60,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let dir = std::env::var_os("DATINI_DATI").map(std::path::PathBuf::from).unwrap_or(app.path().app_data_dir()?);
+            let dir = match std::env::var_os("DATINI_DATI") {
+                Some(d) => std::path::PathBuf::from(d),
+                None => {
+                    let dir = app.path().app_data_dir()?;
+                    migrate_old_data_dir(&dir);
+                    dir
+                }
+            };
             std::fs::create_dir_all(&dir)?;
             let db = Db::open(&dir.join("datini.db"))?;
             let secrets: Arc<dyn Secrets> = if std::env::var("DATINI_PORTACHIAVI").as_deref() == Ok("memoria") {
@@ -68,6 +99,11 @@ pub fn run() {
             commands::messages,
             commands::search,
             commands::message,
+            commands::quote_html,
+            commands::signatures,
+            commands::save_signature,
+            commands::delete_signature,
+            commands::fetch_image,
             commands::set_flags,
             commands::move_messages,
             commands::move_to_role,
@@ -94,4 +130,26 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("errore durante l'avvio di Datini");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn old_data_folder_moves_to_the_new_one() {
+        let base = std::env::temp_dir().join(format!("datini-migra-{}", crate::mime::random_id()));
+        let old = base.join("com.paxxion.datini");
+        let new = base.join("app.datini");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::create_dir_all(&new).unwrap();
+        std::fs::write(old.join("datini.db"), b"archivio").unwrap();
+        std::fs::write(new.join("finestra.dat"), b"x").unwrap();
+        super::migrate_old_data_dir(&new);
+        assert_eq!(std::fs::read(new.join("datini.db")).unwrap(), b"archivio");
+        assert!(new.join("finestra.dat").exists());
+        assert!(!old.exists());
+        // Una seconda volta non fa nulla.
+        super::migrate_old_data_dir(&new);
+        assert!(new.join("datini.db").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }

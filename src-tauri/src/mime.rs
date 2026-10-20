@@ -241,6 +241,17 @@ impl Parsed<'_> {
         }
     }
 
+    /// Testo del messaggio da citare in una risposta o in un inoltro, come
+    /// frammento HTML ripulito (senza script né stili globali).
+    pub fn quote_fragment(&self) -> String {
+        match self.html() {
+            // Firma e citazione di un messaggio scritto con Datini restano testo
+            // normale: i segni servono solo per il messaggio che si sta scrivendo.
+            Some(h) => crate::sanitize::clean_fragment(&h, &self.inline_images()).replace(" id=\"datini-firma\"", "").replace(" id=\"datini-citazione\"", ""),
+            None => text_fragment(&self.text()),
+        }
+    }
+
     /// Ricostruisce una bozza da un messaggio salvato.
     pub fn to_draft(&self, account_id: &str, local_id: i64) -> Draft {
         let mut rc = self.recipients();
@@ -272,6 +283,8 @@ impl Parsed<'_> {
             bcc: rc.bcc,
             subject: clean_ws(self.msg.subject().unwrap_or("")),
             body: self.text(),
+            html: self.html().map(|h| crate::sanitize::clean_fragment(&h, &self.inline_images())),
+            plain: self.html().is_none(),
             attachments,
             in_reply_to: self.in_reply_to().into_iter().next(),
             references: self.references(),
@@ -334,6 +347,97 @@ pub fn mailbox(p: &Person) -> Result<Mailbox> {
 
 fn escape_html(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// Testo semplice come frammento HTML: una riga per riga, righe vuote comprese.
+pub fn text_fragment(text: &str) -> String {
+    let normalized = text.replace("\r\n", "\n");
+    let trimmed = normalized.trim_end();
+    trimmed
+        .split('\n')
+        .map(|l| if l.trim().is_empty() { "<div><br></div>".to_string() } else { format!("<div>{}</div>", escape_html(l)) })
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+/// Documento completo dal frammento scritto nell'editor.
+pub fn wrap_html(fragment: &str) -> String {
+    format!("<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>{fragment}</body></html>")
+}
+
+/// Immagine messa nel testo (incollata o inserita), da spedire come parte
+/// incorporata del messaggio.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InlineImage {
+    pub cid: String,
+    pub mime: String,
+    pub bytes: Vec<u8>,
+}
+
+fn parse_data_url(v: &str) -> Option<(String, Vec<u8>)> {
+    let rest = v.strip_prefix("data:")?;
+    let (meta, data) = rest.split_once(',')?;
+    let mime = meta.strip_suffix(";base64")?.trim().to_ascii_lowercase();
+    if !matches!(mime.as_str(), "image/png" | "image/jpeg" | "image/jpg" | "image/gif" | "image/webp" | "image/bmp") {
+        return None;
+    }
+    let compact: String = data.chars().filter(|c| !c.is_whitespace()).collect();
+    let bytes = base64::engine::general_purpose::STANDARD.decode(compact).ok()?;
+    Some((if mime == "image/jpg" { "image/jpeg".into() } else { mime }, bytes))
+}
+
+/// Le immagini scritte come dati nel testo (`src="data:image/..."`) diventano
+/// parti incorporate con un Content-ID: molti programmi di posta non mostrano
+/// le immagini come dati. La stessa immagine ripetuta viaggia una volta sola.
+pub fn extract_data_images(html: &str) -> (String, Vec<InlineImage>) {
+    let lower = html.to_ascii_lowercase();
+    let mut out = String::with_capacity(html.len());
+    let mut images: Vec<InlineImage> = Vec::new();
+    let mut seen: std::collections::HashMap<&str, String> = std::collections::HashMap::new();
+    let tag = random_id();
+    let mut i = 0;
+    while let Some(pos) = lower[i..].find("src=") {
+        let at = i + pos + 4;
+        let q = match html.as_bytes().get(at) {
+            Some(b'"') => '"',
+            Some(b'\'') => '\'',
+            _ => {
+                out.push_str(&html[i..at]);
+                i = at;
+                continue;
+            }
+        };
+        let start = at + 1;
+        let Some(len) = html[start..].find(q) else { break };
+        let end = start + len;
+        let value = &html[start..end];
+        if !lower[start..end].starts_with("data:image/") {
+            out.push_str(&html[i..end]);
+            i = end;
+            continue;
+        }
+        let cid = if let Some(c) = seen.get(value) {
+            Some(c.clone())
+        } else if let Some((mime, bytes)) = parse_data_url(value) {
+            let cid = format!("img{}.{}@datini", images.len() + 1, &tag[..12]);
+            images.push(InlineImage { cid: cid.clone(), mime, bytes });
+            seen.insert(value, cid.clone());
+            Some(cid)
+        } else {
+            None
+        };
+        match cid {
+            Some(c) => {
+                out.push_str(&html[i..start]);
+                out.push_str("cid:");
+                out.push_str(&c);
+            }
+            None => out.push_str(&html[i..end]),
+        }
+        i = end;
+    }
+    out.push_str(&html[i..]);
+    (out, images)
 }
 
 /// Versione HTML del testo scritto: paragrafi e a capo, senza altro.
@@ -399,6 +503,13 @@ pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_dra
         Some(base64::engine::general_purpose::STANDARD.encode(serde_json::to_vec(&pending).unwrap_or_default()))
     };
 
+    // Testo formattato dall'editor, oppure costruito dal testo semplice.
+    let source = match d.html.as_deref() {
+        Some(h) if !h.trim().is_empty() => wrap_html(h),
+        _ => text_to_html(&d.body),
+    };
+    let (html_doc, images) = extract_data_images(&source);
+
     let make = |keep_bcc: bool| -> Result<Vec<u8>> {
         let mut b = lettre::Message::builder()
             .from(from.clone())
@@ -431,17 +542,32 @@ pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_dra
         if keep_bcc {
             b = b.keep_bcc();
         }
-        let alt = MultiPart::alternative_plain_html(d.body.replace("\r\n", "\n"), text_to_html(&d.body));
-        let msg = if atts.is_empty() {
-            b.multipart(alt)
-        } else {
-            let mut mixed = MultiPart::mixed().multipart(alt);
+        let text = d.body.replace("\r\n", "\n");
+        let with_atts = |mut mixed: MultiPart| {
             for a in atts {
                 let ct = ContentType::parse(&a.mime).unwrap_or_else(|_| ContentType::parse("application/octet-stream").expect("tipo valido"));
                 mixed = mixed.singlepart(Attachment::new(a.name.clone()).body(a.bytes.clone(), ct));
             }
-            b.multipart(mixed)
+            mixed
+        };
+        // Testo normale: solo il testo, come il formato "Testo normale" di Outlook.
+        if d.plain {
+            let msg = if atts.is_empty() { b.singlepart(SinglePart::plain(text)) } else { b.multipart(with_atts(MultiPart::mixed().singlepart(SinglePart::plain(text)))) }
+                .map_err(|e| Error::user(format!("Impossibile preparare il messaggio: {e}")))?;
+            return Ok(msg.formatted());
         }
+        let mut alt = MultiPart::alternative().singlepart(SinglePart::plain(text));
+        alt = if images.is_empty() {
+            alt.singlepart(SinglePart::html(html_doc.clone()))
+        } else {
+            let mut related = MultiPart::related().singlepart(SinglePart::html(html_doc.clone()));
+            for img in &images {
+                let ct = ContentType::parse(&img.mime).unwrap_or_else(|_| ContentType::parse("application/octet-stream").expect("tipo valido"));
+                related = related.singlepart(Attachment::new_inline(img.cid.clone()).body(img.bytes.clone(), ct));
+            }
+            alt.multipart(related)
+        };
+        let msg = if atts.is_empty() { b.multipart(alt) } else { b.multipart(with_atts(MultiPart::mixed().multipart(alt))) }
         .map_err(|e| Error::user(format!("Impossibile preparare il messaggio: {e}")))?;
         Ok(msg.formatted())
     };
@@ -476,6 +602,8 @@ mod tests {
             sync: SyncOptions::default(),
             server_saves_sent: false,
             source_file: None,
+            signature_new: None,
+            signature_reply: None,
         }
     }
 
@@ -488,6 +616,8 @@ mod tests {
             bcc: vec![Person::new("Giorgio", "giorgio@valliarredi.it")],
             subject: "Campioni del rovere: però è urgente".into(),
             body: "Ciao Davide,\n\nriesci a portarli giovedì?\nGrazie\n\nChiara".into(),
+            html: None,
+            plain: false,
             attachments: vec![],
             in_reply_to: Some("orig@studiorlandi.it".into()),
             references: vec!["orig@studiorlandi.it".into()],
@@ -559,6 +689,68 @@ mod tests {
         d.to = vec![Person::new("Mario Rossi", "")];
         let e = build(&account(), &d, &[], false).err().unwrap();
         assert!(e.to_string().contains("Mario Rossi"));
+    }
+
+    #[test]
+    fn formatted_text_with_images_roundtrip() {
+        let mut d = draft();
+        let png = base64::engine::general_purpose::STANDARD.encode([137u8, 80, 78, 71, 1, 2, 3]);
+        d.html = Some(format!(
+            "<div class=\"datini-corpo\" style=\"font-family: Aptos; font-size: 11pt\"><div><b>Ciao</b> Davide</div><img src=\"data:image/png;base64,{png}\" width=\"120\"><div id=\"datini-firma\"><img src='data:image/png;base64,{png}'></div><img src=\"https://x.it/a.png\"></div>"
+        ));
+        let b = build(&account(), &d, &[], false).unwrap();
+        let p = parse(&b.copy).unwrap();
+        let html = p.html().unwrap();
+        assert!(html.contains("<b>Ciao</b> Davide"));
+        assert!(!html.contains("data:image"), "le immagini viaggiano come parti incorporate");
+        assert!(html.contains("https://x.it/a.png"));
+        let inline = p.inline_images();
+        assert_eq!(inline.len(), 1, "la stessa immagine viaggia una volta");
+        assert_eq!(inline[0].2, vec![137u8, 80, 78, 71, 1, 2, 3]);
+        assert!(!p.has_real_attachments());
+        assert!(p.text().contains("riesci a portarli"), "resta la versione in testo semplice");
+
+        // La bozza riaperta ritrova il testo formattato con le immagini.
+        let saved = build(&account(), &d, &[], true).unwrap();
+        let back = parse(&saved.copy).unwrap().to_draft("a", 1);
+        let h = back.html.unwrap();
+        assert!(h.contains("<b>Ciao</b>"));
+        assert!(h.contains("id=\"datini-firma\""));
+        assert!(h.contains(&format!("data:image/png;base64,{png}")));
+    }
+
+    #[test]
+    fn plain_text_messages_have_no_html() {
+        let mut d = draft();
+        d.plain = true;
+        d.html = Some("<div><b>ignorato</b></div>".into());
+        let b = build(&account(), &d, &[], false).unwrap();
+        let p = parse(&b.copy).unwrap();
+        assert!(p.html().is_none() || !p.html().unwrap().contains("<b>"));
+        assert!(p.text().contains("riesci a portarli"));
+        assert!(!String::from_utf8_lossy(&b.copy).to_ascii_lowercase().contains("text/html"));
+        let back = p.to_draft("a", 1);
+        assert!(back.plain, "la bozza riaperta resta in testo normale");
+        let with = build(&account(), &d, &[AttachmentData { name: "a.txt".into(), mime: "text/plain".into(), bytes: b"x".to_vec() }], false).unwrap();
+        assert_eq!(parse(&with.copy).unwrap().attachments().len(), 1);
+    }
+
+    #[test]
+    fn quoting_a_datini_message_drops_its_markers() {
+        let mut d = draft();
+        d.html = Some("<div>Ciao</div><div id=\"datini-firma\"><div>Davide</div></div><div id=\"datini-citazione\"><div>Prima</div></div>".into());
+        let b = build(&account(), &d, &[], false).unwrap();
+        let q = parse(&b.copy).unwrap().quote_fragment();
+        assert!(q.contains("Davide") && q.contains("Prima"));
+        assert!(!q.contains("datini-firma") && !q.contains("datini-citazione"));
+    }
+
+    #[test]
+    fn data_images_need_a_known_type() {
+        let (out, imgs) = extract_data_images("<img src=\"data:image/svg+xml;base64,PHN2Zz4=\"> src=\"x\"");
+        assert!(imgs.is_empty());
+        assert!(out.contains("data:image/svg+xml"));
+        assert_eq!(text_fragment("a < b\n\nfine"), "<div>a &lt; b</div><div><br></div><div>fine</div>");
     }
 
     #[test]

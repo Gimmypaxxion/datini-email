@@ -15,6 +15,7 @@ import type {
   Person,
   Role,
   SavedDraft,
+  Signature,
 } from './types';
 
 export type Tab = 'prio' | 'altre';
@@ -31,6 +32,13 @@ export interface Backend {
   messages(folderId: number, tab: Tab | null, offset?: number, limit?: number): Promise<MessageSummary[]>;
   search(query: string, accountId: string | null): Promise<MessageSummary[]>;
   message(id: number, allowRemote: boolean): Promise<MessageDetail>;
+  /** Testo del messaggio da citare in una risposta (frammento HTML ripulito). */
+  quoteHtml(id: number): Promise<string>;
+  signatures(): Promise<Signature[]>;
+  saveSignature(s: Signature): Promise<Signature>;
+  deleteSignature(id: string): Promise<void>;
+  /** Immagine incollata da una pagina web, come dati da incorporare (null se non si può). */
+  fetchImage(url: string): Promise<string | null>;
   setFlags(ids: number[], seen: boolean | null, flagged: boolean | null): Promise<void>;
   moveMessages(ids: number[], folderId: number): Promise<void>;
   moveToRole(ids: number[], role: Role): Promise<void>;
@@ -101,6 +109,21 @@ export class TauriBackend implements Backend {
   }
   message(id: number, allowRemote: boolean) {
     return this.call<MessageDetail>('message', { id, allowRemote });
+  }
+  quoteHtml(id: number) {
+    return this.call<string>('quote_html', { id });
+  }
+  signatures() {
+    return this.call<Signature[]>('signatures');
+  }
+  saveSignature(signature: Signature) {
+    return this.call<Signature>('save_signature', { signature });
+  }
+  deleteSignature(id: string) {
+    return this.call<void>('delete_signature', { id });
+  }
+  fetchImage(url: string) {
+    return this.call<string | null>('fetch_image', { url });
   }
   setFlags(ids: number[], seen: boolean | null, flagged: boolean | null) {
     return this.call<void>('set_flags', { ids, seen, flagged });

@@ -142,6 +142,9 @@ export const FOLDER_IDS: Record<string, number> = {
 
 export function mockData(now = new Date()): MockData {
   const accounts = [account('valli', ME, 'imap'), account('ordini', ORDINI, 'pop3')];
+  // Firma di esempio per i nuovi messaggi e le risposte dall'account principale.
+  accounts[0].signatureNew = 'firma-chiara';
+  accounts[0].signatureReply = 'firma-chiara';
   const folders: Folder[] = [
     folder(1, 'valli', 'INBOX', 'INBOX', 'inbox'),
     folder(2, 'valli', 'Drafts', 'Drafts', 'drafts'),

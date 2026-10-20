@@ -109,6 +109,24 @@ pub struct AccountConfig {
     /// Per i file di dati: percorso del file da cui sono stati importati.
     #[serde(default)]
     pub source_file: Option<String>,
+    /// Firma aggiunta da sola ai nuovi messaggi (identificativo della firma).
+    #[serde(default)]
+    pub signature_new: Option<String>,
+    /// Firma aggiunta da sola a risposte e inoltri.
+    #[serde(default)]
+    pub signature_reply: Option<String>,
+}
+
+/// Firma da mettere in fondo ai messaggi. Le firme valgono per tutti gli
+/// account; ogni account sceglie quale usare per nuovi messaggi e risposte.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Signature {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    /// Contenuto in HTML (testo formattato, immagini incorporate).
+    pub html: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -272,8 +290,17 @@ pub struct Draft {
     pub bcc: Vec<Person>,
     #[serde(default)]
     pub subject: String,
+    /// Testo semplice (versione per i programmi che non leggono l'HTML).
     #[serde(default)]
     pub body: String,
+    /// Testo formattato scritto nell'editor: frammento HTML. Se manca, il
+    /// messaggio si compone dal testo semplice.
+    #[serde(default)]
+    pub html: Option<String>,
+    /// Messaggio in testo normale (formato "Testo normale" di Outlook): si
+    /// spedisce solo `body`, senza versione HTML.
+    #[serde(default)]
+    pub plain: bool,
     #[serde(default)]
     pub attachments: Vec<DraftAttachment>,
     #[serde(default)]
@@ -312,6 +339,8 @@ pub enum Event {
     /// Avanzamento dell'importazione di un archivio (total 0 se non si conosce).
     #[serde(rename_all = "camelCase")]
     Import { name: String, done: u32, total: u32 },
+    /// Le firme sono cambiate (anche le altre finestre devono rileggerle).
+    Signatures,
 }
 
 pub fn now_secs() -> i64 {

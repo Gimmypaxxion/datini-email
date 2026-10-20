@@ -4,11 +4,15 @@
   // con lo stato della bozza. Usato nel riquadro di lettura, nella finestra
   // interna e nella finestra separata del sistema.
   import Icon from '../lib/Icon.svelte';
+  import RichEditor from './RichEditor.svelte';
+  import LinkDialog from './LinkDialog.svelte';
   import { store, type RecipientField } from '../lib/store.svelte';
+  import { composeEditor, fontStack } from '../lib/editor.svelte';
+  import { textToHtml } from '../lib/compose-html';
   import { fileSize, initials, personLabel, validEmail } from '../lib/format';
   import type { Person } from '../lib/types';
 
-  let { inset = 0 }: { inset?: number } = $props();
+  let { inset = 0, onescape = undefined }: { inset?: number; onescape?: () => void } = $props();
 
   const c = $derived(store.c!);
   const sendPos = $derived(store.prefs.ribbon === 'estesa' ? 'sinistra' : 'alto');
@@ -17,27 +21,19 @@
 
   let toEl: HTMLInputElement | undefined = $state();
   let subjEl: HTMLInputElement | undefined = $state();
-  let bodyEl: HTMLTextAreaElement | undefined = $state();
+  let editorAnchor: HTMLDivElement | undefined = $state();
   let sugg = $state<{ key: RecipientField; items: Person[]; idx: number } | null>(null);
   let suggSeq = 0;
 
   // Come in Outlook: il cursore va nel campo A per un messaggio nuovo o
-  // inoltrato, all'inizio del testo per una risposta. Solo all'apertura.
+  // inoltrato, all'inizio del testo per una risposta (lo fa l'editor). Solo all'apertura.
   let focusedKey = '';
   $effect(() => {
     const key = store.c?.key ?? '';
     if (!key || key === focusedKey) return;
     focusedKey = key;
-    const t = setTimeout(() => {
-      if (!store.c) return;
-      if (store.c.to.length && bodyEl) {
-        bodyEl.focus();
-        bodyEl.setSelectionRange(0, 0);
-        bodyEl.scrollTop = 0;
-      } else {
-        toEl?.focus();
-      }
-    }, 0);
+    if (store.c?.to.length) return;
+    const t = setTimeout(() => toEl?.focus(), 0);
     return () => clearTimeout(t);
   });
 
@@ -162,6 +158,13 @@
       <button class="act" onclick={() => { store.askNoSubject = false; subjEl?.focus(); }}>Aggiungi oggetto</button>
     </div>
   {/if}
+  {#if store.askPlain}
+    <div class="note-bar warn ask" role="alertdialog" aria-label="Passa a testo normale">
+      <span class="t">In testo normale si perdono formattazione, immagini e tabelle del messaggio. Continuare?</span>
+      <button class="act" onclick={() => store.setFormat('testo', true)}>Continua</button>
+      <button class="act" onclick={() => (store.askPlain = false)}>Annulla</button>
+    </div>
+  {/if}
   <div class="pad">
     <div class="field subj">
       <label for="subj-{uid}" class="sr">Oggetto</label>
@@ -180,8 +183,41 @@
       {/each}
     </ul>
   {/if}
-  <label for="body-{uid}" class="sr">Testo del messaggio</label>
-  <textarea bind:this={bodyEl} id="body-{uid}" class="ph bare scroll body" value={c.body} oninput={(e) => store.setBody(e.currentTarget.value)} placeholder="Scrivi il messaggio"></textarea>
+  <div class="body">
+    <div class="anchor" bind:this={editorAnchor}></div>
+    {#if c.plain}
+      <label for="testo-{uid}" class="sr">Testo del messaggio</label>
+      <textarea
+        id="testo-{uid}"
+        class="plain scroll"
+        value={c.body}
+        oninput={(e) => store.setBody(e.currentTarget.value)}
+        onkeydown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); void store.send(); }
+          else if (e.key === 'Escape') { e.preventDefault(); onescape?.(); }
+        }}
+        placeholder="Scrivi il messaggio"
+        style:font-family={fontStack(store.font.family)}
+        style:font-size="{store.font.size}pt"
+      ></textarea>
+    {:else}
+    <RichEditor
+      ctl={composeEditor}
+      docKey={c.key}
+      html={c.html ?? textToHtml(c.body)}
+      font={store.font}
+      focusOnLoad={c.to.length ? 'start' : 'none'}
+      onchange={(h, t) => store.setContent(h, t)}
+      onsubmit={() => void store.send()}
+      onescape={() => onescape?.()}
+      onlink={() => store.openLinkDialog(null)}
+      fetchImage={(u) => store.backend.fetchImage(u)}
+    />
+    {/if}
+  </div>
+  {#if store.linkOpen && (store.linkAnchor ?? editorAnchor)}
+    <LinkDialog ctl={composeEditor} anchor={(store.linkAnchor ?? editorAnchor)!} onclose={() => store.closeLinkDialog()} />
+  {/if}
   <div class="foot">
     <button class="btn attach" onclick={() => store.addFiles()}><Icon name="paperclip" size={17} style="color:var(--brand-ink)" />Allega file</button>
     <span class="status" class:bad={!!store.saveError} aria-live="polite" title={store.saveError || undefined}>
@@ -215,7 +251,11 @@
   .an { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sz { color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .rm { width: 26px; height: 26px; }
-  .body { flex: 1; min-height: 0; margin: 0 24px; padding: 16px 0; font-size: 15px; line-height: 1.55; resize: none; outline: none; }
+  .body { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 6px; background: #ffffff; }
+  :global([data-theme="scuro"]) .body { margin: 8px 12px 0; border-radius: 6px; overflow: hidden; }
+  .plain { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; padding: 14px 24px 28px; border: 0; resize: none; outline: none; background: #ffffff; color: #000000; line-height: 1.4; }
+  .plain::placeholder { color: #707070; }
+  .anchor { position: absolute; left: 24px; top: 6px; width: 1px; height: 1px; pointer-events: none; }
   .foot { display: flex; align-items: center; gap: 12px; padding: 8px 14px 10px 18px; box-shadow: inset 0 1px 0 var(--rule); }
   .attach, .discard { height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border: 0; border-radius: 4px; background: transparent; font-size: 13.5px; }
   .status { flex: 1; font-size: 12.5px; color: var(--ink-3); text-align: right; }

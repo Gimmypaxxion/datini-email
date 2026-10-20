@@ -36,7 +36,18 @@ export interface Account {
   sync: SyncOptions;
   serverSavesSent: boolean;
   sourceFile: string | null;
+  /** Firma aggiunta da sola ai nuovi messaggi (identificativo). */
+  signatureNew?: string | null;
+  /** Firma aggiunta da sola a risposte e inoltri. */
+  signatureReply?: string | null;
   status: AccountStatus;
+}
+
+/** Firma: vale per tutti gli account, ognuno sceglie quale usare. */
+export interface Signature {
+  id: string;
+  name: string;
+  html: string;
 }
 
 export interface Folder {
@@ -118,7 +129,12 @@ export interface Draft {
   cc: Person[];
   bcc: Person[];
   subject: string;
+  /** Testo semplice, per chi non legge l'HTML. */
   body: string;
+  /** Testo formattato scritto nell'editor (frammento HTML). */
+  html?: string | null;
+  /** Formato "Testo normale": si spedisce solo `body`, senza HTML. */
+  plain?: boolean;
   attachments: DraftAttachment[];
   inReplyTo: string | null;
   references: string[];
@@ -154,7 +170,8 @@ export type EngineEvent =
   | { type: 'status'; accountId: string; status: AccountStatus }
   | { type: 'outbox'; accountId: string; outboxId: number; state: string; error: string | null }
   | { type: 'accounts' }
-  | { type: 'import'; name: string; done: number; total: number };
+  | { type: 'import'; name: string; done: number; total: number }
+  | { type: 'signatures' };
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {

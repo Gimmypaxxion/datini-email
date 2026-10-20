@@ -133,7 +133,12 @@
           <Icon name="circle-check" size={48} stroke={1.4} style="color:var(--green)" />
           <h2 id="wiz-title">Account aggiunto</h2>
           <p>Datini sta scaricando la posta di <strong>{added}</strong>. I messaggi compaiono man mano, a partire dai più recenti.</p>
-          <button class="primary-btn" onclick={close}>Fine</button>
+          <div class="done-acts">
+            {#if !store.signatures.length}
+              <button class="sec-btn" onclick={() => { close(); store.openSettings('composizione'); }}><Icon name="signature" size={17} />Aggiungi la tua firma</button>
+            {/if}
+            <button class="primary-btn" onclick={close}>Fine</button>
+          </div>
         </div>
       {:else}
         <header>
@@ -243,6 +248,7 @@
   .actions { margin-top: 22px; display: flex; justify-content: flex-end; gap: 8px; }
   .done { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 40px 36px 32px; text-align: center; }
   .done h2 { flex: none; margin-top: 6px; }
+  .done-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
   .done p { margin: 0 0 14px; max-width: 42ch; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
   @media (max-width: 560px) { .srvrow { grid-template-columns: 1fr 1fr; } .srvrow .grow { grid-column: 1 / -1; } }
 </style>

@@ -7,13 +7,12 @@ import type { Backend, Tab } from './backend';
 import { TauriBackend } from './backend';
 import { MockBackend } from './mockBackend';
 import { inTauri } from './platform';
+import { addPlainSignature, hasQuote, htmlToText, newMessageHtml, plainFromHtml, replaceSignature, replyHtml, textToHtml } from './compose-html';
+import { DEFAULT_FONT, composeEditor } from './editor.svelte';
 import {
   clock,
   cleanSubject,
-  longDate,
   parseRecipient,
-  personFull,
-  peopleText,
   randomKey,
   sameAddress,
   validEmail,
@@ -31,6 +30,7 @@ import {
   type OutboxItem,
   type Person,
   type Role,
+  type Signature,
   type SyncOptions,
 } from './types';
 
@@ -39,10 +39,11 @@ export type EntryMode = 'file' | 'ingranaggio';
 export type ComposeMode = 'finestra' | 'pannello';
 export type ThemeChoice = 'sistema' | 'chiaro' | 'scuro';
 export type StyleName = 'classico' | 'nuovo';
-export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inserisci';
-export type WinTab = 'messaggio' | 'inserisci';
+export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inserisci' | 'formato';
+export type WinTab = 'messaggio' | 'inserisci' | 'formato';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
+export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'info';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -99,6 +100,7 @@ interface Saved {
   themeChoice: ThemeChoice;
   showFolders: boolean;
   collapsed?: Record<string, boolean>;
+  font?: { family: string; size: number };
 }
 
 const STORAGE_KEY = 'datini.interfaccia.v1';
@@ -156,12 +158,18 @@ export class MailStore {
   backstage = $state(false);
   bsPage = $state<'info' | 'apri' | 'about'>('info');
   settings = $state(false);
-  setPage = $state<'aspetto' | 'account' | 'info'>('aspetto');
+  setPage = $state<SettingsPage>('aspetto');
   acctSel = $state<string | null>(null);
   wizard = $state<{ open: boolean; first: boolean }>({ open: false, first: false });
   netOffline = $state(false);
 
   // Scrittura
+  /** Carattere predefinito dei nuovi messaggi. */
+  font = $state({ ...DEFAULT_FONT });
+  signatures = $state<Signature[]>([]);
+  /** Riquadro "Inserisci collegamento", vicino al pulsante che l'ha aperto. */
+  linkAnchor = $state.raw<HTMLElement | null>(null);
+  linkOpen = $state(false);
   c = $state<Draft | null>(null);
   cWin = $state(false);
   winMax = $state(false);
@@ -176,6 +184,8 @@ export class MailStore {
   sending = $state(false);
   /** Oggetto vuoto: Outlook chiede conferma prima di inviare. */
   askNoSubject = $state(false);
+  /** Passaggio a testo normale: la formattazione si perde, si chiede conferma. */
+  askPlain = $state(false);
   toast = $state<Toast | null>(null);
   /** Importazione di un archivio in corso (total 0 se non si conosce ancora). */
   importing = $state<{ name: string; done: number; total: number } | null>(null);
@@ -200,6 +210,7 @@ export class MailStore {
         if (saved.themeChoice) this.themeChoice = saved.themeChoice;
         if (typeof saved.showFolders === 'boolean') this.showFolders = saved.showFolders;
         if (saved.collapsed) this.collapsed = saved.collapsed;
+        if (saved.font?.family && saved.font.size) this.font = { ...saved.font };
       }
     }
     if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
@@ -225,6 +236,7 @@ export class MailStore {
       themeChoice: this.themeChoice,
       showFolders: this.showFolders,
       collapsed: { ...this.collapsed },
+      font: { ...this.font },
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -238,7 +250,7 @@ export class MailStore {
   async init() {
     this.unsubscribe?.();
     this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
-    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox()]);
+    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures()]);
     if (this.mode === 'principale') {
       const inbox = this.defaultInbox();
       if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
@@ -280,6 +292,9 @@ export class MailStore {
         if (!this.importing) this.backstage = false;
         this.importing = { name: e.name, done: e.done, total: e.total };
         break;
+      case 'signatures':
+        void this.reloadSignatures();
+        break;
       case 'outbox':
         void this.reloadOutbox();
         if (this.mode !== 'principale') break;
@@ -305,6 +320,14 @@ export class MailStore {
     if (this.sel !== null && this.detail && this.detail.id === this.sel) {
       const s = this.list.find((m) => m.id === this.sel);
       if (s) Object.assign(this.detail, { unread: s.unread, flagged: s.flagged, answered: s.answered });
+    }
+  }
+
+  async reloadSignatures() {
+    try {
+      this.signatures = await this.backend.signatures();
+    } catch {
+      /* le firme non sono essenziali per leggere e scrivere */
     }
   }
 
@@ -379,7 +402,7 @@ export class MailStore {
   }
 
   get ribbonTabs(): RibbonTab[] {
-    return this.paneCompose ? ['home', 'visualizza', 'aiuto', 'messaggio', 'inserisci'] : ['home', 'visualizza', 'aiuto'];
+    return this.paneCompose ? ['home', 'visualizza', 'aiuto', 'messaggio', 'inserisci', 'formato'] : ['home', 'visualizza', 'aiuto'];
   }
   get activeRibbon(): RibbonTab {
     return this.ribbonTabs.includes(this.ribbonTab) ? this.ribbonTab : 'home';
@@ -679,14 +702,28 @@ export class MailStore {
   }
 
   private emptyDraft(accountId: string): Draft {
-    return { key: randomKey(), accountId, to: [], cc: [], bcc: [], subject: '', body: '', attachments: [], inReplyTo: null, references: [], replyToMessage: null };
+    const sig = this.signatureFor(accountId, 'new');
+    const html = newMessageHtml(sig?.html);
+    return { key: randomKey(), accountId, to: [], cc: [], bcc: [], subject: '', body: htmlToText(html), html, attachments: [], inReplyTo: null, references: [], replyToMessage: null };
   }
 
+  /** Firma da aggiungere da sola per questo account, se l'utente l'ha scelta. */
+  signatureFor(accountId: string, kind: 'new' | 'reply'): Signature | null {
+    const a = this.accounts.find((x) => x.id === accountId);
+    const id = kind === 'new' ? a?.signatureNew : a?.signatureReply;
+    return (id && this.signatures.find((s) => s.id === id)) || null;
+  }
+
+  /** Vuoto: niente destinatari, oggetto o allegati, e nel testo solo la firma. */
   static isEmpty(d: Draft): boolean {
-    return !d.to.length && !d.cc.length && !d.bcc.length && !d.subject.trim() && !d.body.trim() && !d.attachments.length;
+    if (d.to.length || d.cc.length || d.bcc.length || d.subject.trim() || d.attachments.length) return false;
+    const text = d.html ? htmlToText(replaceSignature(d.html, null)) : d.body;
+    return !text.trim();
   }
 
   private snapshot(): Draft | null {
+    // L'editor manda il testo con un attimo di ritardo: prima si prende l'ultimo.
+    if (this.c && !this.c.plain && composeEditor.attached) composeEditor.flush();
     return this.c ? ($state.snapshot(this.c) as Draft) : null;
   }
 
@@ -699,6 +736,7 @@ export class MailStore {
     this.savedAt = '';
     this.saveError = '';
     this.askNoSubject = false;
+    this.askPlain = false;
     this.toInput = '';
     this.ccInput = '';
     this.bccInput = '';
@@ -782,21 +820,13 @@ export class MailStore {
     }
   }
 
-  /** Testo citato sotto la risposta, nel formato di Outlook. */
-  static quote(m: MessageDetail): string {
-    const lines = [`Da: ${personFull(m.from)}`, `Inviato: ${longDate(m.date)}`];
-    if (m.to.length) lines.push(`A: ${peopleText(m.to)}`);
-    if (m.cc.length) lines.push(`Cc: ${peopleText(m.cc)}`);
-    lines.push(`Oggetto: ${m.subject}`);
-    return `\n\n\n________________________________\n${lines.join('\n')}\n\n${m.text.trim()}`;
-  }
-
   /** Bozza per Rispondi, Rispondi a tutti o Inoltra, dal messaggio aperto. */
-  draftFrom(kind: Exclude<ComposeKind, 'new'>, m: MessageDetail, acct: Account): Draft {
+  draftFrom(kind: Exclude<ComposeKind, 'new'>, m: MessageDetail, acct: Account, quote?: string): Draft {
     const d = this.emptyDraft(acct.id);
     const me: Person = { name: acct.name, email: acct.email };
     const clean = cleanSubject(m.subject);
-    d.body = MailStore.quote(m);
+    d.html = replyHtml(this.signatureFor(acct.id, 'reply')?.html, m, quote ?? textToHtml(m.text));
+    d.body = htmlToText(d.html);
     if (kind === 'reply' || kind === 'replyAll') {
       d.to = (m.replyTo.length ? m.replyTo : [m.from]).filter((p) => p.email || p.name);
       if (d.to.length && sameAddress(d.to[0], me) && m.to.length) d.to = [...m.to];
@@ -834,7 +864,9 @@ export class MailStore {
       this.openWizard(false);
       return;
     }
-    const d = m ? this.draftFrom(kind as Exclude<ComposeKind, 'new'>, m, acct) : this.emptyDraft(acct.id);
+    let quote: string | undefined;
+    if (m) quote = await this.backend.quoteHtml(m.id).catch(() => undefined);
+    const d = m ? this.draftFrom(kind as Exclude<ComposeKind, 'new'>, m, acct, quote) : this.emptyDraft(acct.id);
     const inWindow = kind === 'new' ? P.compose === 'finestra' : P.compose === 'finestra' && P.replyWin;
     await this.stashDraft();
     await this.present(d, inWindow);
@@ -880,16 +912,148 @@ export class MailStore {
     this.touch();
   }
 
-  setBody(v: string) {
+  /** Il testo scritto nell'editor: formattato e semplice. */
+  setContent(html: string, text: string) {
     if (!this.c) return;
-    this.c.body = v;
+    if (this.c.html === html && this.c.body === text) return;
+    this.c.html = html;
+    this.c.body = text;
     this.touch();
   }
 
+  /** Testo semplice (senza editor): diventa anche la versione formattata. */
+  setBody(v: string) {
+    if (!this.c) return;
+    this.c.body = v;
+    this.c.html = this.c.plain ? null : textToHtml(v);
+    this.touch();
+  }
+
+  /** Formato del messaggio, come in Formato testo › HTML / Testo normale. */
+  setFormat(kind: 'html' | 'testo', confirmed = false) {
+    const c = this.c;
+    if (!c) return;
+    if (kind === 'html') {
+      this.askPlain = false;
+      if (!c.plain) return;
+      c.plain = false;
+      c.html = textToHtml(c.body);
+      this.touch();
+      return;
+    }
+    if (c.plain) return;
+    if (composeEditor.attached) composeEditor.flush();
+    // Se c'è solo testo semplice non serve chiedere: non si perde nulla.
+    const formatted = /<(b|strong|i|em|u|s|font|img|table|ul|ol|a|h\d)\b|style="[^"]*(color|background|font-weight|font-style|text-decoration)/i.test(c.html ?? '');
+    if (formatted && !confirmed) {
+      this.askPlain = true;
+      return;
+    }
+    this.askPlain = false;
+    c.body = plainFromHtml(c.html ?? textToHtml(c.body));
+    c.html = null;
+    c.plain = true;
+    this.touch();
+  }
+
+  private composeKind(): 'new' | 'reply' {
+    return hasQuote(this.c?.html) ? 'reply' : 'new';
+  }
+
+  /** Cambiando mittente cambia anche la firma aggiunta da Datini, come in Outlook. */
   setAccount(accountId: string) {
     if (!this.c) return;
+    const kind = this.composeKind();
+    const before = this.signatureFor(this.c.accountId, kind);
+    const after = this.signatureFor(accountId, kind);
     this.c.accountId = accountId;
+    if (before?.id !== after?.id && !this.c.plain) this.applySignature(after?.html ?? null, false);
     this.touch();
+  }
+
+  /** Mette la firma nel testo: nell'editor se c'è, altrimenti nell'HTML salvato. */
+  private applySignature(html: string | null, atCursor: boolean) {
+    if (!this.c) return;
+    if (composeEditor.attached) {
+      if (atCursor && html) composeEditor.insertSignature(html);
+      else composeEditor.setSignature(html);
+      return;
+    }
+    this.c.html = replaceSignature(this.c.html ?? textToHtml(this.c.body), html);
+    this.c.body = htmlToText(this.c.html);
+    this.touch();
+  }
+
+  /** Pulsante Firma: inserisce la firma scelta (o sostituisce quella già presente). */
+  insertSignature(id: string) {
+    const s = this.signatures.find((x) => x.id === id);
+    if (!s || !this.c) return;
+    if (this.c.plain) {
+      this.c.body = addPlainSignature(this.c.body, s.html);
+      this.touch();
+      return;
+    }
+    this.applySignature(s.html, true);
+  }
+
+  openLinkDialog(anchor: HTMLElement | null) {
+    this.linkAnchor = anchor;
+    this.linkOpen = true;
+  }
+
+  closeLinkDialog() {
+    this.linkOpen = false;
+    this.linkAnchor = null;
+  }
+
+  /** Avviso breve in basso (per esempio come usare un comando). */
+  hint(text: string) {
+    this.flash({ kind: 'info', text }, 5000);
+  }
+
+  // ---------- Firme e carattere ----------
+
+  async saveSignature(s: Signature): Promise<Signature | null> {
+    try {
+      const first = !this.signatures.length;
+      const saved = await this.backend.saveSignature(s);
+      await this.reloadSignatures();
+      // La prima firma diventa subito quella di tutti gli account che ancora
+      // non ne hanno una: basta crearla perché compaia nei messaggi.
+      if (first) {
+        for (const a of this.accounts) {
+          if (!this.canSend(a) || (a.signatureNew && a.signatureReply)) continue;
+          a.signatureNew ??= saved.id;
+          a.signatureReply ??= saved.id;
+          await this.backend.updateAccount($state.snapshot(a) as Account);
+        }
+      }
+      return saved;
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+      return null;
+    }
+  }
+
+  async deleteSignature(id: string) {
+    await this.act(async () => {
+      await this.backend.deleteSignature(id);
+      await this.reloadSignatures();
+      await this.reloadAccounts();
+    });
+  }
+
+  async setAccountSignature(accountId: string, kind: 'new' | 'reply', id: string | null) {
+    const a = this.accounts.find((x) => x.id === accountId);
+    if (!a) return;
+    if (kind === 'new') a.signatureNew = id;
+    else a.signatureReply = id;
+    await this.act(() => this.backend.updateAccount($state.snapshot(a) as Account));
+  }
+
+  setFont(font: { family: string; size: number }) {
+    this.font = { ...font };
+    this.save();
   }
 
   private inputOf(key: RecipientField): string {
@@ -1228,7 +1392,7 @@ export class MailStore {
     if (this.backend.real && !this.accounts.length) this.openWizard(true);
   }
 
-  openSettings(page: 'aspetto' | 'account' | 'info' = 'aspetto') {
+  openSettings(page: SettingsPage = 'aspetto') {
     this.settings = true;
     this.setPage = page;
   }
@@ -1261,11 +1425,12 @@ export class MailStore {
       d.cc = [{ name: 'Marco Ventura', email: 'm.ventura@valliarredi.it' }];
       if (win) {
         d.subject = 'Campioni del rovere per Bassano';
-        d.body = 'Ciao Davide,\n\nil cliente vuole vedere i campioni del rovere prima di firmare il preventivo. Riesci a portarli giovedì in sede? Bastano il naturale e lo spazzolato.\n\nA presto,\nChiara';
+        d.html = textToHtml('Ciao Davide,\n\nil cliente vuole vedere i campioni del rovere prima di firmare il preventivo. Riesci a portarli giovedì in sede? Bastano il naturale e lo spazzolato.\n\nA presto,\nChiara') + replaceSignature('', this.signatureFor(acct.id, 'new')?.html ?? null);
       } else if (this.detail) {
-        Object.assign(d, this.draftFrom('reply', this.detail, acct));
-        d.body = 'Ciao Davide,\n\ngrazie, la revisione va bene. Il cliente vuole però vedere i campioni del rovere prima di firmare: riesci a portarli giovedì in sede?\n\nA presto,\nChiara' + d.body;
+        Object.assign(d, this.draftFrom('reply', this.detail, acct, await this.backend.quoteHtml(this.detail.id)));
+        d.html = textToHtml('Ciao Davide,\n\ngrazie, la revisione va bene. Il cliente vuole però vedere i campioni del rovere prima di firmare: riesci a portarli giovedì in sede?\n\nA presto,\nChiara') + d.html;
       }
+      d.body = htmlToText(d.html ?? '');
       if (v === 'composizione') {
         this.startCompose(d, win);
         this.savedAt = '09:04';

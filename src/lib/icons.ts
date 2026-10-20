@@ -1,6 +1,31 @@
 // Registro delle icone usate dall'interfaccia. Tutte vengono da Tabler Icons
 // (licenza MIT, https://tabler.io/icons). Si importano una per una, così
 // nell'app finiscono solo quelle usate.
+import Highlight from '@tabler/icons-svelte/icons/highlight';
+import Palette from '@tabler/icons-svelte/icons/palette';
+import TextColor from '@tabler/icons-svelte/icons/text-color';
+import ClearFormatting from '@tabler/icons-svelte/icons/clear-formatting';
+import IndentIncrease from '@tabler/icons-svelte/icons/indent-increase';
+import IndentDecrease from '@tabler/icons-svelte/icons/indent-decrease';
+import AlignLeft from '@tabler/icons-svelte/icons/align-left';
+import AlignCenter from '@tabler/icons-svelte/icons/align-center';
+import AlignRight from '@tabler/icons-svelte/icons/align-right';
+import TextIncrease from '@tabler/icons-svelte/icons/text-increase';
+import TextDecrease from '@tabler/icons-svelte/icons/text-decrease';
+import SeparatorHorizontal from '@tabler/icons-svelte/icons/separator-horizontal';
+import Scissors from '@tabler/icons-svelte/icons/scissors';
+import Copy from '@tabler/icons-svelte/icons/copy';
+import LinkOff from '@tabler/icons-svelte/icons/link-off';
+import Strikethrough from '@tabler/icons-svelte/icons/strikethrough';
+import Typography from '@tabler/icons-svelte/icons/typography';
+import Subscript from '@tabler/icons-svelte/icons/subscript';
+import Superscript from '@tabler/icons-svelte/icons/superscript';
+import AlignJustified from '@tabler/icons-svelte/icons/align-justified';
+import LineHeight from '@tabler/icons-svelte/icons/line-height';
+import LetterCase from '@tabler/icons-svelte/icons/letter-case';
+import FileTypeHtml from '@tabler/icons-svelte/icons/file-type-html';
+import Txt from '@tabler/icons-svelte/icons/txt';
+import DeviceFloppy from '@tabler/icons-svelte/icons/device-floppy';
 import CircleCheck from '@tabler/icons-svelte/icons/circle-check';
 import CloudOff from '@tabler/icons-svelte/icons/cloud-off';
 import Database from '@tabler/icons-svelte/icons/database';
@@ -104,6 +129,31 @@ import WifiOff from '@tabler/icons-svelte/icons/wifi-off';
 import X from '@tabler/icons-svelte/icons/x';
 
 export const icons = {
+  highlight: Highlight,
+  palette: Palette,
+  'text-color': TextColor,
+  'clear-formatting': ClearFormatting,
+  'indent-increase': IndentIncrease,
+  'indent-decrease': IndentDecrease,
+  'align-left': AlignLeft,
+  'align-center': AlignCenter,
+  'align-right': AlignRight,
+  'text-increase': TextIncrease,
+  'text-decrease': TextDecrease,
+  'separator-horizontal': SeparatorHorizontal,
+  scissors: Scissors,
+  copy: Copy,
+  'link-off': LinkOff,
+  strikethrough: Strikethrough,
+  typography: Typography,
+  subscript: Subscript,
+  superscript: Superscript,
+  'align-justified': AlignJustified,
+  'line-height': LineHeight,
+  'letter-case': LetterCase,
+  'file-type-html': FileTypeHtml,
+  txt: Txt,
+  'device-floppy': DeviceFloppy,
   'circle-check': CircleCheck,
   'cloud-off': CloudOff,
   database: Database,

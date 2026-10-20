@@ -205,6 +205,8 @@ async fn ciclo_completo_imap() {
         bcc: vec![],
         subject: "Campioni del rovere".into(),
         body: "Ciao Davide,\n\nriesci a portarli giovedì?\n\nChiara".into(),
+        html: None,
+        plain: false,
         attachments: vec![],
         in_reply_to: None,
         references: vec![],
@@ -261,6 +263,11 @@ async fn ciclo_completo_imap() {
     }];
     let reply_target = lucia.id;
     msg.reply_to_message = Some(reply_target);
+    // Testo formattato con un'immagine incollata: viaggia come parte incorporata.
+    const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    msg.html = Some(format!(
+        "<div class=\"datini-corpo\" style=\"font-family: Aptos; font-size: 11pt;\"><div>Ciao Davide, riesci a portarli <b>giovedì</b>?</div><img src=\"data:image/png;base64,{PNG}\" width=\"1\"><div class=\"datini-firma\"><div>Chiara Valli</div></div></div>"
+    ));
     eng.send(&msg).await.unwrap();
     wait_for("inviato", 40, || {
         let events = events.clone();
@@ -280,6 +287,14 @@ async fn ciclo_completo_imap() {
         }
     })
     .await;
+    let got = find(&eng, inbox.id, "Prova di invio da Datini").unwrap();
+    let d = eng.detail(got.id, false).await.unwrap();
+    let h = d.html.expect("parte HTML");
+    assert!(h.contains("<b>giovedì</b>"), "formattazione conservata");
+    assert!(h.contains("data:image/png;base64,"), "immagine incorporata visibile");
+    assert!(d.attachments.iter().any(|x| x.inline), "immagine come parte incorporata");
+    assert!(d.attachments.iter().any(|x| !x.inline && x.name.ends_with(".pdf")), "allegato vero conservato");
+    assert!(d.text.contains("riesci a portarli"), "versione in testo semplice");
     wait_for("risposto sul server", 30, || async { server_flags("INBOX", "Campionario tessuti").await.contains("Answered") }).await;
 
     // Cambiamenti fatti da un altro dispositivo arrivano qui.
@@ -326,6 +341,8 @@ async fn account_pop3() {
         bcc: vec![],
         subject: format!("POP {}", datini_lib::mime::random_id()),
         body: "Prova POP".into(),
+        html: None,
+        plain: false,
         attachments: vec![],
         in_reply_to: None,
         references: vec![],

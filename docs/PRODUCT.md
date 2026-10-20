@@ -14,7 +14,7 @@ Raccomandato: Tauri 2, motore in Rust, interfaccia in HTML/CSS/TypeScript. Il co
 
 ## Users
 
-Primari: i clienti di Paxxion, PMI italiane. Sono impiegati che usano Outlook (classico o nuovo) tutti i giorni e devono passare a Datini senza riabituarsi. Secondari: chiunque voglia un client di posta desktop gratuito e open source.
+Primari: le PMI italiane. Sono impiegati che usano Outlook (classico o nuovo) tutti i giorni e devono passare a Datini senza riabituarsi. Secondari: chiunque voglia un client di posta desktop gratuito e open source.
 
 ## Product Purpose
 

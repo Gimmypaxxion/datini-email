@@ -5,7 +5,9 @@
   // principale).
   import Composer from './Composer.svelte';
   import RibbonCompose from './RibbonCompose.svelte';
-  import { store } from '../lib/store.svelte';
+  import Settings from './Settings.svelte';
+  import Icon from '../lib/Icon.svelte';
+  import { store, type WinTab } from '../lib/store.svelte';
   import { setWindowTitle } from '../lib/platform';
 
   let ready = $state(false);
@@ -36,7 +38,7 @@
   $effect(() => {
     let unlisten: (() => void) | undefined;
     (async () => {
-      await store.reloadAccounts();
+      await Promise.all([store.reloadAccounts(), store.reloadSignatures()]);
       const d = await store.backend.takeComposeDraft();
       if (!d) {
         await closeWindow(false);
@@ -67,8 +69,8 @@
   {#if ready && store.c}
     <div class="cmds">
       <nav class="tabs-row" style="height:36px" aria-label="Schede del messaggio">
-        {#each [['messaggio', 'Messaggio'], ['inserisci', 'Inserisci']] as [id, label] (id)}
-          <button class="tab-btn btn" aria-pressed={store.winTab === id} onclick={() => (store.winTab = id as 'messaggio' | 'inserisci')}>{label}</button>
+        {#each [['messaggio', 'Messaggio'], ['inserisci', 'Inserisci'], ['formato', 'Formato testo']] as [id, label] (id)}
+          <button class="tab-btn btn" aria-pressed={store.winTab === id} onclick={() => (store.winTab = id as WinTab)}>{label}</button>
         {/each}
       </nav>
       <div class="rib" data-mode={store.prefs.ribbon} role="toolbar" aria-label="Comandi del messaggio">
@@ -76,13 +78,24 @@
       </div>
     </div>
     <div class="content">
-      <Composer />
+      <Composer onescape={() => void closeWindow(true)} />
     </div>
   {/if}
 </div>
+<Settings />
+{#if store.toast && store.toast.kind !== 'sent'}
+  <div role={store.toast.kind === 'error' ? 'alert' : 'status'} class="toast rise" data-kind={store.toast.kind}>
+    <span class="tt">{store.toast.text}</span>
+    <button class="ibtn btn tx" onclick={() => store.dismissToast()} aria-label="Chiudi avviso"><Icon name="x" size={15} /></button>
+  </div>
+{/if}
 
 <style>
   .app { height: 100vh; display: flex; flex-direction: column; background: var(--ground); }
   .cmds { flex: none; padding: 4px 10px 8px; }
+  .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 70; max-width: min(560px, calc(100vw - 32px)); display: flex; align-items: center; gap: 10px; min-height: 40px; box-sizing: border-box; padding: 6px 6px 6px 14px; border-radius: 4px; background: var(--ink); color: var(--sheet); box-shadow: var(--lift); font-size: 14px; }
+  .toast[data-kind="error"] { background: #A4262C; color: #fff; }
+  .tt { flex: 1; min-width: 0; }
+  .tx { color: inherit; }
   .content { flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 10px 10px; border-radius: 8px; background: var(--sheet); box-shadow: var(--sheet-shadow); overflow: hidden; }
 </style>

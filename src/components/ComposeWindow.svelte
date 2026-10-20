@@ -5,7 +5,7 @@
   import Icon from '../lib/Icon.svelte';
   import Composer from './Composer.svelte';
   import RibbonCompose from './RibbonCompose.svelte';
-  import { store } from '../lib/store.svelte';
+  import { store, type WinTab } from '../lib/store.svelte';
 
   const title = $derived(store.c?.subject || 'Nuovo messaggio');
 </script>
@@ -32,8 +32,8 @@
     </div>
     <div class="cmds">
       <nav class="tabs-row" style="height:36px" aria-label="Schede del messaggio">
-        {#each [['messaggio', 'Messaggio'], ['inserisci', 'Inserisci']] as [id, label] (id)}
-          <button class="tab-btn btn" aria-pressed={store.winTab === id} onclick={() => (store.winTab = id as 'messaggio' | 'inserisci')}>{label}</button>
+        {#each [['messaggio', 'Messaggio'], ['inserisci', 'Inserisci'], ['formato', 'Formato testo']] as [id, label] (id)}
+          <button class="tab-btn btn" aria-pressed={store.winTab === id} onclick={() => (store.winTab = id as WinTab)}>{label}</button>
         {/each}
       </nav>
       <div class="rib" data-mode={store.prefs.ribbon} role="toolbar" aria-label="Comandi del messaggio">
@@ -41,7 +41,7 @@
       </div>
     </div>
     <div class="content">
-      <Composer />
+      <Composer onescape={() => store.closeWin()} />
     </div>
   </div>
 {/if}

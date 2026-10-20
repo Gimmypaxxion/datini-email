@@ -892,6 +892,8 @@ impl Db {
                 bcc: vec![],
                 subject: String::new(),
                 body: String::new(),
+                html: None,
+                plain: false,
                 attachments: vec![],
                 in_reply_to: None,
                 references: vec![],
@@ -1025,6 +1027,8 @@ mod tests {
             sync: SyncOptions::default(),
             server_saves_sent: false,
             source_file: None,
+            signature_new: None,
+            signature_reply: None,
         };
         db.save_account(&cfg).unwrap();
         cfg.id
@@ -1103,6 +1107,8 @@ mod tests {
             bcc: vec![],
             subject: "Prova".into(),
             body: "ciao".into(),
+            html: None,
+            plain: false,
             attachments: vec![],
             in_reply_to: None,
             references: vec![],

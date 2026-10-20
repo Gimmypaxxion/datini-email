@@ -33,6 +33,11 @@ struct Worker {
     stop: Arc<AtomicBool>,
 }
 
+/// Chiave dell'archivio in cui stanno le firme.
+const SIGNATURES_KEY: &str = "firme";
+/// Immagini incollate da una pagina web: oltre questa dimensione restano un collegamento.
+const MAX_PASTED_IMAGE: u64 = 5 * 1024 * 1024;
+
 pub struct Engine {
     pub db: Db,
     secrets: Arc<dyn Secrets>,
@@ -558,6 +563,8 @@ impl Engine {
             sync: SyncOptions::default(),
             server_saves_sent: gmail,
             source_file: None,
+            signature_new: None,
+            signature_reply: None,
         };
         self.secrets.set(&id, &input.password)?;
         lock(&self.passwords).insert(id.clone(), input.password.clone());
@@ -597,6 +604,8 @@ impl Engine {
             sync: SyncOptions::default(),
             server_saves_sent: false,
             source_file: source,
+            signature_new: None,
+            signature_reply: None,
         };
         self.db.save_account(&cfg)?;
         self.emit(Event::Accounts);
@@ -615,6 +624,8 @@ impl Engine {
         if cfg.outgoing.is_some() {
             cur.outgoing = cfg.outgoing;
         }
+        cur.signature_new = cfg.signature_new;
+        cur.signature_reply = cfg.signature_reply;
         self.db.save_account(&cur)?;
         self.emit(Event::Accounts);
         if keep_changed {
@@ -735,6 +746,103 @@ impl Engine {
             remote_images: remote,
             remote_allowed: allow_remote,
         })
+    }
+
+    /// Testo di un messaggio da citare in una risposta o in un inoltro.
+    pub async fn quote_html(&self, id: i64) -> Result<String> {
+        let row = self.db.message(id)?;
+        let raw = self.raw(&row).await?;
+        let parsed = mime::parse(&raw).ok_or_else(|| Error::user("Il messaggio non è leggibile."))?;
+        Ok(parsed.quote_fragment())
+    }
+
+    // ------------------------------------------------------------------
+    // Firme
+    // ------------------------------------------------------------------
+
+    pub fn signatures(&self) -> Result<Vec<Signature>> {
+        Ok(self.db.meta(SIGNATURES_KEY)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default())
+    }
+
+    /// Crea o aggiorna una firma. Il contenuto viene ripulito come ogni HTML.
+    pub fn save_signature(&self, mut sig: Signature) -> Result<Signature> {
+        let name = sig.name.trim();
+        if name.is_empty() {
+            return Err(Error::user("Dai un nome alla firma."));
+        }
+        sig.name = name.chars().take(80).collect();
+        sig.html = sanitize::clean_fragment(&sig.html, &[]);
+        if sig.html.len() > 2_000_000 {
+            return Err(Error::user("La firma è troppo grande: usa immagini più piccole."));
+        }
+        let mut all = self.signatures()?;
+        if sig.id.is_empty() {
+            sig.id = mime::random_id()[..12].to_string();
+            all.push(sig.clone());
+        } else if let Some(s) = all.iter_mut().find(|s| s.id == sig.id) {
+            *s = sig.clone();
+        } else {
+            all.push(sig.clone());
+        }
+        self.db.set_meta(SIGNATURES_KEY, &serde_json::to_string(&all)?)?;
+        self.emit(Event::Signatures);
+        Ok(sig)
+    }
+
+    /// Elimina una firma e la toglie dagli account che la usavano.
+    pub fn delete_signature(&self, id: &str) -> Result<()> {
+        let all: Vec<Signature> = self.signatures()?.into_iter().filter(|s| s.id != id).collect();
+        self.db.set_meta(SIGNATURES_KEY, &serde_json::to_string(&all)?)?;
+        for mut a in self.db.accounts()? {
+            let mut changed = false;
+            if a.signature_new.as_deref() == Some(id) {
+                a.signature_new = None;
+                changed = true;
+            }
+            if a.signature_reply.as_deref() == Some(id) {
+                a.signature_reply = None;
+                changed = true;
+            }
+            if changed {
+                self.db.save_account(&a)?;
+            }
+        }
+        self.emit(Event::Signatures);
+        self.emit(Event::Accounts);
+        Ok(())
+    }
+
+    /// Scarica un'immagine incollata da una pagina web, per incorporarla nel
+    /// messaggio (come fa Outlook). La richiesta parte solo da un incolla
+    /// dell'utente e va direttamente al sito dell'immagine.
+    pub async fn fetch_image(&self, url: &str) -> Result<Option<String>> {
+        use base64::Engine as _;
+        if !(url.starts_with("https://") || url.starts_with("http://")) {
+            return Ok(None);
+        }
+        crate::net::install_crypto();
+        let client = reqwest::Client::builder().timeout(Duration::from_secs(10)).build().map_err(|e| Error::user(e.to_string()))?;
+        let Ok(r) = client.get(url).send().await else { return Ok(None) };
+        if !r.status().is_success() {
+            return Ok(None);
+        }
+        let mime = r
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.split(';').next().unwrap_or("").trim().to_ascii_lowercase())
+            .unwrap_or_default();
+        if !matches!(mime.as_str(), "image/png" | "image/jpeg" | "image/gif" | "image/webp" | "image/bmp") {
+            return Ok(None);
+        }
+        if r.content_length().unwrap_or(0) > MAX_PASTED_IMAGE {
+            return Ok(None);
+        }
+        let Ok(bytes) = r.bytes().await else { return Ok(None) };
+        if bytes.len() as u64 > MAX_PASTED_IMAGE {
+            return Ok(None);
+        }
+        Ok(Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(&bytes))))
     }
 
     pub async fn attachment(&self, id: i64, index: u32) -> Result<(String, String, Vec<u8>)> {

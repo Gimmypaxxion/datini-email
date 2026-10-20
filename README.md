@@ -24,6 +24,10 @@ Cosa funziona:
   - archivio sul computer con ricerca nel testo;
   - uso offline: le modifiche partono quando torna la connessione.
 - **Scrittura:**
+  - editor di testo formattato con lo stesso motore della versione web di Outlook: carattere, dimensione, grassetto, colori, evidenziazione, elenchi (anche automatici con `* ` o `1. `), rientri, allineamento, interlinea, collegamenti, immagini e tabelle;
+  - schede Messaggio, Inserisci e Formato testo con i comandi dove li mette Outlook; formato HTML o Testo normale;
+  - incolla da Word, Excel e dai siti mantenendo la formattazione;
+  - firme come in Outlook: più firme con un nome, una predefinita per i nuovi messaggi e una per le risposte di ogni account, pulsante Firma per cambiarla; la prima parte già scritta con nome e indirizzo;
   - nuovo messaggio in una vera finestra del sistema o nel riquadro di lettura;
   - suggerimento dei contatti, Cc e Ccn, allegati;
   - bozze salvate da sole;
@@ -41,7 +45,7 @@ Cosa funziona:
 
 Cosa manca ancora:
 - **Microsoft 365, Outlook.com e Gmail con accesso moderno (OAuth).** Su queste caselle l'accesso IMAP con la sola password è già disattivato o lo sarà presto. Gmail per ora si può usare solo con una "password per le app", se Google la consente sull'account.
-- Formattazione del testo (grassetto, elenchi...), firma, regole, risposte automatiche.
+- Regole, risposte automatiche, invio programmato.
 - Calendario, contatti e attività.
 - File `.ost` (copie locali di Exchange): non si aprono, va esportato un `.pst`.
 - Firma del codice e aggiornamenti automatici.
@@ -125,6 +129,8 @@ src/                     interfaccia (Svelte 5 + TypeScript)
   lib/backend.ts         collegamento al motore (comandi Tauri)
   lib/mockBackend.ts     motore finto con i messaggi di esempio, per il browser e i test
   lib/shortcuts.ts       scorciatoie da tastiera
+  lib/editor.svelte.ts   editor di testo formattato (RoosterJS in un iframe isolato)
+  lib/compose-html.ts    nuovo messaggio, citazione, firma e testo normale
 src-tauri/src/           motore (Rust)
   engine.rs              account, sincronizzazione, posta in uscita, bozze
   imap.rs, pop3.rs, smtp.rs   protocolli di posta
@@ -146,7 +152,7 @@ assets/                  logo e icona del programma
 1. **Fondamenta:** progetto, interfaccia, installer automatici. *(fatto)*
 2. **Primo account reale** IMAP/SMTP con password: cartelle, messaggi, lettura sicura dell'HTML, invio. *(fatto)*
 3. **Archivio locale**, uso offline, ricerca. *(fatto)*
-4. **Scrittura completa:** bozze, allegati, finestre separate vere. *(fatto, manca la formattazione del testo)*
+4. **Scrittura completa:** bozze, allegati, finestre separate vere, testo formattato, firme. *(fatto)*
 5. **POP3 e più account.** *(fatto)*
 6. **Archivi:** apertura dei file PST, import MBOX, export MBOX ed EML. *(fatto)*
 7. Accesso Microsoft 365 e Gmail (OAuth), firma del codice, aggiornamenti automatici, licenza.
@@ -161,6 +167,7 @@ Da definire prima della pubblicazione (in valutazione GPL-3.0 o MPL-2.0).
 
 - [Tauri](https://tauri.app) e [Svelte](https://svelte.dev).
 - Posta: [async-imap](https://github.com/chatmail/async-imap), [lettre](https://lettre.rs), [mail-parser e mail-builder](https://github.com/stalwartlabs), [ammonia](https://github.com/rust-ammonia/ammonia), [outlook-pst](https://github.com/microsoft/outlook-pst-rs).
+- Editor di testo: [RoosterJS](https://github.com/microsoft/roosterjs), licenza MIT.
 - Archivio: [SQLite](https://sqlite.org) con [rusqlite](https://github.com/rusqlite/rusqlite).
 - Icone [Tabler Icons](https://tabler.io/icons), licenza MIT.
 - Colori ispirati alla palette [Fluent 2](https://fluent2.microsoft.design) di Microsoft, pubblicata con licenza MIT.

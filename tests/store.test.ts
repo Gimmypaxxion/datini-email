@@ -360,6 +360,51 @@ describe('preferenze', () => {
   });
 });
 
+describe('formato del messaggio', () => {
+  it('in testo normale chiede conferma se si perde la formattazione, poi tiene solo il testo', async () => {
+    const s = await fresh('nuovo');
+    await s.openCompose('reply');
+    s.c!.html = s.c!.html!.replace('<div><br></div>', '<div><b>Va bene</b></div>');
+    s.setFormat('testo');
+    expect(s.askPlain).toBe(true);
+    expect(s.c?.plain).toBeFalsy();
+    s.setFormat('testo', true);
+    expect(s.askPlain).toBe(false);
+    expect(s.c?.plain).toBe(true);
+    expect(s.c?.html).toBeNull();
+    expect(s.c?.body.startsWith('Va bene')).toBe(true);
+    expect(s.c?.body).toContain('________________________________\nDa: Davide Orlandi');
+    expect(s.c?.body.indexOf('Ufficio acquisti')).toBeLessThan(s.c!.body.indexOf('_____'));
+  });
+
+  it('senza formattazione passa subito al testo normale e torna in HTML', async () => {
+    const s = await fresh('nuovo');
+    await s.openCompose('new');
+    // La firma di esempio è grigia: con l'altro account (senza firma) non c'è formattazione.
+    s.setAccount('ordini');
+    s.setFormat('testo');
+    expect(s.askPlain).toBe(false);
+    expect(s.c?.plain).toBe(true);
+    expect(s.c?.body).toBe('');
+    s.setBody('Ciao');
+    expect(s.c?.html).toBeNull();
+    s.setFormat('html');
+    expect(s.c?.plain).toBe(false);
+    expect(s.c?.html).toContain('<div>Ciao</div>');
+  });
+
+  it('in testo normale la firma scelta va sopra il messaggio citato', async () => {
+    const s = await fresh('nuovo');
+    const breve = await s.saveSignature({ id: '', name: 'Breve', html: '<div><b>C. Valli</b></div>' });
+    await s.openCompose('reply');
+    s.setFormat('testo', true);
+    s.insertSignature(breve!.id);
+    const b = s.c!.body;
+    expect(b).toContain('C. Valli');
+    expect(b.indexOf('C. Valli')).toBeLessThan(b.indexOf('_____'));
+  });
+});
+
 describe('archivi', () => {
   it('aprire un PST mostra il file di dati, ne apre la posta e torna senza avanzamento', async () => {
     const s = await fresh();
@@ -398,3 +443,97 @@ describe('archivi', () => {
     }
   });
 });
+
+describe('testo formattato e firma', () => {
+  it('trova, cambia e toglie il blocco della firma senza toccare la citazione', async () => {
+    const { replaceSignature, findBlock, htmlToText, unwrapBody, newMessageHtml } = await import('../src/lib/compose-html');
+    const html = `${newMessageHtml('<div>Chiara</div><div><div>Valli</div></div>')}<div id="datini-citazione"><div>Originale</div></div>`;
+    expect(findBlock(html, 'datini-firma')).not.toBeNull();
+    const swapped = replaceSignature(html, '<div>Marco</div>');
+    expect(swapped).toContain('<div id="datini-firma"><div>Marco</div></div>');
+    expect(swapped).toContain('<div id="datini-citazione"><div>Originale</div></div>');
+    expect(swapped).not.toContain('Chiara');
+    const removed = replaceSignature(html, null);
+    expect(removed).not.toContain('datini-firma');
+    expect(removed).toContain('Originale');
+    const added = replaceSignature('<div>Testo</div><div id="datini-citazione">X</div>', '<b>Firma</b>');
+    expect(added.indexOf('Firma')).toBeLessThan(added.indexOf('datini-citazione'));
+    // La firma dentro il messaggio citato (di chi ci ha scritto con Datini) non si tocca.
+    const quoted = '<div>Ciao</div><div id="datini-citazione"><div>Sotto</div><div id="datini-firma"><div>Davide</div></div></div>';
+    const mine = replaceSignature(quoted, '<div>Chiara</div>');
+    expect(mine).toContain('<div id="datini-firma"><div>Davide</div></div>');
+    expect(mine.indexOf('Chiara')).toBeLessThan(mine.indexOf('datini-citazione'));
+    expect(replaceSignature(quoted, null)).toContain('Davide');
+    // Le bozze salvate con la versione precedente usavano una classe.
+    expect(replaceSignature('<div class="datini-firma"><div>Vecchia</div></div>', '<div>Nuova</div>')).toContain('Nuova');
+    expect(htmlToText('<div>Prezzo &lt; 100&nbsp;€</div><div><br></div><div>Grazie &amp; saluti</div>')).toBe('Prezzo < 100 €\n\nGrazie & saluti');
+    expect(htmlToText('<ul><li><div>Uno</div></li><li><div>Due</div></li></ul><ol><li>A</li><li>B</li></ol><div>Fine</div>')).toBe('• Uno\n• Due\n1. A\n2. B\nFine');
+    expect(htmlToText('<div><br></div><div><br></div><div>Firma</div>', true)).toBe('\n\nFirma');
+    expect(unwrapBody('<div class="datini-corpo" style="font-size: 11pt;"><div>a</div></div>')).toBe('<div>a</div>');
+    expect(unwrapBody('<div class="datini-corpo"><div>a</div></div><div>b</div>')).toContain('<div>b</div>');
+  });
+
+  it('il nuovo messaggio ha la firma dell’account; senza altro testo non diventa una bozza', async () => {
+    const s = await fresh('nuovo');
+    await s.openCompose('new');
+    expect(s.c?.html).toContain('datini-firma');
+    expect(s.c?.body).toContain('Ufficio acquisti, Valli Arredi');
+    expect(MailStore.isEmpty($snap(s))).toBe(true);
+    await s.discard();
+    const drafts = (await s.backend.folders()).find((f) => f.role === 'drafts' && f.accountId === 'valli')!;
+    const before = drafts.total;
+    await s.openCompose('new');
+    await s.closeWin();
+    expect(await total(s, drafts.id)).toBe(before);
+  });
+
+  it('la risposta ha la firma sopra il messaggio citato', async () => {
+    const s = await fresh('nuovo');
+    await s.openCompose('reply');
+    const h = s.c!.html!;
+    expect(h.indexOf('datini-firma')).toBeLessThan(h.indexOf('datini-citazione'));
+    expect(h).toContain('<b>Oggetto:</b> Preventivo uffici Bassano, revisione 3');
+  });
+
+  it('cambiando mittente cambia la firma, come in Outlook', async () => {
+    const s = await fresh('nuovo');
+    await s.openCompose('new');
+    s.setAccount('ordini');
+    expect(s.c?.html).not.toContain('datini-firma');
+    s.setAccount('valli');
+    expect(s.c?.html).toContain('Ufficio acquisti');
+  });
+
+  it('il pulsante Firma mette la firma scelta al posto di quella presente', async () => {
+    const s = await fresh('nuovo');
+    const nuova = await s.saveSignature({ id: '', name: 'Breve', html: '<div>C. Valli</div>' });
+    expect(nuova?.id).toBeTruthy();
+    await s.openCompose('new');
+    s.insertSignature(nuova!.id);
+    expect(s.c?.html).toContain('<div id="datini-firma"><div>C. Valli</div></div>');
+    expect(s.c?.html).not.toContain('Ufficio acquisti');
+  });
+
+  it('la prima firma creata diventa quella di tutti gli account', async () => {
+    const s = await fresh('nuovo');
+    await s.deleteSignature('firma-chiara');
+    expect(s.signatures).toHaveLength(0);
+    expect(s.accounts.find((a) => a.id === 'valli')?.signatureNew ?? null).toBeNull();
+    const f = await s.saveSignature({ id: '', name: 'Ufficio', html: '<div>Valli Arredi</div>' });
+    await s.reloadAccounts();
+    for (const a of s.accounts) {
+      expect(a.signatureNew).toBe(f!.id);
+      expect(a.signatureReply).toBe(f!.id);
+    }
+  });
+
+  it('il carattere predefinito resta scelto', async () => {
+    const s = await fresh();
+    s.setFont({ family: 'Verdana', size: 12 });
+    expect(s.font).toEqual({ family: 'Verdana', size: 12 });
+  });
+});
+
+function $snap(s: MailStore) {
+  return JSON.parse(JSON.stringify(s.c));
+}

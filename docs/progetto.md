@@ -8,7 +8,7 @@ Questo file raccoglie le decisioni di progetto e lo stato dello sviluppo. Le sez
 
 ## 0. Stato dello sviluppo (20 ottobre 2026)
 
-Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-email), personale e pubblico. È un progetto sperimentale, per scelta di Gimmy **non** sta nell'organizzazione Paxxion.
+Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-email), personale e pubblico. È un progetto personale e sperimentale di Gimmy.
 
 **Fasi da 1 a 6 completate.** Il motore in Rust è collegato all'interfaccia con comandi Tauri.
 
@@ -25,6 +25,8 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 | Finestre | Il nuovo messaggio si apre in una vera finestra del sistema (vista classica) o nel riquadro di lettura (vista nuova). |
 | PST | Libreria `outlook-pst` (Rust, MIT, pubblicata da Microsoft). Ogni messaggio viene ricostruito come email completa: intestazioni originali quando ci sono, testo, HTML (anche quello salvato solo come RTF), allegati e immagini. Si importano solo le cartelle di posta. |
 | MBOX ed EML | Import MBOX in un file di dati; export di una cartella in MBOX e di un messaggio in EML. |
+| Editor di testo | [RoosterJS](https://github.com/microsoft/roosterjs) (MIT), lo stesso motore della versione web e del nuovo Outlook, dentro un iframe con una Content-Security-Policy che vieta script e immagini esterne: l'HTML citato non può cambiare l'aspetto di Datini né scaricare immagini di tracciamento. Schede Messaggio, Inserisci e Formato testo come in Outlook; formato HTML o Testo normale. Le immagini nel testo partono come parti incorporate (cid), non come dati. |
+| Firme | Più firme con un nome, salvate nell'archivio. Ogni account sceglie la firma per i nuovi messaggi e quella per risposte e inoltri; il pulsante Firma la cambia mentre si scrive. La prima firma parte da nome e indirizzo dell'account. Nel testo la firma è il blocco `id="datini-firma"`, la citazione `id="datini-citazione"`: nei messaggi citati questi segni si tolgono. |
 
 **Prove automatiche.** A ogni modifica GitHub Actions esegue i test dell'interfaccia (vitest), i test del motore e una prova completa contro un server di posta vero (Dovecot e un server SMTP di prova, in `tools/posta-di-prova`). Poi prepara gli installer per Windows, macOS (Apple Silicon e Intel) e Linux.
 
@@ -32,19 +34,19 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 - Il PST non si modifica: "Apri PST" ne fa una copia nell'archivio di Datini, come file di dati separato. Spostare o eliminare messaggi lì non tocca il file originale.
 - I file `.ost` non si aprono (la libreria non legge il formato di Exchange 2013 e successivi).
 - Alcuni allegati di PST generati da programmi diversi da Outlook non sono leggibili dalla libreria: vengono contati e segnalati alla fine dell'importazione.
-- La scrittura è in testo semplice: formattazione, firma e modelli arriveranno dopo.
+- Mancano ancora regole, risposte automatiche, invio programmato e modelli.
 - Calendario, Contatti e Attività sono solo icone.
 
 ---
 
 ## 1. Il progetto
 
-**Datini** è un client di posta desktop **gratuito e open source**, pensato per i clienti di Paxxion (PMI italiane) che usano Outlook ogni giorno.
+**Datini** è un client di posta desktop **gratuito e open source**, pensato per le PMI italiane che usano Outlook ogni giorno.
 
 L'obiettivo è che un utente di Outlook trovi ogni comando dove se lo aspetta, sia che venga da **Outlook classico** sia dal **nuovo Outlook**, senza doversi riabituare. Si riprendono posizioni dei comandi, scorciatoie da tastiera e sensazione cromatica di Outlook, ma **non** nomi, loghi o icone Microsoft.
 
-- **Committente e tester:** Gimmy, Digital Project Manager di Paxxion.
-- **Sviluppo:** Paxxion non ha sviluppatori dedicati, quindi il codice lo scrive Claude.
+- **Committente e tester:** Gimmy.
+- **Sviluppo:** il codice lo scrive Claude.
 - **Piattaforme:** Windows, macOS e Linux.
 - **Lingua dell'interfaccia:** italiano.
 

@@ -19,5 +19,8 @@ export default defineConfig({
   build: {
     target: ['es2021', 'chrome105', 'safari15'],
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    // L'app si carica dal disco, non dalla rete: l'editor di testo (RoosterJS)
+    // rende il pacchetto più grande dei 500 kB pensati per i siti web.
+    chunkSizeWarningLimit: 1200,
   },
 });

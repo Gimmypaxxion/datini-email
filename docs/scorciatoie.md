@@ -27,6 +27,17 @@ Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegna
 | Azione | Scorciatoia |
 |---|---|
 | Invia | Ctrl+Invio |
+| Grassetto | Ctrl+G (anche Ctrl+B) |
+| Corsivo | Ctrl+I |
+| Sottolineato | Ctrl+S (anche Ctrl+U) |
+| Inserisci o modifica un collegamento | Ctrl+K |
+| Elenco puntato | Ctrl+punto, oppure scrivi `* ` o `- ` a inizio riga |
+| Elenco numerato | Ctrl+/ , oppure scrivi `1. ` a inizio riga |
+| Aumenta o riduci il rientro di un elenco | Tab e Maiusc+Tab (anche Alt+Maiusc+freccia destra o sinistra) |
+| Aumenta o riduci la dimensione del carattere | Ctrl+Maiusc+punto, Ctrl+Maiusc+virgola |
+| Cancella la formattazione | Ctrl+Spazio |
+| Annulla, Ripeti | Ctrl+Z, Ctrl+Y |
+| Cella successiva o precedente di una tabella | Tab, Maiusc+Tab (Tab nell'ultima cella aggiunge una riga) |
 | Scegli un indirizzo suggerito | Freccia giù / Freccia su, poi Invio o Tab |
 | Aggiungi l'indirizzo scritto | Invio, virgola o punto e virgola |
 | Togli l'ultimo destinatario | Backspace nel campo vuoto |
@@ -40,4 +51,3 @@ Queste scorciatoie di Outlook arriveranno con le funzioni a cui servono:
 |---|---|
 | Sposta in una cartella | Ctrl+Maiusc+V |
 | Posta, Calendario, Contatti, Attività | Ctrl+1 … Ctrl+4 |
-| Grassetto, Corsivo, Sottolineato | Ctrl+G, Ctrl+I, Ctrl+S |

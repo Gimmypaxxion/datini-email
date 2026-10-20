@@ -15,6 +15,7 @@
     aiuto: 'Aiuto',
     messaggio: 'Messaggio',
     inserisci: 'Inserisci',
+    formato: 'Formato testo',
   };
 
   const noSel = $derived(!store.selected);

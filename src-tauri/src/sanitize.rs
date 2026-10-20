@@ -78,8 +78,11 @@ fn count_remote_in_style_blocks(html: &str) -> u32 {
     n
 }
 
-pub fn clean_email_html(html: &str, inline: &[(String, String, Vec<u8>)], allow_remote: bool) -> Clean {
-    let count = Arc::new(AtomicU32::new(0));
+/// Regole di pulizia comuni. `allow_remote`: le risorse esterne restano
+/// (altrimenti diventano segnaposto e vengono contate). `keep_style`: i
+/// blocchi <style> restano (nella lettura sì; nelle citazioni e nell'editor no,
+/// perché cambierebbero l'aspetto di tutto il testo scritto).
+fn builder(inline: &[(String, String, Vec<u8>)], allow_remote: bool, keep_style: bool, count: Arc<AtomicU32>) -> ammonia::Builder<'static> {
     let cids: Arc<HashMap<String, String>> = Arc::new(
         inline
             .iter()
@@ -91,9 +94,7 @@ pub fn clean_email_html(html: &str, inline: &[(String, String, Vec<u8>)], allow_
     );
 
     let mut b = ammonia::Builder::default();
-    b.add_tags(["style", "font", "center", "u", "s", "strike", "big", "small", "hr", "span", "div", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "col", "colgroup", "img", "picture", "sup", "sub"])
-        .rm_clean_content_tags(["style"])
-        .clean_content_tags(HashSet::from(["script", "title", "noscript", "template", "object", "embed", "applet", "iframe", "frame", "frameset"]))
+    b.add_tags(["font", "center", "u", "s", "strike", "big", "small", "hr", "span", "div", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "col", "colgroup", "img", "picture", "sup", "sub"])
         .add_generic_attributes(["style", "class", "align", "valign", "width", "height", "bgcolor", "color", "border", "dir", "lang", "title", "id"])
         .add_tag_attributes("table", ["cellpadding", "cellspacing", "background", "role"])
         .add_tag_attributes("td", ["background", "colspan", "rowspan", "nowrap"])
@@ -107,9 +108,15 @@ pub fn clean_email_html(html: &str, inline: &[(String, String, Vec<u8>)], allow_
         .url_schemes(HashSet::from(["http", "https", "mailto", "tel", "cid", "data"]))
         .link_rel(Some("noopener noreferrer"))
         .strip_comments(true);
+    if keep_style {
+        b.add_tags(["style"]).rm_clean_content_tags(["style"]);
+        b.clean_content_tags(HashSet::from(["script", "title", "noscript", "template", "object", "embed", "applet", "iframe", "frame", "frameset"]));
+    } else {
+        b.clean_content_tags(HashSet::from(["script", "style", "title", "noscript", "template", "object", "embed", "applet", "iframe", "frame", "frameset"]));
+    }
 
-    let c2 = count.clone();
-    let cids2 = cids.clone();
+    let c2 = count;
+    let cids2 = cids;
     b.attribute_filter(move |element, attribute, value| {
         match (element, attribute) {
             ("img", "src") => {
@@ -152,6 +159,20 @@ pub fn clean_email_html(html: &str, inline: &[(String, String, Vec<u8>)], allow_
             _ => Some(Cow::Borrowed(value)),
         }
     });
+    b
+}
+
+/// Frammento HTML ripulito da mettere nell'editor (citazione di un messaggio,
+/// bozza riaperta, firma). Le immagini incorporate diventano dati; quelle
+/// esterne restano indicate, ma l'editor non le scarica.
+pub fn clean_fragment(html: &str, inline: &[(String, String, Vec<u8>)]) -> String {
+    let count = Arc::new(AtomicU32::new(0));
+    builder(inline, true, false, count).clean(html).to_string().trim().to_string()
+}
+
+pub fn clean_email_html(html: &str, inline: &[(String, String, Vec<u8>)], allow_remote: bool) -> Clean {
+    let count = Arc::new(AtomicU32::new(0));
+    let b = builder(inline, allow_remote, true, count.clone());
 
     let body = b.clean(html).to_string();
     let mut remote = count.load(Ordering::Relaxed);
@@ -208,6 +229,16 @@ mod tests {
         let c = clean_email_html("<img src=\"cid:logo@x\">", &[("logo@x".into(), "image/png".into(), vec![1, 2, 3])], false);
         assert!(c.html.contains("src=\"data:image/png;base64,AQID\""));
         assert_eq!(c.remote, 0);
+    }
+
+    #[test]
+    fn fragments_drop_style_blocks_and_keep_links() {
+        let f = clean_fragment("<html><head><style>body{display:none}</style><title>x</title></head><body><div id=\"datini-firma\" class=\"x\" style=\"color:red\"><img src=\"https://x.it/logo.png\"><img src=\"cid:a@b\"><script>alert(1)</script></div></body></html>", &[("a@b".into(), "image/png".into(), vec![1, 2, 3])]);
+        assert!(!f.contains("display:none"));
+        assert!(!f.contains("alert"));
+        assert!(f.contains("id=\"datini-firma\""));
+        assert!(f.contains("src=\"https://x.it/logo.png\""));
+        assert!(f.contains("src=\"data:image/png;base64,AQID\""));
     }
 
     #[test]

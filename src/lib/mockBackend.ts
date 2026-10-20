@@ -3,6 +3,7 @@
 
 import type { Backend, Tab } from './backend';
 import { mockData, type MockMessage } from './mock';
+import { textToHtml } from './compose-html';
 import type {
   Account,
   Draft,
@@ -16,6 +17,7 @@ import type {
   Person,
   Role,
   SavedDraft,
+  Signature,
 } from './types';
 
 export const UNDO_MS = 7000;
@@ -61,6 +63,13 @@ export class MockBackend implements Backend {
   private listeners = new Set<(e: EngineEvent) => void>();
   private outgoing = new Map<number, Outgoing>();
   private nextId = 1000;
+  private sigs: Signature[] = [
+    {
+      id: 'firma-chiara',
+      name: 'Chiara Valli',
+      html: '<div>Chiara Valli</div><div style="color: #595959;">Ufficio acquisti, Valli Arredi</div><div style="color: #595959;">Tel. 0574 152 638</div>',
+    },
+  ];
   /** Ritardo simulato per la ricerca dei server. */
   addDelay = 0;
 
@@ -134,7 +143,7 @@ export class MockBackend implements Backend {
 
   async updateAccount(account: Account) {
     const i = this.accountsList.findIndex((a) => a.id === account.id);
-    if (i >= 0) this.accountsList[i] = { ...this.accountsList[i], name: account.name, sync: { ...account.sync } };
+    if (i >= 0) this.accountsList[i] = { ...this.accountsList[i], name: account.name, sync: { ...account.sync }, signatureNew: account.signatureNew ?? null, signatureReply: account.signatureReply ?? null };
     this.emit({ type: 'accounts' });
   }
 
@@ -180,6 +189,39 @@ export class MockBackend implements Backend {
       })
       .sort((a, b) => b.date - a.date)
       .map((m) => ({ ...summary(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
+  }
+
+  async quoteHtml(id: number) {
+    const m = this.find(id);
+    return m.html ?? textToHtml(m.text);
+  }
+
+  async signatures() {
+    return this.sigs.map((s) => ({ ...s }));
+  }
+
+  async saveSignature(s: Signature) {
+    if (!s.name.trim()) throw err('utente', 'Dai un nome alla firma.');
+    const saved = { ...s, name: s.name.trim(), id: s.id || `firma-${this.nextId++}` };
+    const i = this.sigs.findIndex((x) => x.id === saved.id);
+    if (i >= 0) this.sigs[i] = saved;
+    else this.sigs.push(saved);
+    this.emit({ type: 'signatures' });
+    return { ...saved };
+  }
+
+  async deleteSignature(id: string) {
+    this.sigs = this.sigs.filter((s) => s.id !== id);
+    for (const a of this.accountsList) {
+      if (a.signatureNew === id) a.signatureNew = null;
+      if (a.signatureReply === id) a.signatureReply = null;
+    }
+    this.emit({ type: 'signatures' });
+    this.emit({ type: 'accounts' });
+  }
+
+  async fetchImage() {
+    return null;
   }
 
   async message(id: number, allowRemote: boolean): Promise<MessageDetail> {
@@ -258,7 +300,7 @@ export class MockBackend implements Backend {
       folderName: null,
       messageId: `${d.key}@bozza`,
       references: d.references,
-      html: null,
+      html: d.html ?? null,
       text: d.body,
       attachments: d.attachments.map((a, index) => ({ index, name: a.name, size: a.size, mime: a.mime ?? 'application/octet-stream', inline: false })),
       remoteImages: 0,
@@ -309,6 +351,7 @@ export class MockBackend implements Backend {
       bcc: m.bcc,
       subject: m.subject,
       body: m.text,
+      html: m.html,
       attachments: m.attachments.map((a) => ({ name: a.name, size: a.size, mime: a.mime, source: { messageId: m.id, index: a.index } })),
       inReplyTo: null,
       references: m.references,

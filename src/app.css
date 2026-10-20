@@ -153,6 +153,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .rb { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 9px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font-size: 13.5px; white-space: nowrap; flex: none; transition: background-color .15s ease-out; }
 .rb:hover:not(:disabled) { background: var(--hover); }
 .rb:active:not(:disabled) { transform: translateY(1px); }
+.rb[aria-pressed="true"] { background: var(--brand-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-ink) 30%, transparent); }
+.rb[aria-pressed="true"]:hover:not(:disabled) { background: var(--brand-sel); }
 .rb svg.i { width: 18px; height: 18px; color: var(--ink-2); }
 .rb svg.chev { width: 14px; height: 14px; color: var(--ink-3); margin-left: -2px; }
 .rb svg.c-brand { color: var(--brand-ink); }

@@ -61,6 +61,31 @@ pub async fn message(e: E<'_>, id: i64, allow_remote: bool) -> Result<MessageDet
 }
 
 #[tauri::command]
+pub async fn quote_html(e: E<'_>, id: i64) -> Result<String> {
+    e.quote_html(id).await
+}
+
+#[tauri::command]
+pub async fn signatures(e: E<'_>) -> Result<Vec<Signature>> {
+    e.signatures()
+}
+
+#[tauri::command]
+pub async fn save_signature(e: E<'_>, signature: Signature) -> Result<Signature> {
+    e.save_signature(signature)
+}
+
+#[tauri::command]
+pub async fn delete_signature(e: E<'_>, id: String) -> Result<()> {
+    e.delete_signature(&id)
+}
+
+#[tauri::command]
+pub async fn fetch_image(e: E<'_>, url: String) -> Result<Option<String>> {
+    e.fetch_image(&url).await
+}
+
+#[tauri::command]
 pub async fn set_flags(e: E<'_>, ids: Vec<i64>, seen: Option<bool>, flagged: Option<bool>) -> Result<()> {
     e.set_flags(&ids, seen, flagged, None)
 }
