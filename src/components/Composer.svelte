@@ -16,6 +16,7 @@
   const uid = Math.random().toString(36).slice(2, 8);
 
   let toEl: HTMLInputElement | undefined = $state();
+  let subjEl: HTMLInputElement | undefined = $state();
   let bodyEl: HTMLTextAreaElement | undefined = $state();
   let sugg = $state<{ key: RecipientField; items: Person[]; idx: number } | null>(null);
   let suggSeq = 0;
@@ -154,10 +155,17 @@
       {#if store.showBcc}{@render field('bcc')}{/if}
     </div>
   </div>
+  {#if store.askNoSubject}
+    <div class="note-bar warn ask" role="alertdialog" aria-label="Messaggio senza oggetto">
+      <span class="t">Questo messaggio non ha un oggetto. Vuoi inviarlo comunque?</span>
+      <button class="act" onclick={() => store.send(true)}>Invia comunque</button>
+      <button class="act" onclick={() => { store.askNoSubject = false; subjEl?.focus(); }}>Aggiungi oggetto</button>
+    </div>
+  {/if}
   <div class="pad">
     <div class="field subj">
       <label for="subj-{uid}" class="sr">Oggetto</label>
-      <input id="subj-{uid}" class="ph bare" value={c.subject} oninput={(e) => store.setSubject(e.currentTarget.value)} placeholder="Aggiungi un oggetto" autocomplete="off" />
+      <input bind:this={subjEl} id="subj-{uid}" class="ph bare" value={c.subject} oninput={(e) => store.setSubject(e.currentTarget.value)} placeholder="Aggiungi un oggetto" autocomplete="off" />
     </div>
   </div>
   {#if c.attachments.length}
@@ -199,6 +207,7 @@
   .sgn { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sge { font-size: 12.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pad { padding: 0 24px; }
+  .ask { margin: 10px 24px 0; border-radius: 4px; }
   .subj { min-height: 44px; }
   .subj input { flex: 1; min-width: 0; height: 32px; font-size: 15px; font-weight: 600; outline: none; }
   .atts { margin: 0; padding: 10px 24px 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }

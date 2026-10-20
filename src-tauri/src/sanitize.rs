@@ -169,9 +169,9 @@ pub fn clean_email_html(html: &str, inline: &[(String, String, Vec<u8>)], allow_
 <meta name=\"color-scheme\" content=\"light\">\
 <style>html,body{{margin:0;padding:0;background:#ffffff;}}\
 body{{font-family:'Segoe UI Variable','Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif;font-size:14.5px;line-height:1.5;color:#242424;overflow-wrap:break-word;}}\
-img{{max-width:100%;height:auto;}} table{{max-width:100%;}} pre{{white-space:pre-wrap;}}\
+img{{max-width:100%;}} img:not([src^='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP']){{height:auto;}} table{{max-width:100%;}} pre{{white-space:pre-wrap;}}\
 blockquote{{margin:0 0 0 .8em;padding-left:.8em;border-left:2px solid #d1d1d1;}}\
-a{{color:#0f6cbd;}} img[src^='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP']{{background:#f3f3f3;}}</style></head><body>{body}</body></html>"
+a{{color:#0f6cbd;}} img[src^='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP']{{background:#f3f3f3;max-height:320px;}} img[src^='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP']:not([height]){{height:40px;}}</style></head><body>{body}</body></html>"
     );
     Clean { html: doc, remote }
 }

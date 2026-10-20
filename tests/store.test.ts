@@ -194,6 +194,16 @@ describe('scrittura', () => {
     expect(s.c?.to[0].name).toBe('Mario Rossi');
   });
 
+  it('senza oggetto chiede conferma prima di inviare', async () => {
+    const s = await fresh();
+    await s.openCompose('new');
+    s.recipientInput('to', 'lucia@marchettitessuti.it');
+    expect(await s.send()).toBe(false);
+    expect(s.askNoSubject).toBe(true);
+    expect(await s.send(true)).toBe(true);
+    expect(s.c).toBeNull();
+  });
+
   it('l’invio va in uscita, con avviso e Annulla che riapre il messaggio', async () => {
     const s = await fresh();
     await s.openCompose('new');

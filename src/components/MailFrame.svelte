@@ -20,7 +20,7 @@
       if (!body || !frame) return;
       body.style.transform = '';
       body.style.width = '';
-      doc.documentElement.style.overflowX = '';
+      doc.documentElement.style.overflow = '';
       const avail = frame.clientWidth;
       const natural = Math.max(doc.documentElement.scrollWidth, body.scrollWidth);
       const scale = natural > avail + 4 ? Math.max(0.55, avail / natural) : 1;
@@ -28,7 +28,7 @@
         body.style.transformOrigin = '0 0';
         body.style.transform = `scale(${scale})`;
         body.style.width = `${natural}px`;
-        doc.documentElement.style.overflowX = 'hidden';
+        doc.documentElement.style.overflow = 'hidden';
       }
       height = Math.ceil(Math.max(body.scrollHeight, 40) * scale) + 6;
     };

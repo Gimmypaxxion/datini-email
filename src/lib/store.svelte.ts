@@ -174,6 +174,8 @@ export class MailStore {
   savedAt = $state('');
   saveError = $state('');
   sending = $state(false);
+  /** Oggetto vuoto: Outlook chiede conferma prima di inviare. */
+  askNoSubject = $state(false);
   toast = $state<Toast | null>(null);
   private lastSent: LastSent | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -689,6 +691,7 @@ export class MailStore {
     this.winMax = false;
     this.savedAt = '';
     this.saveError = '';
+    this.askNoSubject = false;
     this.toInput = '';
     this.ccInput = '';
     this.bccInput = '';
@@ -866,6 +869,7 @@ export class MailStore {
   setSubject(v: string) {
     if (!this.c) return;
     this.c.subject = v;
+    this.askNoSubject = false;
     this.touch();
   }
 
@@ -951,7 +955,7 @@ export class MailStore {
     this.touch();
   }
 
-  async send(): Promise<boolean> {
+  async send(confirmed = false): Promise<boolean> {
     if (!this.c || this.sending) return false;
     this.commitInputs();
     const d = this.snapshot()!;
@@ -965,6 +969,11 @@ export class MailStore {
       this.err = `L’indirizzo “${bad.email || bad.name}” non è valido. Scrivi l’indirizzo email completo.`;
       return false;
     }
+    if (!d.subject.trim() && !confirmed) {
+      this.askNoSubject = true;
+      return false;
+    }
+    this.askNoSubject = false;
     clearTimeout(this.saveTimer);
     this.sending = true;
     try {
