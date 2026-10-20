@@ -1,0 +1,1476 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Datini, posta in arrivo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.tb{--font:"Segoe UI Variable Text","Segoe UI",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;--ground:#F0F0F0;--sheet:#FFFFFF;--rail:#F5F5F5;--rail-2:#E0E0E0;--ink:#242424;--ink-2:#424242;--ink-3:#616161;--rule:#E0E0E0;--rule-2:#D1D1D1;--brand:#0F6CBD;--brand-ink:#0F6CBD;--on-brand:#FFFFFF;--brand-soft:#EBF3FC;--brand-sel:#CFE4FA;--danger:#C50F1F;--warn:#8A6200;--warn-soft:#FFF4CE;--green:#107C10;--amber:#A06A00;--head:#0F6CBD;--on-head:#FFFFFF;--head-hover:rgba(255,255,255,.16);--hover:rgba(0,0,0,.045);--focus:#242424;--scrim:rgba(0,0,0,.4);--lift:0 0 2px rgba(0,0,0,.12),0 2px 4px rgba(0,0,0,.14);--sheet-shadow:0 0 2px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.1);--win-shadow:0 0 8px rgba(0,0,0,.12),0 24px 48px rgba(0,0,0,.2);
+--av1-bg:#DEECF9;--av1-fg:#0F548C;--av2-bg:#C7EBE8;--av2-fg:#00666D;--av3-bg:#E7DDF4;--av3-fg:#5C2E91;--av4-bg:#FCE0D4;--av4-fg:#8E3C0E;--av5-bg:#DFF0D6;--av5-fg:#2E6A0F}
+.tb[data-theme="scuro"]{--ground:#141414;--sheet:#292929;--rail:#1F1F1F;--rail-2:#3D3D3D;--ink:#FFFFFF;--ink-2:#D6D6D6;--ink-3:#ADADAD;--rule:#3D3D3D;--rule-2:#525252;--brand:#115EA3;--brand-ink:#479EF5;--on-brand:#FFFFFF;--brand-soft:#082338;--brand-sel:#0A3354;--danger:#E37D80;--warn:#FFC83D;--warn-soft:#463100;--green:#54B054;--amber:#FFC83D;--head:#262626;--on-head:#FFFFFF;--head-hover:rgba(255,255,255,.1);--hover:rgba(255,255,255,.06);--focus:#FFFFFF;--scrim:rgba(0,0,0,.6);--lift:0 0 2px rgba(0,0,0,.5),0 2px 4px rgba(0,0,0,.5);--sheet-shadow:0 0 2px rgba(0,0,0,.4),0 1px 2px rgba(0,0,0,.4);--win-shadow:0 0 8px rgba(0,0,0,.5),0 24px 48px rgba(0,0,0,.6);
+--av1-bg:#0F3A5E;--av1-fg:#9CCBF3;--av2-bg:#0B3D40;--av2-fg:#7FD3CC;--av3-bg:#3A2556;--av3-fg:#C9B3EA;--av4-bg:#4A2412;--av4-fg:#F2B597;--av5-bg:#203A12;--av5-fg:#A9D98F}
+.tb svg.i{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tb ::selection{background:var(--brand-sel);color:var(--ink)}
+.tb button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tb button:disabled{opacity:.42;cursor:default}
+.tb input,.tb textarea{caret-color:var(--brand-ink)}
+.tb .btn{transition:background-color .15s ease-out}
+.tb .btn:hover:not(:disabled){background:var(--hover)}
+.tb .btn:active:not(:disabled){transform:translateY(1px)}
+.tb .primary{transition:filter .15s ease-out}
+.tb .primary:hover:not(:disabled){filter:brightness(1.1)}
+.tb .primary:active:not(:disabled){transform:translateY(1px)}
+.tb button:focus-visible,.tb input:focus-visible,.tb textarea:focus-visible,.tb a:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.tb .ph::placeholder{color:var(--ink-3);opacity:1}
+.tb .hbtn{width:36px;height:36px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--on-head);transition:background-color .15s ease-out}
+.tb .hbtn:hover{background:var(--head-hover)}
+.tb .hbtn:focus-visible{outline-color:var(--on-head)}
+.tb .fold[data-sel="si"]{background:var(--brand-soft)}
+.tb .row .row-main{transition:background-color .12s ease-out}
+.tb .row[data-sel="no"] .row-main:hover{background:var(--hover)}
+.tb .row[data-sel="si"] .row-main{background:var(--brand-sel)}
+.tb .row-acts{opacity:0;transition:opacity .15s ease-out}
+.tb .row:hover .row-acts,.tb .row:focus-within .row-acts{opacity:1}
+.tb .scroll{scrollbar-width:thin;scrollbar-color:var(--rule-2) transparent}
+.tb .scroll::-webkit-scrollbar{width:10px;height:10px}
+.tb .scroll::-webkit-scrollbar-thumb{background:var(--rule-2);border-radius:10px;border:3px solid transparent;background-clip:content-box}
+.tb .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tb a{color:var(--brand-ink);text-underline-offset:3px}
+.tb .rib{display:flex;align-items:center;padding:0 6px;background:var(--sheet);border-radius:8px;box-shadow:var(--sheet-shadow);overflow:hidden}
+.tb .rib[data-mode="compatta"]{height:46px}
+.tb .rib[data-mode="estesa"]{height:108px;align-items:stretch;padding:6px 6px 0}
+.tb .rg{display:flex;align-items:center;flex:none}
+.tb .rg + .rg{margin-left:6px;padding-left:6px;background:linear-gradient(var(--rule),var(--rule)) left center/1px 24px no-repeat}
+.tb .rgb{display:flex;align-items:center;gap:2px}
+.tb .rgl{display:none}
+.tb .rs,.tb .rr{display:contents}
+.tb .rb{height:34px;display:flex;align-items:center;gap:6px;padding:0 9px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:13.5px;white-space:nowrap;flex:none;transition:background-color .15s ease-out}
+.tb .rb:hover:not(:disabled){background:var(--hover)}
+.tb .rb:active:not(:disabled){transform:translateY(1px)}
+.tb .rb svg.i{width:18px;height:18px;color:var(--ink-2)}
+.tb .rb svg.chev{width:14px;height:14px;color:var(--ink-3);margin-left:-2px}
+.tb .rb svg.c-brand{color:var(--brand-ink)}
+.tb .rb svg.c-red{color:var(--danger)}
+.tb .rb svg.c-green{color:var(--green)}
+.tb .rb svg.c-amber{color:var(--amber)}
+.tb .rb.ico{width:34px;padding:0;justify-content:center}
+.tb .rb.sel{height:30px;justify-content:space-between;box-shadow:inset 0 0 0 1px var(--rule-2);padding:0 8px 0 10px}
+.tb .rb.pri{background:var(--brand);color:var(--on-brand);font-weight:600;padding:0 14px 0 12px}
+.tb .rb.pri svg.i{color:var(--on-brand)}
+.tb .rb.pri:hover:not(:disabled){background:var(--brand);filter:brightness(1.1)}
+.tb .rb.pri-x{width:28px;padding:0;justify-content:center;margin-left:-2px;border-radius:0 4px 4px 0;box-shadow:inset 1px 0 0 rgba(255,255,255,.4)}
+.tb .rb.pri-x svg.chev{width:16px;height:16px;margin:0;color:var(--on-brand)}
+.tb .bl{display:inline-flex;align-items:center;gap:4px}
+.tb .rib[data-mode="estesa"] .rg{flex-direction:column;align-items:stretch;padding:0 4px}
+.tb .rib[data-mode="estesa"] .rg + .rg{margin-left:4px;padding-left:8px;background-size:1px 84px}
+.tb .rib[data-mode="estesa"] .rgb{flex:1;align-items:flex-start}
+.tb .rib[data-mode="estesa"] .rgl{display:block;padding:3px 0 6px;text-align:center;font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.tb .rib[data-mode="estesa"] .rs{display:flex;flex-direction:column;gap:1px;padding-top:1px}
+.tb .rib[data-mode="estesa"] .rr{display:flex;align-items:center;gap:2px}
+.tb .rib[data-mode="estesa"] .rs .rb{height:25px;padding:0 8px 0 6px;font-size:12.5px}
+.tb .rib[data-mode="estesa"] .rs .rb svg.i{width:16px;height:16px}
+.tb .rib[data-mode="estesa"] .rs .rb.ico{width:28px;padding:0}
+.tb .rib[data-mode="estesa"] .rs .rb.sel{height:26px}
+.tb .rib[data-mode="estesa"] .rb.big{flex-direction:column;justify-content:flex-start;height:78px;min-width:56px;max-width:90px;padding:8px 6px 4px;gap:5px;font-size:12.5px;line-height:1.15;text-align:center;white-space:normal}
+.tb .rib[data-mode="estesa"] .rb.big svg.i{width:30px;height:30px;stroke-width:1.5}
+.tb .rib[data-mode="estesa"] .rb.big .bl{display:block}
+.tb .rib[data-mode="estesa"] .rb.big .bl svg.chev{display:inline-block;width:12px;height:12px;margin:0 0 0 3px;vertical-align:-1px}
+.tb .rib[data-mode="estesa"] .rb.pri{min-width:78px;max-width:96px;background:transparent;color:var(--ink);font-weight:400}
+.tb .rib[data-mode="estesa"] .rb.pri svg.i{color:var(--brand-ink)}
+.tb .rib[data-mode="estesa"] .rb.pri:hover:not(:disabled){background:var(--hover);filter:none}
+.tb .rib[data-mode="compatta"] .rb.split{border-radius:4px 0 0 4px}
+.tb .rib[data-mode="compatta"] .only-e,.tb .rib[data-mode="compatta"] .lbl-x{display:none}
+.tb .rib[data-mode="estesa"] .only-c{display:none}
+.tb .rib-tg{margin-left:auto}
+.tb .rib[data-mode="estesa"] .rib-tg{align-self:flex-end;width:28px;height:28px;margin-bottom:4px}
+.tb .cmp-h{display:grid;column-gap:16px;padding:16px 24px 0}
+.tb .cmp-h[data-send="sinistra"]{grid-template-columns:72px minmax(0,1fr)}
+.tb .cmp-h[data-send="alto"]{grid-template-columns:minmax(0,1fr);row-gap:8px;padding-top:12px}
+.tb .cmp-send{border:0;border-radius:4px;background:var(--brand);color:var(--on-brand);display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:600}
+.tb .cmp-h[data-send="sinistra"] .cmp-send{flex-direction:column;gap:6px;min-height:88px;align-self:stretch}
+.tb .cmp-h[data-send="alto"] .cmp-send{justify-self:start;height:32px;padding:0 16px 0 12px}
+.tb .cmp-send svg.i{width:20px;height:20px}
+.tb .win{position:absolute;z-index:20;top:76px;bottom:32px;left:max(24px,calc(50% - 400px));right:max(24px,calc(50% - 560px));display:flex;flex-direction:column;border-radius:8px;background:var(--sheet);box-shadow:var(--win-shadow),0 0 0 1px var(--rule-2);overflow:hidden}
+.tb .win[data-max="si"]{top:6px;bottom:6px;left:6px;right:6px}
+.tb .wbtn{width:46px;height:36px;border:0;border-radius:0;background:transparent;display:grid;place-items:center;color:var(--on-head)}
+.tb .wbtn:hover{background:var(--head-hover)}
+.tb .wbtn.wx:hover{background:#C42B1C;color:#FFFFFF}
+.tb .bs{position:absolute;z-index:25;left:0;right:0;top:48px;bottom:0;display:flex;background:var(--sheet)}
+.tb .bs-nav{width:232px;flex:none;display:flex;flex-direction:column;gap:2px;padding:14px 10px 18px;background:var(--brand);color:var(--on-brand)}
+.tb .bs-it{height:42px;display:flex;align-items:center;padding:0 16px;border:0;border-radius:4px;background:transparent;color:var(--on-brand);font-size:15px;text-align:left}
+.tb .bs-it:hover{background:rgba(0,0,0,.12)}
+.tb .bs-it[data-on="si"]{background:rgba(0,0,0,.22);font-weight:600}
+.tb .bs-nav button:focus-visible{outline-color:var(--on-brand)}
+.tb .bs-row{display:grid;grid-template-columns:104px minmax(0,1fr);gap:22px;align-items:start;padding:20px 0}
+.tb .bs-row + .bs-row{box-shadow:inset 0 1px 0 var(--rule)}
+.tb .bs-tile{width:104px;height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 6px;border:0;border-radius:4px;background:var(--sheet);box-shadow:inset 0 0 0 1px var(--rule-2);color:var(--ink);font-size:12.5px;line-height:1.2;text-align:center}
+.tb .bs-tile svg.i{width:30px;height:30px;color:var(--brand-ink);stroke-width:1.5}
+.tb .scrim{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:32px;background:var(--scrim)}
+.tb .opt{position:relative;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:4px;background:var(--sheet);box-shadow:inset 0 0 0 1px var(--rule-2);cursor:pointer;transition:box-shadow .15s ease-out}
+.tb .pill{position:relative;height:32px;display:inline-flex;align-items:center;padding:0 14px;border-radius:16px;background:var(--sheet);box-shadow:inset 0 0 0 1px var(--rule-2);font-size:13.5px;cursor:pointer}
+.tb .obc{position:relative;display:flex;flex-direction:column;gap:14px;padding:14px 14px 18px;border-radius:8px;background:var(--sheet);box-shadow:inset 0 0 0 1px var(--rule-2);cursor:pointer;transition:box-shadow .15s ease-out}
+.tb .opt:hover,.tb .pill:hover,.tb .obc:hover{background:var(--rail)}
+.tb .opt[data-on="si"],.tb .obc[data-on="si"]{box-shadow:inset 0 0 0 2px var(--brand)}
+.tb .pill[data-on="si"]{background:var(--brand);color:var(--on-brand);box-shadow:none;font-weight:600}
+.tb .opt:focus-within,.tb .pill:focus-within,.tb .obc:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+.tb .opt input,.tb .pill input,.tb .obc input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.tb .dot{width:18px;height:18px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--ink-3);margin-top:1px;transition:box-shadow .15s ease-out}
+.tb [data-on="si"] .dot{box-shadow:inset 0 0 0 5.5px var(--brand)}
+@keyframes tb-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes tb-win{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes tb-fade{from{opacity:0}to{opacity:1}}
+.tb .rise{animation:tb-rise .2s cubic-bezier(.2,.8,.2,1) both}
+.tb .win-in{animation:tb-win .22s cubic-bezier(.2,.8,.2,1) both}
+.tb .fade-in{animation:tb-fade .16s ease-out both}
+@media (prefers-reduced-motion: reduce){.tb .rise,.tb .win-in,.tb .fade-in{animation:none}.tb .btn,.tb .primary,.tb .rb,.tb .hbtn,.tb .row .row-main,.tb .dot,.tb .opt,.tb .obc{transition:none}}
+@media (max-width:1380px){.tb .rib[data-mode="estesa"] .p1{display:none}}
+@media (max-width:1360px){.tb .rib[data-mode="compatta"] .lbl{display:none}}
+@media (max-width:1260px){.tb .rib[data-mode="estesa"] .p2{display:none}}
+@media (max-width:1120px){.tb .pane-folders{display:none}}
+@media (max-width:760px){.tb .rail-apps,.tb .pane-read,.tb .search-wrap,.tb .side-l{display:none}.tb .pane-list{width:auto;flex:1 1 auto;margin-right:10px}.tb .win{top:0;bottom:0;left:0;right:0;border-radius:0}.tb .two{grid-template-columns:minmax(0,1fr)}.tb .set-dlg{flex-direction:column}.tb .set-nav{width:auto}.tb .scrim{padding:12px}.tb .bs-nav{width:180px}}
+</style>
+</helmet>
+<div class="tb" data-theme="{{theme}}" style="position:relative;height:100vh;min-height:640px;display:flex;flex-direction:column;background:var(--ground);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.4;overflow:hidden">
+
+<header style="height:48px;flex:none;display:flex;align-items:center;gap:16px;padding:0 10px 0 14px;background:var(--head);color:var(--on-head)">
+<div class="side-l" aria-hidden="true" style="width:280px;flex:none"></div>
+<div class="search-wrap" style="flex:1;min-width:0;display:flex;justify-content:center">
+<label style="position:relative;display:block;width:100%;max-width:560px">
+<span class="sr">Cerca nella posta</span>
+<svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="position:absolute;left:10px;top:7px;color:var(--brand-ink)"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg>
+<input class="ph" type="search" value="{{q}}" onChange="{{onSearch}}" placeholder="Cerca" title="Cerca (Ctrl+E)" style="width:100%;box-sizing:border-box;height:32px;padding:0 38px 0 38px;border:0;border-radius:4px;background:var(--sheet);color:var(--ink);font:inherit;font-size:14px">
+<sc-if value="{{hasQ}}" hint-placeholder-val="{{false}}">
+<button class="btn" onClick="{{clearSearch}}" aria-label="Cancella ricerca" style="position:absolute;right:3px;top:3px;width:26px;height:26px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button>
+</sc-if>
+</label>
+</div>
+<div style="width:280px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:2px">
+<sc-if value="{{showGear}}" hint-placeholder-val="{{false}}">
+<button class="hbtn" onClick="{{openSettings}}" aria-label="Impostazioni" title="Impostazioni"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065"/><path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"/></svg></button>
+</sc-if>
+<button class="hbtn" aria-label="Guida" title="Guida (F1)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 16v.01"/><path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"/></svg></button>
+<button aria-label="Account di Chiara Valli" title="chiara.valli@valliarredi.it" style="width:32px;height:32px;margin-left:8px;border:0;border-radius:50%;background:var(--av1-bg);color:var(--av1-fg);font-size:12.5px;font-weight:600">CV</button>
+</div>
+</header>
+
+<div style="flex:none;background:var(--ground);padding:0 10px 8px">
+<nav aria-label="Schede dei comandi" style="height:38px;display:flex;align-items:flex-end;gap:2px;padding-left:4px">
+<sc-if value="{{showFileTab}}" hint-placeholder-val="{{true}}">
+<button class="btn" onClick="{{openBackstage}}" aria-haspopup="dialog" title="File" style="height:32px;padding:0 14px;border:0;border-radius:4px 4px 0 0;background:transparent;color:var(--brand-ink);font-size:13.5px;font-weight:600">File</button>
+</sc-if>
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+<button class="btn" onClick="{{t.pick}}" aria-pressed="{{t.on}}" style="height:32px;padding:0 12px;border:0;border-radius:4px 4px 0 0;background:transparent;color:var(--ink);font-size:13.5px;font-weight:{{t.weight}};box-shadow:{{t.bar}}">{{t.label}}</button>
+</sc-for>
+</nav>
+<div class="rib" data-mode="{{ribMode}}" role="toolbar" aria-label="Comandi">
+
+<sc-if value="{{ribHome}}" hint-placeholder-val="{{true}}">
+<div class="rg"><div class="rgb">
+<button class="rb big pri split" onClick="{{newMsg}}" title="Nuovo messaggio (Ctrl+N)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19h-7a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v5.5"/><path d="M16 19h6"/><path d="M19 16v6"/><path d="M3 7l9 6l9 -6"/></svg><span>Nuovo messaggio</span></button>
+<button class="rb pri pri-x only-c" aria-label="Altri elementi nuovi" title="Nuovo evento, contatto o attività"><svg class="i chev" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+<button class="rb big only-e" aria-label="Nuovi elementi" title="Nuovo evento, contatto o attività"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M14 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M4 15a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1l0 -4"/><path d="M14 17h6m-3 -3v6"/></svg><span class="bl"><span class="lbl">Nuovi elementi</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+</div><span class="rgl">Nuovo</span></div>
+<div class="rg only-e"><div class="rgb">
+<button class="rb big" aria-label="Invia e ricevi" title="Invia/Ricevi tutte le cartelle (F9)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg><span class="lbl">Invia e ricevi</span></button>
+</div><span class="rgl">Aggiorna</span></div>
+<div class="rg"><div class="rgb">
+<div class="rs only-e">
+<button class="rb" disabled="{{noSel}}" aria-label="Ignora conversazione" title="Ignora conversazione"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h10a2 2 0 0 1 2 2v10m-2 2h-14a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2"/><path d="M3 7l9 6l.565 -.377m2.435 -1.623l6 -4"/><path d="M3 3l18 18"/></svg></button>
+<button class="rb" disabled="{{noSel}}" aria-label="Pulisci conversazione" title="Pulisci conversazione"><svg class="i c-amber" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 20h-10.5l-4.21 -4.3a1 1 0 0 1 0 -1.41l10 -10a1 1 0 0 1 1.41 0l5 5a1 1 0 0 1 0 1.41l-9.2 9.3"/><path d="M18 13.3l-6.3 -6.3"/></svg><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+<button class="rb" onClick="{{junkSel}}" disabled="{{noSel}}" aria-label="Posta indesiderata" title="Segnala come posta indesiderata"><svg class="i c-red" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></svg><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+</div>
+<button class="rb big" onClick="{{delSel}}" disabled="{{noSel}}" aria-label="Elimina" title="Elimina (Canc)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg><span class="lbl">Elimina</span></button>
+<button class="rb big" onClick="{{archiveSel}}" disabled="{{noSel}}" aria-label="Archivia" title="Archivia (Backspace)"><svg class="i c-green" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"/><path d="M10 12l4 0"/></svg><span class="lbl">Archivia</span></button>
+<button class="rb ico only-c" onClick="{{junkSel}}" disabled="{{noSel}}" aria-label="Segnala come posta indesiderata" title="Segnala come posta indesiderata"><svg class="i c-red" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></svg></button>
+</div><span class="rgl">Elimina</span></div>
+<div class="rg"><div class="rgb">
+<div class="rs">
+<button class="rb" onClick="{{reply}}" disabled="{{noSel}}" aria-label="Rispondi" title="Rispondi (Ctrl+R)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg><span class="lbl">Rispondi</span></button>
+<button class="rb" onClick="{{replyAll}}" disabled="{{noSel}}" aria-label="Rispondi a tutti" title="Rispondi a tutti (Ctrl+Maiusc+R)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 14l-4 -4l4 -4"/><path d="M8 14l-4 -4l4 -4"/><path d="M9 10h7a4 4 0 1 1 0 8h-1"/></svg><span class="lbl">Rispondi a tutti</span></button>
+<button class="rb" onClick="{{forward}}" disabled="{{noSel}}" aria-label="Inoltra" title="Inoltra (Ctrl+F)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg><span class="lbl">Inoltra</span></button>
+</div>
+<div class="rs only-e">
+<button class="rb" disabled="{{noSel}}" aria-label="Rispondi con una riunione" title="Rispondi con una riunione"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M16 19h6"/><path d="M19 16v6"/></svg></button>
+<button class="rb" disabled="{{noSel}}" aria-label="Altre risposte" title="Altre risposte"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11v.01"/><path d="M8 11v.01"/><path d="M16 11v.01"/><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3l12 0"/></svg><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+</div>
+</div><span class="rgl">Rispondi</span></div>
+<div class="rg only-e"><div class="rgb">
+<button class="rb big" aria-label="Azioni rapide" title="Azioni rapide: più passaggi con un clic"><svg class="i c-amber" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/></svg><span class="bl"><span class="lbl">Azioni rapide</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+</div><span class="rgl">Azioni rapide</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" disabled="{{noSel}}" aria-label="Sposta in" title="Sposta in (Ctrl+Maiusc+V)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21v-4a3 3 0 0 1 3 -3h5"/><path d="M8 17l3 -3l-3 -3"/><path d="M3 11v-5a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8"/></svg><span class="bl"><span class="lbl">Sposta in</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+</div><span class="rgl">Sposta</span></div>
+<div class="rg"><div class="rgb"><div class="rs">
+<button class="rb" onClick="{{readSel}}" disabled="{{noSel}}" aria-label="Letto o non letto" title="Segna come letto (Ctrl+Q) o non letto (Ctrl+U)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9 6l9 -6l-9 -6l-9 6"/><path d="M21 9v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M3 19l6 -6"/><path d="M15 13l6 6"/></svg><span class="lbl">Letto/Non letto</span></button>
+<button class="rb" disabled="{{noSel}}" aria-label="Categorizza" title="Categorizza"><svg class="i c-amber" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3"/></svg><span class="lbl lbl-x">Categorizza</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+<button class="rb" onClick="{{flagSel}}" disabled="{{noSel}}" aria-label="Contrassegna" title="Contrassegna (Ins)"><svg class="i c-red" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9"/><path d="M5 21v-7"/></svg><span class="lbl">Contrassegna</span></button>
+</div></div><span class="rgl">Tag</span></div>
+<div class="rg only-e p2"><div class="rgb">
+<button class="rb big" aria-label="Trova" title="Cerca persone, rubrica e filtri della posta"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg><span class="bl"><span class="lbl">Trova</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+</div><span class="rgl">Trova</span></div>
+<div class="rg only-e p1"><div class="rgb">
+<button class="rb big" aria-label="Leggi ad alta voce" title="Leggi ad alta voce"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 0 8"/><path d="M17.7 5a9 9 0 0 1 0 14"/><path d="M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l3.5 -4.5a.8 .8 0 0 1 1.5 .5v14a.8 .8 0 0 1 -1.5 .5l-3.5 -4.5"/></svg><span class="lbl">Leggi ad alta voce</span></button>
+</div><span class="rgl">Comandi vocali</span></div>
+<div class="rg only-e p1"><div class="rgb">
+<button class="rb big" aria-label="Traduci" title="Traduci il messaggio"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6.371c0 4.418 -2.239 6.629 -5 6.629"/><path d="M4 6.371h7"/><path d="M5 9c0 2.144 2.252 3.908 6 4"/><path d="M12 20l4 -9l4 9"/><path d="M19.1 18h-6.2"/><path d="M6.694 3l.793 .582"/></svg><span class="bl"><span class="lbl">Traduci</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+</div><span class="rgl">Lingua</span></div>
+<div class="rg only-e p2"><div class="rgb">
+<button class="rb big" aria-label="Tutte le estensioni" title="Estensioni installate"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1"/></svg><span class="lbl">Tutte le estensioni</span></button>
+</div><span class="rgl">Estensioni</span></div>
+</sc-if>
+
+<sc-if value="{{ribView}}" hint-placeholder-val="{{false}}">
+<div class="rg"><div class="rgb">
+<button class="rb big" onClick="{{toggleFolders}}" aria-pressed="{{showFolders}}" aria-label="Riquadro cartelle"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M9 4l0 16"/></svg><span class="lbl">Riquadro cartelle</span></button>
+<button class="rb big" aria-label="Riquadro di lettura"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M15 4l0 16"/></svg><span class="bl"><span class="lbl">Riquadro di lettura</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+</div><span class="rgl">Layout</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Densità"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -2"/><path d="M4 16a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v2a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -2"/></svg><span class="bl"><span class="lbl">Densità</span><svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></span></button>
+<button class="rb big" aria-label="Conversazioni"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14l-3 -3h-7a1 1 0 0 1 -1 -1v-6a1 1 0 0 1 1 -1h9a1 1 0 0 1 1 1v10"/><path d="M14 15v2a1 1 0 0 1 -1 1h-7l-3 3v-10a1 1 0 0 1 1 -1h2"/></svg><span class="lbl">Conversazioni</span></button>
+</div><span class="rgl">Elenco messaggi</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" onClick="{{toggleTheme}}" aria-label="{{themeLabel}}">
+<sc-if value="{{isDark}}" hint-placeholder-val="{{false}}"><svg class="i c-amber" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7"/></svg></sc-if>
+<sc-if value="{{isLight}}" hint-placeholder-val="{{true}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"/></svg></sc-if>
+<span class="lbl">{{themeLabel}}</span></button>
+<button class="rb big" onClick="{{toggleRibbon}}" aria-label="{{ribSwitchLabel}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M6 8h.01"/><path d="M9 8h.01"/></svg><span class="lbl">{{ribSwitchLabel}}</span></button>
+</div><span class="rgl">Aspetto</span></div>
+</sc-if>
+
+<sc-if value="{{ribHelp}}" hint-placeholder-val="{{false}}">
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Guida"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 16v.01"/><path d="M12 13a2 2 0 0 0 .914 -3.782a1.98 1.98 0 0 0 -2.414 .483"/></svg><span class="lbl">Guida</span></button>
+<button class="rb big" aria-label="Scorciatoie da tastiera"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2l0 -8"/><path d="M6 10l0 .01"/><path d="M10 10l0 .01"/><path d="M14 10l0 .01"/><path d="M18 10l0 .01"/><path d="M6 14l0 .01"/><path d="M18 14l0 .01"/><path d="M10 14l4 .01"/></svg><span class="lbl">Scorciatoie da tastiera</span></button>
+<button class="rb big" aria-label="Novità"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1 -4 0v-13a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1v12a3 3 0 0 0 3 3h11"/><path d="M8 8l4 0"/><path d="M8 12l4 0"/><path d="M8 16l4 0"/></svg><span class="lbl">Novità</span></button>
+</div><span class="rgl">Guida</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Segnala un problema"><svg class="i c-red" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9v-1a3 3 0 0 1 6 0v1"/><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3"/><path d="M3 13l4 0"/><path d="M17 13l4 0"/><path d="M12 20l0 -6"/><path d="M4 19l3.35 -2"/><path d="M20 19l-3.35 -2"/><path d="M4 7l3.75 2.4"/><path d="M20 7l-3.75 2.4"/></svg><span class="lbl">Segnala un problema</span></button>
+<button class="rb big" aria-label="Codice sorgente"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></svg><span class="lbl">Codice sorgente</span></button>
+</div><span class="rgl">Progetto open source</span></div>
+</sc-if>
+
+<sc-if value="{{ribMsg}}" hint-placeholder-val="{{false}}">
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Incolla" title="Incolla (Ctrl+V)"><svg class="i c-amber" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2"/></svg><span class="lbl">Incolla</span></button>
+</div><span class="rgl">Appunti</span></div>
+<div class="rg"><div class="rgb"><div class="rs">
+<div class="rr">
+<button class="rb sel" aria-label="Tipo di carattere" style="width:132px">Segoe UI<svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+<button class="rb sel" aria-label="Dimensione carattere" style="width:58px">11<svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+</div>
+<div class="rr">
+<button class="rb ico" aria-label="Grassetto" title="Grassetto (Ctrl+G)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2"><path d="M7 5h6a3.5 3.5 0 0 1 0 7h-6l0 -7"/><path d="M13 12h1a3.5 3.5 0 0 1 0 7h-7v-7"/></svg></button>
+<button class="rb ico" aria-label="Corsivo" title="Corsivo (Ctrl+I)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5l6 0"/><path d="M7 19l6 0"/><path d="M14 5l-4 14"/></svg></button>
+<button class="rb ico" aria-label="Sottolineato" title="Sottolineato (Ctrl+S)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v5a5 5 0 0 0 10 0v-5"/><path d="M5 19h14"/></svg></button>
+<button class="rb ico" aria-label="Elenco puntato"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg></button>
+<button class="rb ico" aria-label="Elenco numerato"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></svg></button>
+</div>
+</div></div><span class="rgl">Testo</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Allega file"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg><span class="lbl">Allega file</span></button>
+<button class="rb big" aria-label="Collegamento" title="Collegamento (Ctrl+K)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg><span class="lbl">Collegamento</span></button>
+<button class="rb big" aria-label="Firma"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3.333 -3.333 5 -6 5 -8c0 -3 -1 -3 -2 -3s-2.032 1.085 -2 3c.034 2.048 1.658 4.877 2.5 6c1.5 2 2.5 2.5 3.5 1l2 -3c.333 2.667 1.333 4 3 4c.53 0 2.639 -2 3 -2c.517 0 1.517 .667 3 2"/></svg><span class="lbl">Firma</span></button>
+</div><span class="rgl">Includi</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Invio programmato"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 7v5l3 3"/></svg><span class="lbl">Invio programmato</span></button>
+</div><span class="rgl">Invio</span></div>
+</sc-if>
+
+<sc-if value="{{ribIns}}" hint-placeholder-val="{{false}}">
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Allega file"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg><span class="lbl">Allega file</span></button>
+<button class="rb big" aria-label="Immagine"><svg class="i c-green" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg><span class="lbl">Immagine</span></button>
+<button class="rb big" aria-label="Tabella"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14"/><path d="M3 10h18"/><path d="M10 3v18"/></svg><span class="lbl">Tabella</span></button>
+<button class="rb big" aria-label="Collegamento"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg><span class="lbl">Collegamento</span></button>
+</div><span class="rgl">Includi</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Proposta di riunione"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M16 19h6"/><path d="M19 16v6"/></svg><span class="lbl">Proposta di riunione</span></button>
+</div><span class="rgl">Riunione</span></div>
+</sc-if>
+
+<button class="rb ico rib-tg" onClick="{{toggleRibbon}}" aria-label="{{ribToggleLabel}}" title="{{ribToggleLabel}}">
+<sc-if value="{{ribIsExt}}" hint-placeholder-val="{{true}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6 -6l6 6"/></svg></sc-if>
+<sc-if value="{{ribIsCompact}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></sc-if>
+</button>
+</div>
+</div>
+
+<div style="flex:1;min-height:0;display:flex">
+
+<nav class="rail-apps" aria-label="App" style="width:52px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px;background:var(--ground)">
+<button aria-label="Posta" aria-current="page" title="Posta (Ctrl+1)" style="width:40px;height:40px;border:0;border-radius:4px;background:var(--brand-soft);display:grid;place-items:center;color:var(--brand-ink)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.7"><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M3 7l9 6l9 -6"/></svg></button>
+<button class="btn" aria-label="Calendario" title="Calendario (Ctrl+2)" style="width:40px;height:40px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M16 3l0 4"/><path d="M8 3l0 4"/><path d="M4 11l16 0"/><path d="M8 15h2v2h-2l0 -2"/></svg></button>
+<button class="btn" aria-label="Contatti" title="Contatti (Ctrl+3)" style="width:40px;height:40px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></svg></button>
+<button class="btn" aria-label="Attività" title="Attività (Ctrl+4)" style="width:40px;height:40px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg></button>
+</nav>
+
+<sc-if value="{{showFolders}}" hint-placeholder-val="{{true}}">
+<nav class="pane-folders scroll" aria-label="Cartelle" style="width:240px;flex:none;box-sizing:border-box;overflow:auto;padding:0 8px 20px 2px;background:var(--ground)">
+<div style="height:34px;display:flex;align-items:center">
+<button class="btn" onClick="{{toggleFolders}}" aria-label="Comprimi riquadro cartelle" title="Comprimi riquadro cartelle" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></svg></button>
+</div>
+<h2 style="margin:4px 0 2px;padding:0 10px;display:flex;align-items:center;gap:6px;height:30px;font-size:13px;font-weight:600;color:var(--ink)"><svg class="i" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M6 9l6 6l6 -6"/></svg>Preferiti</h2>
+<sc-for list="{{favs}}" as="f" hint-placeholder-count="3">
+<button class="btn fold" data-sel="{{f.sel}}" onClick="{{f.pick}}" aria-current="{{f.cur}}" style="width:100%;height:32px;display:flex;align-items:center;gap:10px;padding:0 10px 0 28px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:14px;text-align:left">
+<sc-if value="{{f.icInbox}}" hint-placeholder-val="{{true}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M4 13h3l3 3h4l3 -3h3"/></svg></sc-if>
+<sc-if value="{{f.icSent}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M10 14l11 -11"/><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5"/></svg></sc-if>
+<sc-if value="{{f.icDrafts}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2"/></svg></sc-if>
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:{{f.weight}}">{{f.label}}</span>
+<span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:{{f.countColor}}">{{f.count}}</span>
+</button>
+</sc-for>
+
+<h2 style="margin:14px 0 2px;padding:0 10px;display:flex;align-items:center;gap:6px;height:30px;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><svg class="i" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M6 9l6 6l6 -6"/></svg>chiara.valli@valliarredi.it</h2>
+<sc-for list="{{accFolders}}" as="f" hint-placeholder-count="9">
+<button class="btn fold" data-sel="{{f.sel}}" onClick="{{f.pick}}" aria-current="{{f.cur}}" style="width:100%;height:32px;display:flex;align-items:center;gap:10px;padding:0 10px 0 28px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:14px;text-align:left">
+<sc-if value="{{f.icInbox}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M4 13h3l3 3h4l3 -3h3"/></svg></sc-if>
+<sc-if value="{{f.icSent}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M10 14l11 -11"/><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5"/></svg></sc-if>
+<sc-if value="{{f.icDrafts}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2"/></svg></sc-if>
+<sc-if value="{{f.icArchive}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"/><path d="M10 12l4 0"/></svg></sc-if>
+<sc-if value="{{f.icJunk}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M5.7 5.7l12.6 12.6"/></svg></sc-if>
+<sc-if value="{{f.icDeleted}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg></sc-if>
+<sc-if value="{{f.icFolder}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2"/></svg></sc-if>
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:{{f.weight}}">{{f.label}}</span>
+<span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:{{f.countColor}}">{{f.count}}</span>
+</button>
+</sc-for>
+
+<h2 style="margin:12px 0 2px;padding:0;font-size:13px;font-weight:600">
+<button class="btn" onClick="{{toggleAcct2}}" aria-expanded="{{acct2Open}}" style="width:100%;height:30px;display:flex;align-items:center;gap:6px;padding:0 10px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:13px;font-weight:600;text-align:left;white-space:nowrap;overflow:hidden">
+<sc-if value="{{acct2Open}}" hint-placeholder-val="{{false}}"><svg class="i" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M6 9l6 6l6 -6"/></svg></sc-if>
+<sc-if value="{{acct2Closed}}" hint-placeholder-val="{{true}}"><svg class="i" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M9 6l6 6l-6 6"/></svg></sc-if>
+<span style="overflow:hidden;text-overflow:ellipsis">ordini@valliarredi.it</span></button>
+</h2>
+<sc-if value="{{acct2Open}}" hint-placeholder-val="{{false}}">
+<sc-for list="{{acct2Folders}}" as="f" hint-placeholder-count="1">
+<button class="btn fold" data-sel="{{f.sel}}" onClick="{{f.pick}}" aria-current="{{f.cur}}" style="width:100%;height:32px;display:flex;align-items:center;gap:10px;padding:0 10px 0 28px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:14px;text-align:left">
+<svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M4 13h3l3 3h4l3 -3h3"/></svg>
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:{{f.weight}}">{{f.label}}</span>
+</button>
+</sc-for>
+</sc-if>
+<button class="btn" onClick="{{openAccountSettings}}" style="width:100%;height:32px;margin-top:10px;display:flex;align-items:center;gap:10px;padding:0 10px;border:0;border-radius:4px;background:transparent;color:var(--brand-ink);font-size:14px;text-align:left"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M16 19h6"/><path d="M19 16v6"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4"/></svg>Aggiungi account</button>
+</nav>
+</sc-if>
+
+<section class="pane-list" aria-label="Elenco messaggi" style="position:relative;width:420px;flex:none;min-height:0;display:flex;flex-direction:column;margin:0 0 10px;border-radius:8px;background:var(--sheet);box-shadow:var(--sheet-shadow);overflow:hidden">
+<sc-if value="{{offline}}" hint-placeholder-val="{{false}}">
+<div role="status" style="display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;background:var(--warn-soft);color:var(--ink);font-size:13.5px;line-height:1.35"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--warn)"><path d="M12 18l.01 0"/><path d="M9.172 15.172a4 4 0 0 1 5.656 0"/><path d="M6.343 12.343a7.963 7.963 0 0 1 3.864 -2.14m4.163 .155a7.965 7.965 0 0 1 3.287 2"/><path d="M3.515 9.515a12 12 0 0 1 3.544 -2.455m3.101 -.92a12 12 0 0 1 10.325 3.374"/><path d="M3 3l18 18"/></svg><span style="flex:1">Sei offline. I messaggi in uscita partono appena torna la connessione.</span><button class="btn" style="height:30px;padding:0 10px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:13.5px;font-weight:600;flex:none">Riprova</button></div>
+</sc-if>
+<div style="display:flex;align-items:center;gap:6px;padding:10px 10px 0 16px">
+<sc-if value="{{foldersHidden}}" hint-placeholder-val="{{false}}">
+<button class="btn" onClick="{{toggleFolders}}" aria-label="Mostra riquadro cartelle" title="Mostra riquadro cartelle" style="width:34px;height:34px;margin-left:-6px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></svg></button>
+</sc-if>
+<h1 style="margin:0;flex:1;min-width:0;font-size:18px;font-weight:600;line-height:34px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{listTitle}}</h1>
+<button class="btn" aria-label="Seleziona messaggi" title="Seleziona" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg></button>
+<button class="btn" aria-label="Filtra" title="Filtra" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v2.172a2 2 0 0 1 -.586 1.414l-4.414 4.414v7l-6 2v-8.5l-4.48 -4.928a2 2 0 0 1 -.52 -1.345v-2.227"/></svg></button>
+</div>
+<sc-if value="{{hasListTabs}}" hint-placeholder-val="{{true}}">
+<div role="tablist" aria-label="Schede della posta in arrivo" style="display:flex;gap:18px;padding:2px 16px 0;box-shadow:inset 0 -1px 0 var(--rule)">
+<sc-for list="{{listTabs}}" as="t" hint-placeholder-count="2">
+<button role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="height:34px;padding:0 2px;border:0;background:transparent;color:{{t.color}};font-size:14px;font-weight:{{t.weight}};box-shadow:{{t.bar}}">{{t.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+<div class="scroll" style="flex:1;min-height:0;overflow:auto;padding:2px 0 28px">
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding:72px 36px 0;display:flex;flex-direction:column;align-items:center;text-align:center">
+<svg class="i" width="56" height="56" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink);stroke-width:1.2"><path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12"/><path d="M4 13h3l3 3h4l3 -3h3"/></svg>
+<p style="margin:14px 0 4px;font-size:15px;font-weight:600;color:var(--ink)">{{emptyTitle}}</p>
+<p style="margin:0;max-width:300px;font-size:13.5px;line-height:1.5;color:var(--ink-2)">{{emptyText}}</p>
+</div>
+</sc-if>
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+<h2 style="margin:12px 16px 4px;font-size:12.5px;font-weight:600;color:var(--ink-2)">{{g.label}}</h2>
+<sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
+<div class="row" data-sel="{{m.sel}}" style="position:relative;margin:0 6px 1px">
+<button class="row-main" onClick="{{m.pick}}" aria-current="{{m.cur}}" aria-label="{{m.label}}" style="position:relative;width:100%;display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:12px;align-items:start;padding:10px 12px 11px 14px;border:0;border-radius:4px;background:transparent;color:var(--ink);text-align:left">
+<span aria-hidden="true" style="position:absolute;left:4px;top:10px;bottom:10px;width:3px;border-radius:2px;background:{{m.bar}}"></span>
+<span aria-hidden="true" style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:600;background:{{m.tintBg}};color:{{m.tintInk}}">{{m.ini}}</span>
+<span style="min-width:0;display:flex;flex-direction:column;gap:1px">
+<span style="display:flex;align-items:baseline;gap:10px">
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:{{m.wFrom}}">{{m.from}}</span>
+<span style="flex:none;font-size:12.5px;font-variant-numeric:tabular-nums;font-weight:{{m.wTime}};color:{{m.timeColor}}">{{m.time}}</span>
+</span>
+<span style="display:flex;align-items:center;gap:6px">
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;font-weight:{{m.wSubj}};color:{{m.subjColor}}">{{m.subject}}</span>
+<sc-if value="{{m.att}}" hint-placeholder-val="{{false}}"><svg class="i" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-3);stroke-width:1.7"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg></sc-if>
+<sc-if value="{{m.flagged}}" hint-placeholder-val="{{false}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="color:var(--danger);flex:none"><path d="M4 5a1 1 0 0 1 .3 -.714a6 6 0 0 1 8.213 -.176l.351 .328a4 4 0 0 0 5.272 0l.249 -.227c.61 -.483 1.527 -.097 1.61 .676l.005 .113v9a1 1 0 0 1 -.3 .714a6 6 0 0 1 -8.213 .176l-.351 -.328a4 4 0 0 0 -5.136 -.114v6.552a1 1 0 0 1 -1.993 .117l-.007 -.117v-16z"/></svg></sc-if>
+</span>
+<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--ink-3)"><sc-if value="{{m.draft}}" hint-placeholder-val="{{false}}"><span style="color:var(--danger);font-weight:600">[Bozza] </span></sc-if>{{m.preview}}</span>
+</span>
+</button>
+<div class="row-acts" style="position:absolute;right:8px;top:6px;display:flex;gap:2px;padding:2px;border-radius:4px;background:var(--sheet);box-shadow:var(--lift)">
+<button class="btn" onClick="{{m.del}}" aria-label="Elimina" title="Elimina" style="width:28px;height:28px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg></button>
+<button class="btn" onClick="{{m.flag}}" aria-label="{{m.flagLabel}}" title="{{m.flagLabel}}" style="width:28px;height:28px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--danger)"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9"/><path d="M5 21v-7"/></svg></button>
+<button class="btn" onClick="{{m.read}}" aria-label="{{m.readLabel}}" title="{{m.readLabel}}" style="width:28px;height:28px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--brand-ink)"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9 6l9 -6l-9 -6l-9 6"/><path d="M21 9v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M3 19l6 -6"/><path d="M15 13l6 6"/></svg></button>
+</div>
+</div>
+</sc-for>
+</sc-for>
+</div>
+<sc-if value="{{toastOn}}" hint-placeholder-val="{{false}}">
+<div role="status" class="rise" style="position:absolute;left:14px;right:14px;bottom:14px;z-index:5;display:flex;align-items:center;gap:12px;min-height:44px;box-sizing:border-box;padding:6px 6px 6px 14px;border-radius:4px;background:var(--ink);color:var(--sheet);box-shadow:var(--lift);font-size:14px">
+<sc-if value="{{toastSent}}" hint-placeholder-val="{{true}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14l11 -11"/><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5"/></svg></sc-if>
+<sc-if value="{{toastDraft}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2"/></svg></sc-if>
+<span style="flex:1">{{toastText}}</span>
+<sc-if value="{{toastUndo}}" hint-placeholder-val="{{true}}"><button onClick="{{undo}}" style="height:32px;padding:0 12px;border:0;border-radius:4px;background:transparent;color:var(--sheet);font-size:14px;font-weight:600;text-decoration:underline;text-underline-offset:3px">Annulla</button></sc-if>
+</div>
+</sc-if>
+</section>
+
+<main class="pane-read" style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;box-sizing:border-box;padding:0 10px 10px 8px">
+
+<sc-if value="{{modeRead}}" hint-placeholder-val="{{true}}">
+<article class="scroll" style="flex:1;min-height:0;overflow:auto;box-sizing:border-box;padding:20px 28px 32px;border-radius:8px;background:var(--sheet);box-shadow:var(--sheet-shadow)">
+<div style="display:flex;align-items:flex-start;gap:12px">
+<h2 style="margin:0;flex:1;min-width:0;font-size:20px;font-weight:600;line-height:1.3;text-wrap:balance">{{r.subject}}</h2>
+<sc-if value="{{r.hasCat}}" hint-placeholder-val="{{true}}"><span style="flex:none;margin-top:2px;height:22px;display:inline-flex;align-items:center;gap:6px;padding:0 8px;border-radius:4px;background:var(--brand-soft);color:var(--brand-ink);font-size:12.5px;font-weight:600"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M6.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3"/></svg>{{r.cat}}</span></sc-if>
+</div>
+<div style="margin-top:16px;display:grid;grid-template-columns:44px minmax(0,1fr) auto;column-gap:14px;align-items:start">
+<span aria-hidden="true" style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:15px;font-weight:600;background:{{r.tintBg}};color:{{r.tintInk}}">{{r.ini}}</span>
+<div style="min-width:0;padding-top:1px">
+<p style="margin:0;font-size:15px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="font-weight:600">{{r.from}}</span> <span style="color:var(--ink-3);font-size:13.5px">{{r.emailShown}}</span></p>
+<p style="margin:3px 0 0;font-size:13.5px;color:var(--ink-2)">{{r.toLine}}</p>
+<sc-if value="{{r.hasCc}}" hint-placeholder-val="{{true}}"><p style="margin:1px 0 0;font-size:13.5px;color:var(--ink-2)">{{r.ccLine}}</p></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+<div style="display:flex;gap:2px">
+<button class="btn" onClick="{{reply}}" aria-label="Rispondi" title="Rispondi (Ctrl+R)" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--brand-ink)"><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg></button>
+<button class="btn" onClick="{{replyAll}}" aria-label="Rispondi a tutti" title="Rispondi a tutti (Ctrl+Maiusc+R)" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--brand-ink)"><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 14l-4 -4l4 -4"/><path d="M8 14l-4 -4l4 -4"/><path d="M9 10h7a4 4 0 1 1 0 8h-1"/></svg></button>
+<button class="btn" onClick="{{forward}}" aria-label="Inoltra" title="Inoltra (Ctrl+F)" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--brand-ink)"><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg></button>
+<button class="btn" aria-label="Altre azioni" title="Altre azioni" style="width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="19" height="19" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/><path d="M18 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"/></svg></button>
+</div>
+<span style="font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;white-space:nowrap">{{r.date}}</span>
+</div>
+</div>
+<sc-if value="{{r.hasAtts}}" hint-placeholder-val="{{true}}">
+<div style="margin:14px 0 0 58px;display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{r.atts}}" as="a" hint-placeholder-count="2">
+<button class="btn" aria-label="Scarica {{a.name}}, {{a.size}}" style="max-width:280px;height:50px;display:flex;align-items:center;gap:10px;padding:0 14px 0 8px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);text-align:left">
+<span aria-hidden="true" style="width:32px;height:32px;flex:none;border-radius:4px;display:grid;place-items:center;background:{{a.iconBg}};color:{{a.iconInk}}">
+<sc-if value="{{a.zip}}" hint-placeholder-val="{{false}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24"><path d="M6 20.735a2 2 0 0 1 -1 -1.735v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-1"/><path d="M11 17a2 2 0 0 1 2 2v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-2a2 2 0 0 1 2 -2"/><path d="M11 5l-1 0"/><path d="M13 7l-1 0"/><path d="M11 9l-1 0"/><path d="M13 11l-1 0"/><path d="M11 13l-1 0"/><path d="M13 15l-1 0"/></svg></sc-if>
+<sc-if value="{{a.pdf}}" hint-placeholder-val="{{true}}"><svg class="i" width="18" height="18" viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4"/><path d="M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6"/><path d="M17 18h2"/><path d="M20 15h-3v6"/><path d="M11 15v6h1a2 2 0 0 0 2 -2v-2a2 2 0 0 0 -2 -2h-1"/></svg></sc-if>
+</span>
+<span style="min-width:0;display:flex;flex-direction:column">
+<span style="font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{a.name}}</span>
+<span style="font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums">{{a.size}}</span>
+</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+<div style="margin:22px 0 0 58px;max-width:68ch;font-size:15px;line-height:1.55">
+<sc-for list="{{r.paras}}" as="p" hint-placeholder-count="4">
+<p style="margin:0 0 14px;white-space:pre-line">{{p.t}}</p>
+</sc-for>
+<sc-if value="{{r.hasSig}}" hint-placeholder-val="{{true}}"><p style="margin:18px 0 0;padding-top:12px;box-shadow:inset 0 1px 0 var(--rule);font-size:13.5px;color:var(--ink-2);white-space:pre-line">{{r.sig}}</p></sc-if>
+</div>
+<div style="margin:26px 0 0 58px;display:flex;flex-wrap:wrap;gap:8px">
+<button class="btn" onClick="{{reply}}" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M9 14l-4 -4l4 -4"/><path d="M5 10h11a4 4 0 1 1 0 8h-1"/></svg>Rispondi</button>
+<button class="btn" onClick="{{replyAll}}" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M13 14l-4 -4l4 -4"/><path d="M8 14l-4 -4l4 -4"/><path d="M9 10h7a4 4 0 1 1 0 8h-1"/></svg>Rispondi a tutti</button>
+<button class="btn" onClick="{{forward}}" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M15 14l4 -4l-4 -4"/><path d="M19 10h-11a4 4 0 1 0 0 8h1"/></svg>Inoltra</button>
+</div>
+</article>
+</sc-if>
+
+<sc-if value="{{modeNone}}" hint-placeholder-val="{{false}}">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 32px;border-radius:8px;background:var(--sheet);box-shadow:var(--sheet-shadow)">
+<svg class="i" width="64" height="64" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink);stroke-width:1.1"><path d="M3 9l9 6l9 -6l-9 -6l-9 6"/><path d="M21 9v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10"/><path d="M3 19l6 -6"/><path d="M15 13l6 6"/></svg>
+<p style="margin:16px 0 4px;font-size:15px;font-weight:600">Nessun messaggio selezionato</p>
+<p style="margin:0;font-size:13.5px;color:var(--ink-2)">Scegli un messaggio dall’elenco per leggerlo qui.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{paneCompose}}" hint-placeholder-val="{{false}}">
+<section class="rise" aria-label="{{cv.title}}" style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;border-radius:8px;background:var(--sheet);box-shadow:var(--sheet-shadow);overflow:hidden">
+<button class="btn" onClick="{{popOut}}" aria-label="Apri in una finestra separata" title="Apri in una finestra separata" style="position:absolute;top:12px;right:12px;z-index:1;width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/><path d="M11 13l9 -9"/><path d="M15 4h5v5"/></svg></button>
+<div class="cmp-h" data-send="{{sendPos}}" style="padding-right:60px">
+<button class="primary cmp-send" onClick="{{send}}" title="Invia (Ctrl+Invio)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14l11 -11"/><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5"/></svg>Invia</button>
+<div style="min-width:0">
+<div style="display:flex;align-items:center;gap:10px;min-height:42px;box-shadow:inset 0 -1px 0 var(--rule)">
+<label for="tb-to" style="width:28px;flex:none;font-size:13.5px;color:var(--ink-2)">A</label>
+<div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0">
+<sc-for list="{{cv.toChips}}" as="p" hint-placeholder-count="1">
+<span style="height:26px;display:inline-flex;align-items:center;gap:6px;padding:0 2px 0 3px;border-radius:4px;background:var(--brand-soft);color:var(--ink);font-size:13.5px"><span aria-hidden="true" style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);font-size:9.5px;font-weight:600">{{p.ini}}</span>{{p.name}}<button class="btn" onClick="{{p.remove}}" aria-label="Rimuovi {{p.name}}" style="width:22px;height:22px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button></span>
+</sc-for>
+<input id="tb-to" class="ph" value="{{toInput}}" onChange="{{onToChange}}" onKeyDown="{{onToKey}}" placeholder="{{cv.toPh}}" autocomplete="off" style="flex:1;min-width:140px;height:28px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px">
+</div>
+</div>
+<sc-if value="{{cv.hasErr}}" hint-placeholder-val="{{false}}">
+<p role="alert" style="margin:6px 0 0 38px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--danger)"><svg class="i" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.7"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>{{cv.err}}</p>
+</sc-if>
+<div style="display:flex;align-items:center;gap:10px;min-height:42px;box-shadow:inset 0 -1px 0 var(--rule)">
+<label for="tb-cc" style="width:28px;flex:none;font-size:13.5px;color:var(--ink-2)">Cc</label>
+<div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0">
+<sc-for list="{{cv.ccChips}}" as="p" hint-placeholder-count="1">
+<span style="height:26px;display:inline-flex;align-items:center;gap:6px;padding:0 2px 0 3px;border-radius:4px;background:var(--brand-soft);color:var(--ink);font-size:13.5px"><span aria-hidden="true" style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);font-size:9.5px;font-weight:600">{{p.ini}}</span>{{p.name}}<button class="btn" onClick="{{p.remove}}" aria-label="Rimuovi {{p.name}}" style="width:22px;height:22px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button></span>
+</sc-for>
+<input id="tb-cc" class="ph" value="{{ccInput}}" onChange="{{onCcChange}}" onKeyDown="{{onCcKey}}" autocomplete="off" style="flex:1;min-width:140px;height:28px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px">
+</div>
+<span style="font-size:13.5px;color:var(--brand-ink);flex:none">Ccn</span>
+</div>
+</div>
+</div>
+<div style="padding:0 24px">
+<div style="display:flex;align-items:center;gap:10px;min-height:44px;box-shadow:inset 0 -1px 0 var(--rule)">
+<label for="tb-subj" class="sr">Oggetto</label>
+<input id="tb-subj" class="ph" value="{{cv.subj}}" onChange="{{onSubj}}" placeholder="Aggiungi un oggetto" autocomplete="off" style="flex:1;min-width:0;height:32px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:15px;font-weight:600">
+</div>
+</div>
+<sc-if value="{{cv.hasAtts}}" hint-placeholder-val="{{false}}">
+<div style="padding:10px 24px 0;display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{cv.atts}}" as="a" hint-placeholder-count="1">
+<span style="height:30px;display:inline-flex;align-items:center;gap:8px;padding:0 12px 0 8px;border:1px solid var(--rule-2);border-radius:4px;font-size:13px"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg>{{a.name}}<span style="color:var(--ink-3)">{{a.size}}</span></span>
+</sc-for>
+</div>
+</sc-if>
+<label for="tb-body" class="sr">Testo del messaggio</label>
+<textarea id="tb-body" class="ph scroll" value="{{cv.body}}" onChange="{{onBody}}" placeholder="Scrivi il messaggio" style="flex:1;min-height:0;margin:0 24px;padding:16px 0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:15px;line-height:1.55;resize:none"></textarea>
+<div style="display:flex;align-items:center;gap:12px;padding:8px 14px 10px 24px;box-shadow:inset 0 1px 0 var(--rule)">
+<span style="flex:1;font-size:12.5px;color:var(--ink-3)">{{cv.status}}</span>
+<button class="btn" onClick="{{discard}}" style="height:32px;display:flex;align-items:center;gap:6px;padding:0 12px 0 10px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:13.5px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>Elimina bozza</button>
+</div>
+</section>
+</sc-if>
+</main>
+</div>
+
+<sc-if value="{{winOpen}}" hint-placeholder-val="{{false}}">
+<section class="win win-in" data-max="{{winMaxAttr}}" role="dialog" aria-label="{{cv.title}}" onKeyDown="{{winKey}}">
+<div style="height:36px;flex:none;display:flex;align-items:center;gap:10px;padding-left:12px;background:var(--head);color:var(--on-head)">
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">{{cv.winTitle}}</span>
+<button class="wbtn" onClick="{{winMinimize}}" aria-label="Riduci a icona" title="Riduci a icona"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l14 0"/></svg></button>
+<button class="wbtn" onClick="{{winMaxToggle}}" aria-label="{{winMaxLabel}}" title="{{winMaxLabel}}"><svg class="i" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14"/></svg></button>
+<button class="wbtn wx" onClick="{{winClose}}" aria-label="Chiudi e salva in Bozze" title="Chiudi e salva in Bozze"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button>
+</div>
+<div style="flex:none;background:var(--ground);padding:0 10px 8px">
+<nav aria-label="Schede del messaggio" style="height:36px;display:flex;align-items:flex-end;gap:2px;padding-left:4px">
+<sc-for list="{{winTabs}}" as="t" hint-placeholder-count="2">
+<button class="btn" onClick="{{t.pick}}" aria-pressed="{{t.on}}" style="height:32px;padding:0 12px;border:0;border-radius:4px 4px 0 0;background:transparent;color:var(--ink);font-size:13.5px;font-weight:{{t.weight}};box-shadow:{{t.bar}}">{{t.label}}</button>
+</sc-for>
+</nav>
+<div class="rib" data-mode="{{ribMode}}" role="toolbar" aria-label="Comandi del messaggio">
+<sc-if value="{{winMsg}}" hint-placeholder-val="{{true}}">
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Incolla" title="Incolla (Ctrl+V)"><svg class="i c-amber" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2"/></svg><span class="lbl">Incolla</span></button>
+</div><span class="rgl">Appunti</span></div>
+<div class="rg"><div class="rgb"><div class="rs">
+<div class="rr">
+<button class="rb sel" aria-label="Tipo di carattere" style="width:132px">Segoe UI<svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+<button class="rb sel" aria-label="Dimensione carattere" style="width:58px">11<svg class="i chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6l6 -6"/></svg></button>
+</div>
+<div class="rr">
+<button class="rb ico" aria-label="Grassetto" title="Grassetto (Ctrl+G)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:2"><path d="M7 5h6a3.5 3.5 0 0 1 0 7h-6l0 -7"/><path d="M13 12h1a3.5 3.5 0 0 1 0 7h-7v-7"/></svg></button>
+<button class="rb ico" aria-label="Corsivo" title="Corsivo (Ctrl+I)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5l6 0"/><path d="M7 19l6 0"/><path d="M14 5l-4 14"/></svg></button>
+<button class="rb ico" aria-label="Sottolineato" title="Sottolineato (Ctrl+S)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v5a5 5 0 0 0 10 0v-5"/><path d="M5 19h14"/></svg></button>
+<button class="rb ico" aria-label="Elenco puntato"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l11 0"/><path d="M9 12l11 0"/><path d="M9 18l11 0"/><path d="M5 6l0 .01"/><path d="M5 12l0 .01"/><path d="M5 18l0 .01"/></svg></button>
+<button class="rb ico" aria-label="Elenco numerato"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 6h9"/><path d="M11 12h9"/><path d="M12 18h8"/><path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"/><path d="M6 10v-6l-2 2"/></svg></button>
+</div>
+</div></div><span class="rgl">Testo</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Allega file"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg><span class="lbl">Allega file</span></button>
+<button class="rb big" aria-label="Collegamento" title="Collegamento (Ctrl+K)"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg><span class="lbl">Collegamento</span></button>
+<button class="rb big" aria-label="Firma"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c3.333 -3.333 5 -6 5 -8c0 -3 -1 -3 -2 -3s-2.032 1.085 -2 3c.034 2.048 1.658 4.877 2.5 6c1.5 2 2.5 2.5 3.5 1l2 -3c.333 2.667 1.333 4 3 4c.53 0 2.639 -2 3 -2c.517 0 1.517 .667 3 2"/></svg><span class="lbl">Firma</span></button>
+</div><span class="rgl">Includi</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Invio programmato"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 7v5l3 3"/></svg><span class="lbl">Invio programmato</span></button>
+</div><span class="rgl">Invio</span></div>
+</sc-if>
+<sc-if value="{{winIns}}" hint-placeholder-val="{{false}}">
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Allega file"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg><span class="lbl">Allega file</span></button>
+<button class="rb big" aria-label="Immagine"><svg class="i c-green" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8h.01"/><path d="M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></svg><span class="lbl">Immagine</span></button>
+<button class="rb big" aria-label="Tabella"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14"/><path d="M3 10h18"/><path d="M10 3v18"/></svg><span class="lbl">Tabella</span></button>
+<button class="rb big" aria-label="Collegamento"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6 -6"/><path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464"/><path d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463"/></svg><span class="lbl">Collegamento</span></button>
+</div><span class="rgl">Includi</span></div>
+<div class="rg"><div class="rgb">
+<button class="rb big" aria-label="Proposta di riunione"><svg class="i c-brand" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M16 19h6"/><path d="M19 16v6"/></svg><span class="lbl">Proposta di riunione</span></button>
+</div><span class="rgl">Riunione</span></div>
+</sc-if>
+</div>
+</div>
+<div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column;background:var(--sheet)">
+<div class="cmp-h" data-send="{{sendPos}}">
+<button class="primary cmp-send" onClick="{{send}}" title="Invia (Ctrl+Invio)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14l11 -11"/><path d="M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5"/></svg>Invia</button>
+<div style="min-width:0">
+<div style="display:flex;align-items:center;gap:10px;min-height:42px;box-shadow:inset 0 -1px 0 var(--rule)">
+<label for="tb-to" style="width:28px;flex:none;font-size:13.5px;color:var(--ink-2)">A</label>
+<div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0">
+<sc-for list="{{cv.toChips}}" as="p" hint-placeholder-count="1">
+<span style="height:26px;display:inline-flex;align-items:center;gap:6px;padding:0 2px 0 3px;border-radius:4px;background:var(--brand-soft);color:var(--ink);font-size:13.5px"><span aria-hidden="true" style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);font-size:9.5px;font-weight:600">{{p.ini}}</span>{{p.name}}<button class="btn" onClick="{{p.remove}}" aria-label="Rimuovi {{p.name}}" style="width:22px;height:22px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button></span>
+</sc-for>
+<input id="tb-to" class="ph" value="{{toInput}}" onChange="{{onToChange}}" onKeyDown="{{onToKey}}" placeholder="{{cv.toPh}}" autocomplete="off" style="flex:1;min-width:140px;height:28px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px">
+</div>
+</div>
+<sc-if value="{{cv.hasErr}}" hint-placeholder-val="{{false}}">
+<p role="alert" style="margin:6px 0 0 38px;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--danger)"><svg class="i" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.7"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>{{cv.err}}</p>
+</sc-if>
+<div style="display:flex;align-items:center;gap:10px;min-height:42px;box-shadow:inset 0 -1px 0 var(--rule)">
+<label for="tb-cc" style="width:28px;flex:none;font-size:13.5px;color:var(--ink-2)">Cc</label>
+<div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 0">
+<sc-for list="{{cv.ccChips}}" as="p" hint-placeholder-count="1">
+<span style="height:26px;display:inline-flex;align-items:center;gap:6px;padding:0 2px 0 3px;border-radius:4px;background:var(--brand-soft);color:var(--ink);font-size:13.5px"><span aria-hidden="true" style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--brand);color:var(--on-brand);font-size:9.5px;font-weight:600">{{p.ini}}</span>{{p.name}}<button class="btn" onClick="{{p.remove}}" aria-label="Rimuovi {{p.name}}" style="width:22px;height:22px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true" style="stroke-width:1.8"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button></span>
+</sc-for>
+<input id="tb-cc" class="ph" value="{{ccInput}}" onChange="{{onCcChange}}" onKeyDown="{{onCcKey}}" autocomplete="off" style="flex:1;min-width:140px;height:28px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px">
+</div>
+<span style="font-size:13.5px;color:var(--brand-ink);flex:none">Ccn</span>
+</div>
+</div>
+</div>
+<div style="padding:0 24px">
+<div style="display:flex;align-items:center;gap:10px;min-height:44px;box-shadow:inset 0 -1px 0 var(--rule)">
+<label for="tb-subj" class="sr">Oggetto</label>
+<input id="tb-subj" class="ph" value="{{cv.subj}}" onChange="{{onSubj}}" placeholder="Aggiungi un oggetto" autocomplete="off" style="flex:1;min-width:0;height:32px;border:0;background:transparent;color:var(--ink);font:inherit;font-size:15px;font-weight:600">
+</div>
+</div>
+<sc-if value="{{cv.hasAtts}}" hint-placeholder-val="{{false}}">
+<div style="padding:10px 24px 0;display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{cv.atts}}" as="a" hint-placeholder-count="1">
+<span style="height:30px;display:inline-flex;align-items:center;gap:8px;padding:0 12px 0 8px;border:1px solid var(--rule-2);border-radius:4px;font-size:13px"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5"/></svg>{{a.name}}<span style="color:var(--ink-3)">{{a.size}}</span></span>
+</sc-for>
+</div>
+</sc-if>
+<label for="tb-body" class="sr">Testo del messaggio</label>
+<textarea id="tb-body" class="ph scroll" value="{{cv.body}}" onChange="{{onBody}}" placeholder="Scrivi il messaggio" style="flex:1;min-height:0;margin:0 24px;padding:16px 0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:15px;line-height:1.55;resize:none"></textarea>
+<div style="display:flex;align-items:center;gap:12px;padding:8px 14px 10px 24px;box-shadow:inset 0 1px 0 var(--rule)">
+<span style="flex:1;font-size:12.5px;color:var(--ink-3)">{{cv.status}}</span>
+<button class="btn" onClick="{{discard}}" style="height:32px;display:flex;align-items:center;gap:6px;padding:0 12px 0 10px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:13.5px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--ink-2)"><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>Elimina bozza</button>
+</div>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{winMinimized}}" hint-placeholder-val="{{false}}">
+<button onClick="{{winRestore}}" title="Riapri il messaggio" style="position:absolute;right:20px;bottom:16px;z-index:20;max-width:340px;height:40px;display:flex;align-items:center;gap:10px;padding:0 16px 0 12px;border:0;border-radius:4px;background:var(--sheet);box-shadow:var(--win-shadow),0 0 0 1px var(--rule-2);color:var(--ink);font-size:14px"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M10 18l5 -5a1.414 1.414 0 0 0 -2 -2l-5 5v2h2"/></svg><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{cv.title}}</span></button>
+</sc-if>
+
+<sc-if value="{{backstage}}" hint-placeholder-val="{{false}}">
+<div class="bs fade-in" role="dialog" aria-label="File" onKeyDown="{{bsKey}}">
+<nav class="bs-nav" aria-label="Menu File">
+<button onClick="{{closeBackstage}}" aria-label="Torna alla posta" title="Torna alla posta (Esc)" style="width:40px;height:40px;margin:0 0 16px 6px;border:0;border-radius:50%;background:transparent;display:grid;place-items:center;color:var(--on-brand);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.8)"><svg class="i" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l14 0"/><path d="M5 12l6 6"/><path d="M5 12l6 -6"/></svg></button>
+<sc-for list="{{bsItems}}" as="b" hint-placeholder-count="2">
+<button class="bs-it" data-on="{{b.on}}" onClick="{{b.pick}}" aria-current="{{b.cur}}">{{b.label}}</button>
+</sc-for>
+<span style="flex:1"></span>
+<button class="bs-it" data-on="{{bsAboutOn}}" onClick="{{openAbout}}" aria-current="{{bsAboutCur}}">Informazioni su Datini</button>
+<button class="bs-it" onClick="{{openOptions}}">Opzioni</button>
+</nav>
+<div class="scroll" style="flex:1;min-width:0;overflow:auto;padding:40px 56px 56px">
+<sc-if value="{{bsInfo}}" hint-placeholder-val="{{true}}">
+<h1 style="margin:0;font-size:28px;font-weight:600">Informazioni account</h1>
+<button class="btn" style="margin-top:16px;height:54px;display:flex;align-items:center;gap:12px;padding:0 14px 0 9px;border:0;border-radius:4px;background:var(--sheet);box-shadow:inset 0 0 0 1px var(--rule-2);color:var(--ink);text-align:left"><span aria-hidden="true" style="width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--av1-bg);color:var(--av1-fg);font-size:13px;font-weight:600">CV</span><span style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:600">chiara.valli@valliarredi.it</span><span style="font-size:12.5px;color:var(--ink-3)">IMAP, connessione diretta</span></span><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="margin-left:14px;color:var(--ink-3)"><path d="M6 9l6 6l6 -6"/></svg></button>
+<div style="margin-top:18px;max-width:780px">
+<div class="bs-row">
+<button class="btn bs-tile" onClick="{{openAccountSettings}}"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0"/><path d="M6 21v-2a4 4 0 0 1 4 -4h2.5"/><path d="M17.001 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M19.001 15.5v1.5"/><path d="M19.001 21v1.5"/><path d="M22.032 17.25l-1.299 .75"/><path d="M17.27 20l-1.3 .75"/><path d="M15.97 17.25l1.3 .75"/><path d="M20.733 20l1.3 .75"/></svg>Impostazioni account</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Impostazioni account</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Server, posta offline e sincronizzazione di questo account. Da qui puoi anche aggiungerne altri.</p></div>
+</div>
+<div class="bs-row">
+<button class="btn bs-tile"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12"/><path d="M11 8l-3 3l3 3"/><path d="M16 11h-8"/></svg>Risposte automatiche</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Risposte automatiche</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Avvisa chi ti scrive che sei fuori ufficio e quando rientri.</p></div>
+</div>
+<div class="bs-row">
+<button class="btn bs-tile"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/><path d="M10 12l4 4m0 -4l-4 4"/></svg>Pulizia</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Pulizia cassetta postale</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Libera spazio sul computer archiviando i messaggi vecchi o svuotando gli elementi eliminati.</p></div>
+</div>
+<div class="bs-row">
+<button class="btn bs-tile"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 11.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 17.5l1.5 1.5l2.5 -2.5"/><path d="M11 6l9 0"/><path d="M11 12l9 0"/><path d="M11 18l9 0"/></svg>Regole e avvisi</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Regole e avvisi</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Sposta in automatico i messaggi nelle cartelle giuste e ricevi un avviso per quelli importanti.</p></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{bsApri}}" hint-placeholder-val="{{false}}">
+<h1 style="margin:0;font-size:28px;font-weight:600">Apri ed esporta</h1>
+<div style="margin-top:18px;max-width:780px">
+<div class="bs-row">
+<button class="btn bs-tile"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l3 3l-3 3"/></svg>Importa PST</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Importa da file PST</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Porta in Datini posta, contatti e calendario da un archivio di Outlook.</p></div>
+</div>
+<div class="bs-row">
+<button class="btn bs-tile"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19l2.757 -7.351a1 1 0 0 1 .936 -.649h12.307a1 1 0 0 1 .986 1.164l-.996 5.211a2 2 0 0 1 -1.964 1.625h-14.026a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2h4l3 3h7a2 2 0 0 1 2 2v2"/></svg>Apri PST</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Apri file di dati di Outlook</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Consulta un archivio .pst senza importarlo.</p></div>
+</div>
+<div class="bs-row">
+<button class="btn bs-tile"><svg class="i" width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M11.5 21h-4.5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v5m-5 6h7m-3 -3l3 3l-3 3"/></svg>Esporta</button>
+<div><h2 style="margin:6px 0 4px;font-size:17px;font-weight:600">Esporta in MBOX o EML</h2><p style="margin:0;max-width:62ch;font-size:14px;line-height:1.5;color:var(--ink-2)">Salva una copia della posta in un formato aperto, leggibile da qualsiasi programma di posta.</p></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{bsAbout}}" hint-placeholder-val="{{false}}">
+<h1 style="margin:0;font-size:28px;font-weight:600">Informazioni su Datini</h1>
+<div style="margin-top:36px;max-width:640px">
+<svg width="166" height="32" viewBox="0 0 182.592 35.232" fill="currentColor" role="img" aria-label="Datini" style="display:block;color:var(--ink)"><path d="M14.688 0.912 C15.232 0.912 16.224 0.912 17.664 0.912 C19.104 0.912 21.776 0.928 25.68 0.96 C31.344 1.024 35.824 2.552 39.12 5.544 C42.416 8.536 44.064 12.616 44.064 17.784 C44.064 22.952 42.416 27.04 39.12 30.048 C35.824 33.056 31.344 34.56 25.68 34.56 L8.256 34.56 L8.256 34.08 L8.88 34.08 C9.68 34.08 10.376 33.8 10.968 33.24 C11.56 32.68 11.888 32 11.952 31.2 L11.952 3.12 C8.368 3.376 5.712 4.208 3.984 5.616 C3.12 6.288 2.44 6.976 1.944 7.68 C1.448 8.384 0.96 9.232 0.48 10.224 L0 10.032 C0.768 6.832 2.376 4.52 4.824 3.096 C7.272 1.672 10.56 0.944 14.688 0.912 Z M25.104 32.544 C28.528 32.544 31.24 31.216 33.24 28.56 C35.24 25.904 36.24 22.304 36.24 17.76 C36.24 13.216 35.24 9.632 33.24 7.008 C31.24 4.384 28.56 3.072 25.2 3.072 C25.168 3.072 25.136 3.072 25.104 3.072 L19.152 3.072 L19.152 32.544 L25.104 32.544 Z"></path><path d="M80.016 34.08 L80.448 34.08 L80.448 34.56 L65.136 34.56 L65.136 34.08 L65.568 34.08 C66.272 34.08 66.792 33.864 67.128 33.432 C67.464 33 67.632 32.592 67.632 32.208 C67.632 31.824 67.552 31.44 67.392 31.056 L65.04 25.152 L53.808 25.152 L51.312 31.056 C51.152 31.472 51.072 31.864 51.072 32.232 C51.072 32.6 51.24 33 51.576 33.432 C51.912 33.864 52.448 34.08 53.184 34.08 L53.568 34.08 L53.568 34.56 L43.296 34.56 L43.296 34.08 L43.728 34.08 C44.464 34.08 45.2 33.856 45.936 33.408 C46.672 32.96 47.28 32.288 47.76 31.392 L58.848 6.288 C60.352 3.12 61.152 1.024 61.248 0 L61.68 0 L75.936 31.296 C76.416 32.224 77.024 32.92 77.76 33.384 C78.496 33.848 79.248 34.08 80.016 34.08 Z M54.624 23.136 L64.224 23.136 L59.568 11.328 Z"></path><path d="M94.368 2.928 L94.368 31.104 C94.4 31.936 94.712 32.64 95.304 33.216 C95.896 33.792 96.608 34.08 97.44 34.08 L98.016 34.08 L98.064 34.56 L83.472 34.56 L83.472 34.08 L84.096 34.08 C84.896 34.08 85.592 33.792 86.184 33.216 C86.776 32.64 87.104 31.952 87.168 31.152 L87.168 2.928 L80.688 2.928 C79.216 2.96 78.048 3.424 77.184 4.32 C76.32 5.216 75.888 6.384 75.888 7.824 L75.888 8.4 L75.408 8.4 L75.408 0.048 C75.856 0.24 76.664 0.432 77.832 0.624 C79 0.816 80.08 0.912 81.072 0.912 L100.416 0.912 C101.984 0.88 103.264 0.752 104.256 0.528 C105.248 0.304 105.856 0.144 106.08 0.048 L106.08 8.4 L105.6 8.4 L105.6 7.824 C105.6 6.384 105.168 5.216 104.304 4.32 C103.44 3.424 102.272 2.96 100.8 2.928 Z"></path><path d="M109.344 34.08 C110.176 34.08 110.888 33.784 111.48 33.192 C112.072 32.6 112.384 31.888 112.416 31.056 L112.416 4.416 C112.384 3.584 112.072 2.88 111.48 2.304 C110.888 1.728 110.176 1.44 109.344 1.44 L108.72 1.44 L108.72 0.96 L123.312 0.96 L123.264 1.44 L122.688 1.44 C121.856 1.44 121.136 1.728 120.528 2.304 C119.92 2.88 119.616 3.584 119.616 4.416 L119.616 31.056 C119.616 31.888 119.92 32.6 120.528 33.192 C121.136 33.784 121.856 34.08 122.688 34.08 L123.264 34.08 L123.312 34.56 L108.72 34.56 L108.72 34.08 Z"></path><path d="M164.448 1.44 C163.648 1.44 162.96 1.72 162.384 2.28 C161.808 2.84 161.504 3.52 161.472 4.32 L161.472 29.088 C161.472 31.232 161.616 33.04 161.904 34.512 L162.048 35.232 L161.616 35.232 L137.376 12.144 L137.376 31.2 C137.376 32 137.664 32.68 138.24 33.24 C138.816 33.8 139.504 34.08 140.304 34.08 L141.216 34.08 L141.216 34.56 L126.672 34.56 L126.672 34.08 L127.536 34.08 C128.368 34.08 129.072 33.8 129.648 33.24 C130.224 32.68 130.512 31.984 130.512 31.152 L130.512 6.24 C130.512 4.128 130.368 2.368 130.08 0.96 L129.984 0.24 L130.416 0.24 L154.656 23.328 L154.656 4.368 C154.624 3.536 154.32 2.84 153.744 2.28 C153.168 1.72 152.48 1.44 151.68 1.44 L150.816 1.44 L150.816 0.96 L165.36 0.96 L165.36 1.44 Z"></path><path d="M168.624 34.08 C169.456 34.08 170.168 33.784 170.76 33.192 C171.352 32.6 171.664 31.888 171.696 31.056 L171.696 4.416 C171.664 3.584 171.352 2.88 170.76 2.304 C170.168 1.728 169.456 1.44 168.624 1.44 L168 1.44 L168 0.96 L182.592 0.96 L182.544 1.44 L181.968 1.44 C181.136 1.44 180.416 1.728 179.808 2.304 C179.2 2.88 178.896 3.584 178.896 4.416 L178.896 31.056 C178.896 31.888 179.2 32.6 179.808 33.192 C180.416 33.784 181.136 34.08 181.968 34.08 L182.544 34.08 L182.592 34.56 L168 34.56 L168 34.08 Z"></path></svg>
+<p style="margin:14px 0 0;font-size:13.5px;color:var(--ink-3)">Versione di anteprima</p>
+<p style="margin:26px 0 0;max-width:60ch;font-size:15px;line-height:1.55;color:var(--ink)">Datini è un programma di posta libero e open source. La posta viaggia direttamente tra il tuo computer e il server del tuo provider.</p>
+<p style="margin:12px 0 0;max-width:60ch;font-size:15px;line-height:1.55;color:var(--ink-2)">Porta il nome di Francesco Datini, mercante di Prato del Trecento. Il suo archivio conserva circa 143.000 lettere d’affari scambiate con quasi trecento città.</p>
+<div style="margin-top:26px;display:flex;flex-wrap:wrap;gap:8px">
+<button class="btn" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></svg>Codice sorgente</button>
+<button class="btn" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M9 9l1 0"/><path d="M9 13l6 0"/><path d="M9 17l6 0"/></svg>Licenza</button>
+<button class="btn" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--danger)"><path d="M9 9v-1a3 3 0 0 1 6 0v1"/><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3"/><path d="M3 13l4 0"/><path d="M17 13l4 0"/><path d="M12 20l0 -6"/><path d="M4 19l3.35 -2"/><path d="M20 19l-3.35 -2"/><path d="M4 7l3.75 2.4"/><path d="M20 7l-3.75 2.4"/></svg>Segnala un problema</button>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{settings}}" hint-placeholder-val="{{false}}">
+<div class="scrim fade-in">
+<div class="set-dlg rise" role="dialog" aria-modal="true" aria-labelledby="tb-set-title" onKeyDown="{{setKey}}" style="width:min(1000px,100%);height:min(720px,100%);display:flex;border-radius:8px;background:var(--sheet);box-shadow:var(--win-shadow);overflow:hidden">
+<nav class="set-nav" aria-label="Sezioni delle impostazioni" style="width:240px;flex:none;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;padding:22px 12px;background:var(--rail)">
+<h2 id="tb-set-title" style="margin:0 0 14px 12px;font-size:20px;font-weight:600">Impostazioni</h2>
+<sc-for list="{{setNav}}" as="n" hint-placeholder-count="2">
+<button class="btn fold" data-sel="{{n.sel}}" onClick="{{n.pick}}" aria-current="{{n.cur}}" style="width:100%;height:36px;display:flex;align-items:center;padding:0 12px;border:0;border-radius:4px;background:transparent;color:var(--ink);font-size:14px;font-weight:{{n.weight}};text-align:left">{{n.label}}</button>
+</sc-for>
+</nav>
+<div class="scroll" style="position:relative;flex:1;min-width:0;overflow:auto;padding:28px 40px 40px">
+<button class="btn" onClick="{{closeSettings}}" aria-label="Chiudi impostazioni" title="Chiudi (Esc)" style="position:absolute;top:16px;right:16px;width:34px;height:34px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--ink-2)"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button>
+
+<sc-if value="{{setAspetto}}" hint-placeholder-val="{{true}}">
+<h3 style="margin:0;font-size:22px;font-weight:600">Aspetto</h3>
+<p style="margin:6px 0 0;max-width:60ch;font-size:14.5px;line-height:1.5;color:var(--ink-2)">Scegli dove trovare i comandi. Le modifiche valgono subito.</p>
+<div role="radiogroup" aria-labelledby="tb-set-preset" style="margin-top:26px">
+<h4 id="tb-set-preset" style="margin:0 0 10px;font-size:15px;font-weight:600">Stile di Outlook</h4>
+<div class="two" style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;max-width:680px">
+<sc-for list="{{presetCards}}" as="o" hint-placeholder-count="2">
+<label class="opt" data-on="{{o.on}}"><input type="radio" name="{{o.group}}" checked="{{o.checked}}" onChange="{{o.pick}}"><span class="dot" aria-hidden="true"></span><span style="min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:14.5px;font-weight:600">{{o.title}}</span><span style="font-size:13px;line-height:1.45;color:var(--ink-2)">{{o.text}}</span></span></label>
+</sc-for>
+</div>
+<sc-if value="{{isCustom}}" hint-placeholder-val="{{false}}"><p style="margin:10px 0 0;font-size:13px;color:var(--ink-2)">Stai usando una combinazione personalizzata delle due viste.</p></sc-if>
+</div>
+<sc-for list="{{setGroups}}" as="g" hint-placeholder-count="4">
+<div role="radiogroup" aria-labelledby="{{g.id}}" style="margin-top:28px;padding-top:24px;box-shadow:inset 0 1px 0 var(--rule)">
+<h4 id="{{g.id}}" style="margin:0 0 10px;font-size:15px;font-weight:600">{{g.legend}}</h4>
+<div class="two" style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;max-width:680px">
+<sc-for list="{{g.opts}}" as="o" hint-placeholder-count="2">
+<label class="opt" data-on="{{o.on}}"><input type="radio" name="{{o.group}}" checked="{{o.checked}}" onChange="{{o.pick}}"><span class="dot" aria-hidden="true"></span><span style="min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font-size:14.5px;font-weight:600">{{o.title}}</span><span style="font-size:13px;line-height:1.45;color:var(--ink-2)">{{o.text}}</span></span></label>
+</sc-for>
+</div>
+<sc-if value="{{g.extra}}" hint-placeholder-val="{{false}}">
+<label style="margin-top:14px;display:flex;align-items:center;gap:10px;font-size:14px;color:{{replyWinColor}}"><input type="checkbox" checked="{{replyWin}}" disabled="{{replyWinDisabled}}" onChange="{{toggleReplyWin}}" style="width:18px;height:18px;margin:0;accent-color:var(--brand)">Apri in una finestra anche risposte e inoltri</label>
+</sc-if>
+</div>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{setInfo}}" hint-placeholder-val="{{false}}">
+<h3 style="margin:0;font-size:22px;font-weight:600">Informazioni su Datini</h3>
+<div style="margin-top:30px;max-width:600px">
+<svg width="166" height="32" viewBox="0 0 182.592 35.232" fill="currentColor" role="img" aria-label="Datini" style="display:block;color:var(--ink)"><path d="M14.688 0.912 C15.232 0.912 16.224 0.912 17.664 0.912 C19.104 0.912 21.776 0.928 25.68 0.96 C31.344 1.024 35.824 2.552 39.12 5.544 C42.416 8.536 44.064 12.616 44.064 17.784 C44.064 22.952 42.416 27.04 39.12 30.048 C35.824 33.056 31.344 34.56 25.68 34.56 L8.256 34.56 L8.256 34.08 L8.88 34.08 C9.68 34.08 10.376 33.8 10.968 33.24 C11.56 32.68 11.888 32 11.952 31.2 L11.952 3.12 C8.368 3.376 5.712 4.208 3.984 5.616 C3.12 6.288 2.44 6.976 1.944 7.68 C1.448 8.384 0.96 9.232 0.48 10.224 L0 10.032 C0.768 6.832 2.376 4.52 4.824 3.096 C7.272 1.672 10.56 0.944 14.688 0.912 Z M25.104 32.544 C28.528 32.544 31.24 31.216 33.24 28.56 C35.24 25.904 36.24 22.304 36.24 17.76 C36.24 13.216 35.24 9.632 33.24 7.008 C31.24 4.384 28.56 3.072 25.2 3.072 C25.168 3.072 25.136 3.072 25.104 3.072 L19.152 3.072 L19.152 32.544 L25.104 32.544 Z"></path><path d="M80.016 34.08 L80.448 34.08 L80.448 34.56 L65.136 34.56 L65.136 34.08 L65.568 34.08 C66.272 34.08 66.792 33.864 67.128 33.432 C67.464 33 67.632 32.592 67.632 32.208 C67.632 31.824 67.552 31.44 67.392 31.056 L65.04 25.152 L53.808 25.152 L51.312 31.056 C51.152 31.472 51.072 31.864 51.072 32.232 C51.072 32.6 51.24 33 51.576 33.432 C51.912 33.864 52.448 34.08 53.184 34.08 L53.568 34.08 L53.568 34.56 L43.296 34.56 L43.296 34.08 L43.728 34.08 C44.464 34.08 45.2 33.856 45.936 33.408 C46.672 32.96 47.28 32.288 47.76 31.392 L58.848 6.288 C60.352 3.12 61.152 1.024 61.248 0 L61.68 0 L75.936 31.296 C76.416 32.224 77.024 32.92 77.76 33.384 C78.496 33.848 79.248 34.08 80.016 34.08 Z M54.624 23.136 L64.224 23.136 L59.568 11.328 Z"></path><path d="M94.368 2.928 L94.368 31.104 C94.4 31.936 94.712 32.64 95.304 33.216 C95.896 33.792 96.608 34.08 97.44 34.08 L98.016 34.08 L98.064 34.56 L83.472 34.56 L83.472 34.08 L84.096 34.08 C84.896 34.08 85.592 33.792 86.184 33.216 C86.776 32.64 87.104 31.952 87.168 31.152 L87.168 2.928 L80.688 2.928 C79.216 2.96 78.048 3.424 77.184 4.32 C76.32 5.216 75.888 6.384 75.888 7.824 L75.888 8.4 L75.408 8.4 L75.408 0.048 C75.856 0.24 76.664 0.432 77.832 0.624 C79 0.816 80.08 0.912 81.072 0.912 L100.416 0.912 C101.984 0.88 103.264 0.752 104.256 0.528 C105.248 0.304 105.856 0.144 106.08 0.048 L106.08 8.4 L105.6 8.4 L105.6 7.824 C105.6 6.384 105.168 5.216 104.304 4.32 C103.44 3.424 102.272 2.96 100.8 2.928 Z"></path><path d="M109.344 34.08 C110.176 34.08 110.888 33.784 111.48 33.192 C112.072 32.6 112.384 31.888 112.416 31.056 L112.416 4.416 C112.384 3.584 112.072 2.88 111.48 2.304 C110.888 1.728 110.176 1.44 109.344 1.44 L108.72 1.44 L108.72 0.96 L123.312 0.96 L123.264 1.44 L122.688 1.44 C121.856 1.44 121.136 1.728 120.528 2.304 C119.92 2.88 119.616 3.584 119.616 4.416 L119.616 31.056 C119.616 31.888 119.92 32.6 120.528 33.192 C121.136 33.784 121.856 34.08 122.688 34.08 L123.264 34.08 L123.312 34.56 L108.72 34.56 L108.72 34.08 Z"></path><path d="M164.448 1.44 C163.648 1.44 162.96 1.72 162.384 2.28 C161.808 2.84 161.504 3.52 161.472 4.32 L161.472 29.088 C161.472 31.232 161.616 33.04 161.904 34.512 L162.048 35.232 L161.616 35.232 L137.376 12.144 L137.376 31.2 C137.376 32 137.664 32.68 138.24 33.24 C138.816 33.8 139.504 34.08 140.304 34.08 L141.216 34.08 L141.216 34.56 L126.672 34.56 L126.672 34.08 L127.536 34.08 C128.368 34.08 129.072 33.8 129.648 33.24 C130.224 32.68 130.512 31.984 130.512 31.152 L130.512 6.24 C130.512 4.128 130.368 2.368 130.08 0.96 L129.984 0.24 L130.416 0.24 L154.656 23.328 L154.656 4.368 C154.624 3.536 154.32 2.84 153.744 2.28 C153.168 1.72 152.48 1.44 151.68 1.44 L150.816 1.44 L150.816 0.96 L165.36 0.96 L165.36 1.44 Z"></path><path d="M168.624 34.08 C169.456 34.08 170.168 33.784 170.76 33.192 C171.352 32.6 171.664 31.888 171.696 31.056 L171.696 4.416 C171.664 3.584 171.352 2.88 170.76 2.304 C170.168 1.728 169.456 1.44 168.624 1.44 L168 1.44 L168 0.96 L182.592 0.96 L182.544 1.44 L181.968 1.44 C181.136 1.44 180.416 1.728 179.808 2.304 C179.2 2.88 178.896 3.584 178.896 4.416 L178.896 31.056 C178.896 31.888 179.2 32.6 179.808 33.192 C180.416 33.784 181.136 34.08 181.968 34.08 L182.544 34.08 L182.592 34.56 L168 34.56 L168 34.08 Z"></path></svg>
+<p style="margin:14px 0 0;font-size:13.5px;color:var(--ink-3)">Versione di anteprima</p>
+<p style="margin:24px 0 0;max-width:60ch;font-size:14.5px;line-height:1.55;color:var(--ink)">Datini è un programma di posta libero e open source. La posta viaggia direttamente tra il tuo computer e il server del tuo provider.</p>
+<p style="margin:12px 0 0;max-width:60ch;font-size:14.5px;line-height:1.55;color:var(--ink-2)">Porta il nome di Francesco Datini, mercante di Prato del Trecento. Il suo archivio conserva circa 143.000 lettere d’affari scambiate con quasi trecento città.</p>
+<div style="margin-top:24px;display:flex;flex-wrap:wrap;gap:8px">
+<button class="btn" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M7 8l-4 4l4 4"/><path d="M17 8l4 4l-4 4"/><path d="M14 4l-4 16"/></svg>Codice sorgente</button>
+<button class="btn" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/><path d="M9 9l1 0"/><path d="M9 13l6 0"/><path d="M9 17l6 0"/></svg>Licenza</button>
+<button class="btn" style="height:32px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;border:1px solid var(--rule-2);border-radius:4px;background:transparent;color:var(--ink);font-size:14px"><svg class="i" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--danger)"><path d="M9 9v-1a3 3 0 0 1 6 0v1"/><path d="M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3"/><path d="M3 13l4 0"/><path d="M17 13l4 0"/><path d="M12 20l0 -6"/><path d="M4 19l3.35 -2"/><path d="M20 19l-3.35 -2"/><path d="M4 7l3.75 2.4"/><path d="M20 7l-3.75 2.4"/></svg>Segnala un problema</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{setAccount}}" hint-placeholder-val="{{false}}">
+<h3 style="margin:0;font-size:22px;font-weight:600">Account e sincronizzazione</h3>
+<p style="margin:6px 0 0;max-width:60ch;font-size:14.5px;line-height:1.5;color:var(--ink-2)">La posta viaggia direttamente tra questo computer e il server del tuo provider. Datini non usa server intermedi.</p>
+<div class="two" style="margin-top:24px;display:grid;grid-template-columns:232px minmax(0,1fr);gap:28px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{accts}}" as="a" hint-placeholder-count="2">
+<button class="btn fold" data-sel="{{a.sel}}" onClick="{{a.pick}}" aria-current="{{a.cur}}" style="width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 12px;border:0;border-radius:4px;background:transparent;color:var(--ink);text-align:left"><span style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;font-weight:600">{{a.addr}}</span><span style="font-size:12.5px;color:var(--ink-3)">{{a.kind}}</span></button>
+</sc-for>
+<button class="btn" style="margin-top:6px;height:36px;display:flex;align-items:center;gap:8px;padding:0 12px;border:0;border-radius:4px;background:transparent;color:var(--brand-ink);font-size:13.5px"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5l0 14"/><path d="M5 12l14 0"/></svg>Aggiungi account</button>
+</div>
+<div style="min-width:0">
+<div style="display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:24px;row-gap:8px;padding:16px 18px;border-radius:4px;background:var(--rail);font-size:13.5px">
+<span style="color:var(--ink-2)">Protocollo</span><span style="font-weight:600">{{srv.proto}}</span>
+<span style="color:var(--ink-2)">Server in arrivo</span><span>{{srv.inLine}}</span>
+<span style="color:var(--ink-2)">Server in uscita</span><span>{{srv.outLine}}</span>
+<span style="color:var(--ink-2)">Connessione</span><span style="display:flex;align-items:center;gap:6px"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink)"><path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-2"/><path d="M3 15a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -2"/><path d="M7 8l0 .01"/><path d="M7 16l0 .01"/></svg>Diretta, senza server intermedi</span>
+</div>
+<sc-if value="{{isImap}}" hint-placeholder-val="{{true}}">
+<div role="radiogroup" aria-labelledby="tb-sync-win" style="margin-top:26px">
+<h4 id="tb-sync-win" style="margin:0 0 4px;font-size:15px;font-weight:600">Posta da tenere sul computer</h4>
+<p style="margin:0 0 12px;max-width:58ch;font-size:13.5px;line-height:1.5;color:var(--ink-2)">I messaggi più vecchi restano sul server e si scaricano quando li apri. Senza connessione vedi solo quelli tenuti sul computer.</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{imapWindow}}" as="o" hint-placeholder-count="4">
+<label class="pill" data-on="{{o.on}}"><input type="radio" name="tb-sync-win" checked="{{o.checked}}" onChange="{{o.pick}}">{{o.label}}</label>
+</sc-for>
+</div>
+</div>
+<div role="radiogroup" aria-labelledby="tb-sync-att" style="margin-top:24px">
+<h4 id="tb-sync-att" style="margin:0 0 12px;font-size:15px;font-weight:600">Allegati</h4>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{attachOpts}}" as="o" hint-placeholder-count="2">
+<label class="pill" data-on="{{o.on}}"><input type="radio" name="tb-sync-att" checked="{{o.checked}}" onChange="{{o.pick}}">{{o.label}}</label>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{isPop}}" hint-placeholder-val="{{false}}">
+<div role="note" style="margin-top:22px;display:flex;gap:12px;padding:12px 14px;border-radius:4px;background:var(--warn-soft);font-size:13.5px;line-height:1.5"><svg class="i" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--warn);margin-top:1px"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0"/><path d="M12 16h.01"/></svg><span>Con POP la posta viene scaricata su questo computer, che ne conserva l’unica copia completa. Includi la cartella di Datini nei backup.</span></div>
+<div role="radiogroup" aria-labelledby="tb-sync-pop" style="margin-top:24px">
+<h4 id="tb-sync-pop" style="margin:0 0 4px;font-size:15px;font-weight:600">Copia sul server</h4>
+<p style="margin:0 0 12px;max-width:58ch;font-size:13.5px;line-height:1.5;color:var(--ink-2)">Per quanto tempo lasciare i messaggi anche sul server dopo averli scaricati.</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{popKeep}}" as="o" hint-placeholder-count="3">
+<label class="pill" data-on="{{o.on}}"><input type="radio" name="tb-sync-pop" checked="{{o.checked}}" onChange="{{o.pick}}">{{o.label}}</label>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{onboarding}}" hint-placeholder-val="{{false}}">
+<div class="scrim" style="z-index:40">
+<div class="rise" role="dialog" aria-modal="true" aria-labelledby="tb-ob-title" style="width:min(840px,100%);max-height:100%;overflow:auto;box-sizing:border-box;padding:32px 36px 28px;border-radius:8px;background:var(--sheet);box-shadow:var(--win-shadow)">
+<svg width="125" height="24" viewBox="0 0 182.592 35.232" fill="currentColor" role="img" aria-label="Datini" style="display:block;color:var(--ink)"><path d="M14.688 0.912 C15.232 0.912 16.224 0.912 17.664 0.912 C19.104 0.912 21.776 0.928 25.68 0.96 C31.344 1.024 35.824 2.552 39.12 5.544 C42.416 8.536 44.064 12.616 44.064 17.784 C44.064 22.952 42.416 27.04 39.12 30.048 C35.824 33.056 31.344 34.56 25.68 34.56 L8.256 34.56 L8.256 34.08 L8.88 34.08 C9.68 34.08 10.376 33.8 10.968 33.24 C11.56 32.68 11.888 32 11.952 31.2 L11.952 3.12 C8.368 3.376 5.712 4.208 3.984 5.616 C3.12 6.288 2.44 6.976 1.944 7.68 C1.448 8.384 0.96 9.232 0.48 10.224 L0 10.032 C0.768 6.832 2.376 4.52 4.824 3.096 C7.272 1.672 10.56 0.944 14.688 0.912 Z M25.104 32.544 C28.528 32.544 31.24 31.216 33.24 28.56 C35.24 25.904 36.24 22.304 36.24 17.76 C36.24 13.216 35.24 9.632 33.24 7.008 C31.24 4.384 28.56 3.072 25.2 3.072 C25.168 3.072 25.136 3.072 25.104 3.072 L19.152 3.072 L19.152 32.544 L25.104 32.544 Z"></path><path d="M80.016 34.08 L80.448 34.08 L80.448 34.56 L65.136 34.56 L65.136 34.08 L65.568 34.08 C66.272 34.08 66.792 33.864 67.128 33.432 C67.464 33 67.632 32.592 67.632 32.208 C67.632 31.824 67.552 31.44 67.392 31.056 L65.04 25.152 L53.808 25.152 L51.312 31.056 C51.152 31.472 51.072 31.864 51.072 32.232 C51.072 32.6 51.24 33 51.576 33.432 C51.912 33.864 52.448 34.08 53.184 34.08 L53.568 34.08 L53.568 34.56 L43.296 34.56 L43.296 34.08 L43.728 34.08 C44.464 34.08 45.2 33.856 45.936 33.408 C46.672 32.96 47.28 32.288 47.76 31.392 L58.848 6.288 C60.352 3.12 61.152 1.024 61.248 0 L61.68 0 L75.936 31.296 C76.416 32.224 77.024 32.92 77.76 33.384 C78.496 33.848 79.248 34.08 80.016 34.08 Z M54.624 23.136 L64.224 23.136 L59.568 11.328 Z"></path><path d="M94.368 2.928 L94.368 31.104 C94.4 31.936 94.712 32.64 95.304 33.216 C95.896 33.792 96.608 34.08 97.44 34.08 L98.016 34.08 L98.064 34.56 L83.472 34.56 L83.472 34.08 L84.096 34.08 C84.896 34.08 85.592 33.792 86.184 33.216 C86.776 32.64 87.104 31.952 87.168 31.152 L87.168 2.928 L80.688 2.928 C79.216 2.96 78.048 3.424 77.184 4.32 C76.32 5.216 75.888 6.384 75.888 7.824 L75.888 8.4 L75.408 8.4 L75.408 0.048 C75.856 0.24 76.664 0.432 77.832 0.624 C79 0.816 80.08 0.912 81.072 0.912 L100.416 0.912 C101.984 0.88 103.264 0.752 104.256 0.528 C105.248 0.304 105.856 0.144 106.08 0.048 L106.08 8.4 L105.6 8.4 L105.6 7.824 C105.6 6.384 105.168 5.216 104.304 4.32 C103.44 3.424 102.272 2.96 100.8 2.928 Z"></path><path d="M109.344 34.08 C110.176 34.08 110.888 33.784 111.48 33.192 C112.072 32.6 112.384 31.888 112.416 31.056 L112.416 4.416 C112.384 3.584 112.072 2.88 111.48 2.304 C110.888 1.728 110.176 1.44 109.344 1.44 L108.72 1.44 L108.72 0.96 L123.312 0.96 L123.264 1.44 L122.688 1.44 C121.856 1.44 121.136 1.728 120.528 2.304 C119.92 2.88 119.616 3.584 119.616 4.416 L119.616 31.056 C119.616 31.888 119.92 32.6 120.528 33.192 C121.136 33.784 121.856 34.08 122.688 34.08 L123.264 34.08 L123.312 34.56 L108.72 34.56 L108.72 34.08 Z"></path><path d="M164.448 1.44 C163.648 1.44 162.96 1.72 162.384 2.28 C161.808 2.84 161.504 3.52 161.472 4.32 L161.472 29.088 C161.472 31.232 161.616 33.04 161.904 34.512 L162.048 35.232 L161.616 35.232 L137.376 12.144 L137.376 31.2 C137.376 32 137.664 32.68 138.24 33.24 C138.816 33.8 139.504 34.08 140.304 34.08 L141.216 34.08 L141.216 34.56 L126.672 34.56 L126.672 34.08 L127.536 34.08 C128.368 34.08 129.072 33.8 129.648 33.24 C130.224 32.68 130.512 31.984 130.512 31.152 L130.512 6.24 C130.512 4.128 130.368 2.368 130.08 0.96 L129.984 0.24 L130.416 0.24 L154.656 23.328 L154.656 4.368 C154.624 3.536 154.32 2.84 153.744 2.28 C153.168 1.72 152.48 1.44 151.68 1.44 L150.816 1.44 L150.816 0.96 L165.36 0.96 L165.36 1.44 Z"></path><path d="M168.624 34.08 C169.456 34.08 170.168 33.784 170.76 33.192 C171.352 32.6 171.664 31.888 171.696 31.056 L171.696 4.416 C171.664 3.584 171.352 2.88 170.76 2.304 C170.168 1.728 169.456 1.44 168.624 1.44 L168 1.44 L168 0.96 L182.592 0.96 L182.544 1.44 L181.968 1.44 C181.136 1.44 180.416 1.728 179.808 2.304 C179.2 2.88 178.896 3.584 178.896 4.416 L178.896 31.056 C178.896 31.888 179.2 32.6 179.808 33.192 C180.416 33.784 181.136 34.08 181.968 34.08 L182.544 34.08 L182.592 34.56 L168 34.56 L168 34.08 Z"></path></svg>
+<h1 id="tb-ob-title" style="margin:24px 0 0;font-size:28px;font-weight:600;line-height:1.2">Da quale Outlook arrivi?</h1>
+<p style="margin:8px 0 0;max-width:56ch;font-size:15px;line-height:1.5;color:var(--ink-2)">Mettiamo i comandi dove sei abituato a trovarli. Puoi cambiare ogni cosa quando vuoi dalle impostazioni.</p>
+<div class="two" role="radiogroup" aria-labelledby="tb-ob-title" style="margin-top:24px;display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:16px">
+<sc-for list="{{obCards}}" as="o" hint-placeholder-count="2">
+<label class="obc" data-on="{{o.on}}">
+<input type="radio" name="tb-ob" checked="{{o.checked}}" onChange="{{o.pick}}">
+<span aria-hidden="true" style="display:block;padding:10px;border-radius:4px;background:var(--ground)">
+<sc-if value="{{o.classic}}" hint-placeholder-val="{{true}}">
+<svg viewBox="0 0 240 136" style="display:block;width:100%;height:auto">
+<rect x="4" y="4" width="232" height="128" rx="5" style="fill:var(--ground);stroke:var(--rule-2)"></rect>
+<path d="M4.5 9.5a5 5 0 0 1 5 -5h221a5 5 0 0 1 5 5v6.5h-231z" style="fill:var(--brand)"></path>
+<rect x="88" y="7" width="64" height="6" rx="1.5" style="fill:#FFFFFF;opacity:.9"></rect>
+<rect x="12" y="20" width="11" height="3" rx="1" style="fill:var(--brand)"></rect>
+<rect x="27" y="20" width="14" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="45" y="20" width="14" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="10" y="27" width="220" height="30" rx="3" style="fill:var(--sheet)"></rect>
+<rect x="15" y="31" width="15" height="15" rx="2" style="fill:none;stroke:var(--brand);stroke-width:1.6"></rect>
+<rect x="15" y="50" width="15" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="37" y="31" width="1" height="22" style="fill:var(--rule-2)"></rect>
+<rect x="43" y="32" width="11" height="11" rx="2" style="fill:var(--brand);opacity:.6"></rect>
+<rect x="43" y="47" width="11" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="59" y="32" width="11" height="11" rx="2" style="fill:var(--green);opacity:.6"></rect>
+<rect x="59" y="47" width="11" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="76" y="31" width="1" height="22" style="fill:var(--rule-2)"></rect>
+<rect x="82" y="32" width="11" height="11" rx="2" style="fill:var(--brand);opacity:.6"></rect>
+<rect x="82" y="47" width="11" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="98" y="32" width="11" height="11" rx="2" style="fill:var(--brand);opacity:.6"></rect>
+<rect x="98" y="47" width="11" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="114" y="32" width="11" height="11" rx="2" style="fill:var(--amber);opacity:.6"></rect>
+<rect x="114" y="47" width="11" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="131" y="31" width="1" height="22" style="fill:var(--rule-2)"></rect>
+<rect x="137" y="33" width="28" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="137" y="40" width="24" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="137" y="47" width="30" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="10" y="62" width="40" height="64" rx="3" style="fill:var(--ground)"></rect>
+<rect x="14" y="68" width="30" height="5" rx="1" style="fill:var(--brand-soft)"></rect>
+<rect x="54" y="62" width="62" height="64" rx="3" style="fill:var(--sheet)"></rect>
+<rect x="56" y="67" width="2" height="9" rx="1" style="fill:var(--brand)"></rect>
+<rect x="61" y="68" width="48" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="82" width="42" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="96" width="48" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="110" width="38" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="120" y="62" width="110" height="64" rx="3" style="fill:var(--sheet)"></rect>
+<rect x="143" y="79" width="92" height="54" rx="4" style="fill:#000000;opacity:.1"></rect>
+<rect x="140" y="76" width="92" height="54" rx="4" style="fill:var(--sheet);stroke:var(--rule-2)"></rect>
+<path d="M140.5 80a3.5 3.5 0 0 1 3.5 -3.5h84a3.5 3.5 0 0 1 3.5 3.5v4h-91z" style="fill:var(--brand)"></path>
+<rect x="146" y="90" width="13" height="22" rx="2" style="fill:var(--brand)"></rect>
+<rect x="164" y="91" width="60" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="164" y="99" width="60" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="164" y="107" width="44" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="146" y="118" width="78" height="2" rx="1" style="fill:var(--rule-2)"></rect>
+</svg>
+</sc-if>
+<sc-if value="{{o.nuovo}}" hint-placeholder-val="{{false}}">
+<svg viewBox="0 0 240 136" style="display:block;width:100%;height:auto">
+<rect x="4" y="4" width="232" height="128" rx="5" style="fill:var(--ground);stroke:var(--rule-2)"></rect>
+<path d="M4.5 9.5a5 5 0 0 1 5 -5h221a5 5 0 0 1 5 5v6.5h-231z" style="fill:var(--brand)"></path>
+<rect x="88" y="7" width="64" height="6" rx="1.5" style="fill:#FFFFFF;opacity:.9"></rect>
+<circle cx="224" cy="10" r="2.6" style="fill:none;stroke:#FFFFFF;stroke-width:1.2"></circle>
+<rect x="12" y="20" width="14" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="30" y="20" width="14" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="48" y="20" width="14" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="10" y="27" width="220" height="11" rx="3" style="fill:var(--sheet)"></rect>
+<rect x="13" y="29.5" width="26" height="6" rx="1.5" style="fill:var(--brand)"></rect>
+<rect x="45" y="30" width="5" height="5" rx="1" style="fill:var(--ink-3);opacity:.5"></rect>
+<rect x="54" y="30" width="5" height="5" rx="1" style="fill:var(--green);opacity:.7"></rect>
+<rect x="63" y="30" width="5" height="5" rx="1" style="fill:var(--danger);opacity:.6"></rect>
+<rect x="75" y="30" width="5" height="5" rx="1" style="fill:var(--brand);opacity:.7"></rect>
+<rect x="84" y="30" width="5" height="5" rx="1" style="fill:var(--brand);opacity:.7"></rect>
+<rect x="93" y="30" width="5" height="5" rx="1" style="fill:var(--brand);opacity:.7"></rect>
+<rect x="105" y="30" width="5" height="5" rx="1" style="fill:var(--ink-3);opacity:.5"></rect>
+<rect x="114" y="30" width="5" height="5" rx="1" style="fill:var(--danger);opacity:.6"></rect>
+<rect x="10" y="43" width="40" height="83" rx="3" style="fill:var(--ground)"></rect>
+<rect x="14" y="48" width="30" height="5" rx="1" style="fill:var(--brand-soft)"></rect>
+<rect x="54" y="43" width="62" height="83" rx="3" style="fill:var(--sheet)"></rect>
+<rect x="56" y="48" width="2" height="9" rx="1" style="fill:var(--brand)"></rect>
+<rect x="61" y="49" width="48" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="63" width="42" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="77" width="48" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="91" width="38" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="61" y="105" width="44" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="120" y="43" width="110" height="83" rx="3" style="fill:var(--sheet)"></rect>
+<rect x="126" y="49" width="22" height="7" rx="1.5" style="fill:var(--brand)"></rect>
+<rect x="126" y="63" width="96" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="126" y="71" width="96" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="126" y="79" width="70" height="3" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="126" y="91" width="90" height="2" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="126" y="97" width="80" height="2" rx="1" style="fill:var(--rule-2)"></rect>
+<rect x="126" y="103" width="60" height="2" rx="1" style="fill:var(--rule-2)"></rect>
+</svg>
+</sc-if>
+</span>
+<span style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-size:17px;font-weight:600">{{o.title}}</span><span class="dot" aria-hidden="true"></span></span>
+<span style="display:flex;flex-direction:column;gap:7px">
+<sc-for list="{{o.lines}}" as="l" hint-placeholder-count="3">
+<span style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-2)"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--brand-ink);stroke-width:2"><path d="M5 12l5 5l10 -10"/></svg>{{l.t}}</span>
+</sc-for>
+</span>
+</label>
+</sc-for>
+</div>
+<div style="margin-top:26px;display:flex;align-items:center;justify-content:flex-end">
+<button class="primary" onClick="{{obContinue}}" style="height:36px;padding:0 24px;border:0;border-radius:4px;background:var(--brand);color:var(--on-brand);font-size:14.5px;font-weight:600">Continua</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["chiaro","scuro"],"default":"chiaro","section":"Aspetto"},"stile":{"editor":"enum","options":["classico","nuovo"],"default":"classico","section":"Aspetto"},"avvio":{"editor":"boolean","default":true,"section":"Stato"},"view":{"editor":"enum","options":["lettura","composizione","inviato","file","impostazioni","account"],"default":"lettura","section":"Stato"},"connection":{"editor":"enum","options":["online","offline"],"default":"online","section":"Stato"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.base = this.makeData();
+    this.timers = [];
+    this.state = this.initialState(props);
+  }
+
+  componentWillUnmount() {
+    this.timers.forEach(function (t) { clearTimeout(t); });
+  }
+
+  componentDidUpdate(prev) {
+    var p = this.props;
+    if (prev.view !== p.view || prev.stile !== p.stile || prev.avvio !== p.avvio) { this.setState(this.initialState(p)); }
+    else if (prev.theme !== p.theme && this.state.themeOverride) { this.setState({ themeOverride: null }); }
+  }
+
+  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+
+  preset(name) {
+    if (name === "nuovo") return { ribbon: "compatta", entry: "ingranaggio", compose: "pannello", replyWin: false };
+    return { ribbon: "estesa", entry: "file", compose: "finestra", replyWin: false };
+  }
+
+  yes(v, dflt) {
+    if (v === undefined || v === null || v === "") return dflt;
+    return v === true || v === "true" || v === "si";
+  }
+
+  makeData() {
+    return [
+      { id: "m1", folder: "inbox", tab: "prio", group: "Oggi", from: "Davide Orlandi", email: "d.orlandi@studiorlandi.it", time: "08:42", dateLong: "ven 16/10/2026 08:42", subject: "Preventivo uffici Bassano, revisione 3", preview: "Ciao Chiara, ti allego la revisione 3 con le scrivanie da 160 al posto di quelle da 180 e le cassettiere su ruote.", body: ["Ciao Chiara,", "ti allego la revisione 3 del preventivo per gli uffici di Bassano. Rispetto alla versione precedente ho sostituito le scrivanie da 180 con quelle da 160 e aggiunto le cassettiere su ruote per le postazioni operative.", "Il totale scende di poco più di 2.000 euro. I tempi restano invariati: posa entro la seconda settimana di dicembre, se confermiamo l’ordine entro il 30 ottobre.", "Nella planimetria trovi le posizioni aggiornate delle prese a pavimento. Fammi sapere se il cliente vuole vedere i campioni del rovere prima di firmare.", "A presto,\nDavide"], sig: "Davide Orlandi\nStudio Orlandi Architetti, Vicenza", atts: [{ name: "Preventivo_Bassano_rev3.pdf", size: "412 KB", kind: "pdf" }, { name: "Planimetria_piano_terra.pdf", size: "1,8 MB", kind: "pdf" }], unread: true, flagged: false, to: "Chiara Valli", cc: "Marco Ventura", cat: "Clienti" },
+      { id: "m2", folder: "inbox", tab: "prio", group: "Oggi", from: "Studio Bassi & Rinaldi", email: "segreteria@bassirinaldi.it", time: "08:15", dateLong: "ven 16/10/2026 08:15", subject: "Documenti mancanti per la chiusura del trimestre", preview: "Buongiorno Chiara, per chiudere il terzo trimestre ci servono ancora le fatture passive di settembre.", body: ["Buongiorno Chiara,", "per completare la chiusura del terzo trimestre ci servono ancora le fatture passive di settembre e gli estratti conto della carta aziendale.", "Può caricarli nella cartella condivisa entro mercoledì 21 ottobre? Se preferisce, passiamo noi a ritirarli lunedì mattina.", "Cordiali saluti,\nGiulia Rinaldi"], sig: "Studio Bassi & Rinaldi\nCommercialisti associati", atts: [], unread: true, flagged: true, to: "Chiara Valli", cc: "", cat: "Amministrazione" },
+      { id: "m3", folder: "inbox", tab: "prio", group: "Oggi", from: "Lucia Marchetti", email: "lucia@marchettitessuti.it", time: "07:58", dateLong: "ven 16/10/2026 07:58", subject: "Re: Campionario tessuti per lo showroom", preview: "Perfetto, allora spedisco lunedì i campioni del bouclé e del velluto a coste nelle sei tinte.", body: ["Ciao Chiara,", "perfetto, allora spedisco lunedì i campioni del bouclé e del velluto a coste nelle sei tinte che avete scelto.", "Ti allego anche la cartella colori 2027: le tinte segnate con l’asterisco saranno disponibili solo da febbraio.", "Un abbraccio,\nLucia"], sig: "", atts: [{ name: "Cartella_colori_2027.pdf", size: "6,4 MB", kind: "pdf" }], unread: false, flagged: false, to: "Chiara Valli", cc: "", cat: "Fornitori" },
+      { id: "m4", folder: "inbox", tab: "prio", group: "Ieri", from: "Tipografia Gualtieri", email: "prestampa@tipografiagualtieri.it", time: "gio 17:20", dateLong: "gio 15/10/2026 17:20", subject: "Bozza del catalogo autunno da approvare", preview: "Gentile Chiara, in allegato la seconda bozza del catalogo con le correzioni di pagina 12.", body: ["Gentile Chiara,", "in allegato la seconda bozza del catalogo autunno, con le correzioni di pagina 12 e la nuova copertina.", "Per rispettare la consegna del 6 novembre ci serve l’approvazione definitiva entro martedì. Le modifiche arrivate dopo quella data spostano la stampa di una settimana.", "Grazie,\nUfficio prestampa"], sig: "Tipografia Gualtieri", atts: [{ name: "Catalogo_autunno_bozza2.pdf", size: "14,2 MB", kind: "pdf" }], unread: true, flagged: false, to: "Chiara Valli", cc: "", cat: "" },
+      { id: "m5", folder: "inbox", tab: "prio", group: "Ieri", from: "Marco Ventura", email: "m.ventura@valliarredi.it", time: "gio 15:02", dateLong: "gio 15/10/2026 15:02", subject: "Riunione commerciale di lunedì", preview: "Spostiamo la riunione alle 10:30, così riesce a esserci anche Giorgio dopo il sopralluogo.", body: ["Ciao Chiara,", "spostiamo la riunione commerciale di lunedì alle 10:30, così riesce a esserci anche Giorgio dopo il sopralluogo.", "Ordine del giorno: preventivo Bassano, listino 2027 e fiera di gennaio. Porto io i numeri del terzo trimestre.", "Marco"], sig: "", atts: [], unread: false, flagged: false, to: "Chiara Valli; Giorgio Valli", cc: "", cat: "" },
+      { id: "m6", folder: "inbox", tab: "prio", group: "Ieri", from: "Elena Fabbri", email: "amministrazione@fabbrilegnami.it", time: "gio 11:47", dateLong: "gio 15/10/2026 11:47", subject: "Fattura n. 418 del 15/10/2026", preview: "Buongiorno, in allegato la fattura relativa alla fornitura di pannelli in rovere.", body: ["Buongiorno,", "in allegato la fattura n. 418 relativa alla fornitura di pannelli in rovere consegnata il 9 ottobre.", "Pagamento a 60 giorni data fattura, come da accordi. Resto a disposizione per qualsiasi chiarimento.", "Elena Fabbri"], sig: "Amministrazione, Fabbri Legnami", atts: [{ name: "Fattura_418.pdf", size: "96 KB", kind: "pdf" }], unread: false, flagged: false, to: "Chiara Valli", cc: "", cat: "Amministrazione" },
+      { id: "m7", folder: "inbox", tab: "prio", group: "Questa settimana", from: "Trasporti Ferri", email: "consegne@trasportiferri.it", time: "mer 14/10", dateLong: "mer 14/10/2026 09:30", subject: "Consegna programmata per martedì 20 ottobre", preview: "La spedizione TF-208114 verrà consegnata martedì 20 ottobre tra le 8:00 e le 12:00.", body: ["Gentile cliente,", "la spedizione TF-208114 verrà consegnata martedì 20 ottobre tra le 8:00 e le 12:00 all’indirizzo di via Emilia 214.", "Se in quella fascia non c’è nessuno, può indicarci un orario diverso rispondendo a questo messaggio.", "Trasporti Ferri"], sig: "", atts: [], unread: false, flagged: false, to: "Chiara Valli", cc: "", cat: "" },
+      { id: "m8", folder: "inbox", tab: "prio", group: "Questa settimana", from: "Giorgio Valli", email: "giorgio@valliarredi.it", time: "mer 14/10", dateLong: "mer 14/10/2026 12:06", subject: "Foto sopralluogo via Mazzini", preview: "Ti mando le foto del sopralluogo. Il soffitto della sala riunioni è più basso del previsto.", body: ["Chiara,", "ti mando le foto del sopralluogo di stamattina. Il soffitto della sala riunioni è più basso del previsto: le lampade a sospensione che avevamo scelto non vanno bene.", "Ne parliamo lunedì?", "Giorgio"], sig: "", atts: [{ name: "Sopralluogo_Mazzini.zip", size: "38 MB", kind: "zip" }], unread: true, flagged: false, to: "Chiara Valli", cc: "", cat: "Clienti" },
+      { id: "m9", folder: "inbox", tab: "prio", group: "Questa settimana", from: "Sara Benassi", email: "s.benassi@valliarredi.it", time: "mar 13/10", dateLong: "mar 13/10/2026 16:05", subject: "Ferie di Natale: calendario da compilare", preview: "Ciao a tutti, entro fine mese segnate i giorni di ferie nel calendario condiviso.", body: ["Ciao a tutti,", "entro fine mese segnate i vostri giorni di ferie di Natale nel calendario condiviso, così organizziamo i turni del magazzino.", "Grazie!\nSara"], sig: "", atts: [], unread: false, flagged: false, to: "Ufficio Valli Arredi", cc: "", cat: "" },
+      { id: "m10", folder: "inbox", tab: "prio", group: "Questa settimana", from: "Paolo Sartori", email: "paolo.sartori@sartoriluce.it", time: "lun 12/10", dateLong: "lun 12/10/2026 11:18", subject: "Re: Listino 2027", preview: "Confermo gli aumenti solo sulla linea in ottone, il resto del listino resta invariato.", body: ["Buongiorno Chiara,", "confermo gli aumenti solo sulla linea in ottone, il resto del listino resta invariato fino a giugno 2027.", "Le invio il listino completo entro la fine del mese.", "Cordiali saluti,\nPaolo Sartori"], sig: "Sartori Luce", atts: [], unread: false, flagged: false, to: "Chiara Valli", cc: "", cat: "Fornitori" },
+      { id: "a1", folder: "inbox", tab: "altre", group: "Oggi", from: "Arredo & Contract", email: "newsletter@arredoecontract.it", time: "06:30", dateLong: "ven 16/10/2026 06:30", subject: "Uffici 2027: materiali, colori e acustica", preview: "Cosa chiedono le aziende per i nuovi uffici, raccontato da tre studi di progettazione.", body: ["Questa settimana:", "cosa chiedono le aziende per i nuovi uffici, raccontato da tre studi di progettazione. Materiali, colori e soluzioni acustiche per gli spazi condivisi.", "Per non ricevere più questa newsletter, aggiorna le preferenze dal tuo profilo."], sig: "", atts: [], unread: true, flagged: false, to: "Chiara Valli", cc: "", cat: "" },
+      { id: "a2", folder: "inbox", tab: "altre", group: "Ieri", from: "Cartoleria Bertelli", email: "ordini@cartoleriabertelli.it", time: "gio 09:12", dateLong: "gio 15/10/2026 09:12", subject: "Il tuo ordine è stato spedito", preview: "Toner e risme di carta in consegna entro sabato.", body: ["Gentile cliente,", "il tuo ordine (toner e risme di carta) è stato spedito e arriverà entro sabato.", "Cartoleria Bertelli"], sig: "", atts: [], unread: false, flagged: false, to: "Chiara Valli", cc: "", cat: "" },
+      { id: "a3", folder: "inbox", tab: "altre", group: "Questa settimana", from: "Rete Progettisti Emilia", email: "eventi@reteprogettisti.it", time: "mer 14/10", dateLong: "mer 14/10/2026 18:00", subject: "Promemoria: webinar sull’illuminazione degli uffici", preview: "Il webinar inizia giovedì 22 ottobre alle 17:00. Ecco come collegarti.", body: ["Ciao,", "il webinar sull’illuminazione degli uffici inizia giovedì 22 ottobre alle 17:00. Riceverai il link di accesso un’ora prima.", "Rete Progettisti Emilia"], sig: "", atts: [], unread: true, flagged: false, to: "Chiara Valli", cc: "", cat: "" },
+      { id: "s1", folder: "sent", tab: "prio", group: "Ieri", from: "Davide Orlandi", email: "d.orlandi@studiorlandi.it", time: "gio 18:05", dateLong: "gio 15/10/2026 18:05", subject: "Re: Preventivo uffici Bassano, revisione 2", preview: "Il cliente chiede scrivanie più strette nelle postazioni operative.", body: ["Ciao Davide,", "il cliente chiede scrivanie più strette nelle postazioni operative: puoi rivedere il preventivo con quelle da 160?", "Grazie,\nChiara"], sig: "", atts: [], unread: false, flagged: false, to: "Davide Orlandi", cc: "Marco Ventura", cat: "", sent: true },
+      { id: "s2", folder: "sent", tab: "prio", group: "Questa settimana", from: "Trasporti Ferri", email: "consegne@trasportiferri.it", time: "mer 14/10", dateLong: "mer 14/10/2026 16:44", subject: "Re: Consegna programmata per martedì 20 ottobre", preview: "Martedì mattina va benissimo, in magazzino ci sarà Sara.", body: ["Buongiorno,", "martedì mattina va benissimo, in magazzino ci sarà Sara.", "Cordiali saluti,\nChiara Valli"], sig: "", atts: [], unread: false, flagged: false, to: "Trasporti Ferri", cc: "", cat: "", sent: true },
+      { id: "s3", folder: "sent", tab: "prio", group: "Questa settimana", from: "Lucia Marchetti", email: "lucia@marchettitessuti.it", time: "mer 14/10", dateLong: "mer 14/10/2026 10:20", subject: "Campionario tessuti per lo showroom", preview: "Per lo showroom ci servirebbero i campioni del bouclé e del velluto a coste.", body: ["Ciao Lucia,", "per lo showroom ci servirebbero i campioni del bouclé e del velluto a coste in sei tinte. Riesci a mandarli entro fine mese?", "Grazie mille,\nChiara"], sig: "", atts: [], unread: false, flagged: false, to: "Lucia Marchetti", cc: "", cat: "", sent: true },
+      { id: "d1", folder: "drafts", tab: "prio", group: "Ieri", from: "Giorgio Valli", email: "giorgio@valliarredi.it", time: "gio 19:10", dateLong: "gio 15/10/2026 19:10", subject: "Lampade sala riunioni", preview: "Ho trovato due modelli a plafone che restano sotto i 12 cm di ingombro.", body: ["Ciao Giorgio,", "ho trovato due modelli a plafone che restano sotto i 12 cm di ingombro. Te li mostro lunedì prima della riunione."], sig: "", atts: [], unread: false, flagged: false, to: "Giorgio Valli", cc: "", cat: "", draft: true },
+      { id: "d2", folder: "drafts", tab: "prio", group: "Questa settimana", from: "Nessun destinatario", email: "", time: "mer 12:31", dateLong: "mer 14/10/2026 12:31", subject: "Ordine campioni rovere", preview: "Servono tre campioni 30x30: rovere naturale, spazzolato e termotrattato.", body: ["Servono tre campioni 30x30: rovere naturale, spazzolato e termotrattato."], sig: "", atts: [], unread: false, flagged: false, to: "", cc: "", cat: "", draft: true }
+    ];
+  }
+
+  draftFor(win) {
+    if (win) {
+      return { to: ["Davide Orlandi"], cc: ["Marco Ventura"], subj: "Campioni del rovere per Bassano", atts: [], saved: "09:04",
+        body: "Ciao Davide,\n\nil cliente vuole vedere i campioni del rovere prima di firmare il preventivo. Riesci a portarli giovedì in sede? Bastano il naturale e lo spazzolato.\n\nA presto,\nChiara" };
+    }
+    return { to: ["Davide Orlandi"], cc: ["Marco Ventura"], subj: "Re: Preventivo uffici Bassano, revisione 3", atts: [], saved: "09:04",
+      body: "Ciao Davide,\n\ngrazie, la revisione va bene. Il cliente vuole però vedere i campioni del rovere prima di firmare: riesci a portarli giovedì in sede?\n\nA presto,\nChiara\n\n\nDa: Davide Orlandi <d.orlandi@studiorlandi.it>\nInviato: ven 16/10/2026 08:42\nOggetto: Preventivo uffici Bassano, revisione 3" };
+  }
+
+  initialState(props) {
+    var p = props || {};
+    var stile = p.stile === "nuovo" ? "nuovo" : "classico";
+    var v = p.view || "lettura";
+    var prefs = this.preset(stile);
+    var s = { folder: "inbox", folderSel: "fav-inbox", tab: "prio", sel: "m1", rd: { m1: true }, fl: {}, mv: {}, q: "",
+      ribbon: "home", winTab: "messaggio", showFolders: true, themeOverride: null, prefs: prefs,
+      onboarding: v === "lettura" && this.yes(p.avvio, true), obChoice: stile,
+      backstage: v === "file", bsPage: "info",
+      settings: v === "impostazioni" || v === "account", setPage: v === "account" ? "account" : "aspetto",
+      acctSel: "imap", sync: { imapWindow: "3m", attach: "apertura", popKeep: "14" }, acct2Open: false,
+      c: null, cWin: false, winMax: false, winMin: false, toInput: "", ccInput: "", err: "",
+      sent: [], drafts: [], toast: null, lastSent: null };
+    if (v === "composizione") {
+      s.cWin = prefs.compose === "finestra";
+      s.c = this.draftFor(s.cWin);
+      s.ribbon = s.cWin ? "home" : "messaggio";
+    }
+    if (v === "inviato" || v === "timbro") {
+      var c = this.draftFor(prefs.compose === "finestra");
+      var msg = this.msgFromCompose(c, "sent");
+      s.sent = [msg];
+      s.toast = { kind: "sent", id: "fisso" };
+      s.lastSent = { msg: msg, c: c, win: prefs.compose === "finestra" };
+    }
+    return s;
+  }
+
+  effS(m, s) {
+    var o = Object.assign({}, m);
+    if (s.rd[m.id] !== undefined) o.unread = !s.rd[m.id];
+    if (s.fl[m.id] !== undefined) o.flagged = s.fl[m.id];
+    if (s.mv[m.id]) o.folder = s.mv[m.id];
+    return o;
+  }
+
+  allIn(s) {
+    var self = this;
+    return [].concat(s.sent, s.drafts, this.base).map(function (m) { return self.effS(m, s); });
+  }
+
+  listIn(s) {
+    var q = (s.q || "").trim().toLowerCase();
+    return this.allIn(s).filter(function (m) {
+      if (m.folder !== s.folder) return false;
+      if (q) return (m.from + " " + m.subject + " " + m.preview).toLowerCase().indexOf(q) >= 0;
+      if (s.folder === "inbox" && m.tab !== s.tab) return false;
+      return true;
+    });
+  }
+
+  find(id) {
+    return this.allIn(this.state).find(function (m) { return m.id === id; }) || null;
+  }
+
+  initials(n) {
+    var w = String(n || "").replace(/[^A-Za-zÀ-ÿ ]/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (!w.length) return "?";
+    return ((w[0][0] || "") + (w.length > 1 ? w[1][0] : "")).toUpperCase();
+  }
+
+  tint(name) {
+    var s = String(name || ""), h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 37 + s.charCodeAt(i)) % 9973;
+    var k = (h % 5) + 1;
+    return ["var(--av" + k + "-bg)", "var(--av" + k + "-fg)"];
+  }
+
+  clock() {
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    var days = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+    var hhmm = p(d.getHours()) + ":" + p(d.getMinutes());
+    return { hhmm: hhmm, long: days[d.getDay()] + " " + p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear() + " " + hhmm, stamp: d.getTime() };
+  }
+
+  msgFromCompose(c, folder) {
+    var k = this.clock();
+    var first = c.to[0] || "Nessun destinatario";
+    var paras = String(c.body || "").split(/\n\s*\n/).map(function (t) { return t.trim(); }).filter(Boolean);
+    return { id: folder.charAt(0) + k.stamp + "-" + Math.floor(Math.random() * 100000), folder: folder, tab: "prio", group: "Oggi", from: first, email: "", time: k.hhmm, dateLong: k.long, hhmm: k.hhmm,
+      subject: c.subj || "(nessun oggetto)", preview: (paras[0] || "").replace(/\n/g, " ").slice(0, 120), body: paras, sig: "", atts: (c.atts || []).slice(), unread: false, flagged: false,
+      to: c.to.join("; "), cc: c.cc.join("; "), cat: "", sent: folder === "sent", draft: folder === "drafts" };
+  }
+
+  draftPatch() {
+    var s = this.state;
+    if (!s.c) return {};
+    var c = s.c, base = { c: null, cWin: false, winMin: false, winMax: false };
+    if (!c.to.length && !c.subj && !String(c.body).trim()) return base;
+    return Object.assign(base, { drafts: [this.msgFromCompose(c, "drafts")].concat(s.drafts) });
+  }
+
+  paneDraftPatch() {
+    return (this.state.c && !this.state.cWin) ? this.draftPatch() : {};
+  }
+
+  flash(kind, ms) {
+    var self = this, id = String(Date.now()) + "-" + Math.random();
+    this.later(function () { if (self.state.toast && self.state.toast.id === id) self.setState({ toast: null }); }, ms || 6000);
+    return { kind: kind, id: id };
+  }
+
+  pickFolder(key, id) {
+    var patch = this.paneDraftPatch();
+    var ns = Object.assign({}, this.state, patch, { folder: key, folderSel: id, tab: "prio", q: "" });
+    var list = this.listIn(ns);
+    var sel = (list.length && key !== "drafts") ? list[0].id : null;
+    var rd = Object.assign({}, this.state.rd);
+    if (sel) rd[sel] = true;
+    this.setState(Object.assign(patch, { folder: key, folderSel: id, tab: "prio", q: "", sel: sel, rd: rd, err: "" }));
+  }
+
+  pickTab(tab) {
+    var patch = this.paneDraftPatch();
+    var ns = Object.assign({}, this.state, patch, { tab: tab });
+    var list = this.listIn(ns);
+    var sel = list.length ? list[0].id : null;
+    var rd = Object.assign({}, this.state.rd);
+    if (sel) rd[sel] = true;
+    this.setState(Object.assign(patch, { tab: tab, sel: sel, rd: rd, err: "" }));
+  }
+
+  pickMsg(id) {
+    var s = this.state, m = this.find(id);
+    if (!m) return;
+    if (m.draft) {
+      var patch = this.draftPatch();
+      var mv = Object.assign({}, s.mv);
+      mv[id] = "gone";
+      var drafts = (patch.drafts || s.drafts).filter(function (d) { return d.id !== id; });
+      var win = s.prefs.compose === "finestra";
+      this.setState(Object.assign(patch, { mv: mv, drafts: drafts, sel: null,
+        c: { to: m.to ? m.to.split("; ").filter(Boolean) : [], cc: m.cc ? m.cc.split("; ").filter(Boolean) : [], subj: m.subject === "(nessun oggetto)" ? "" : m.subject, body: m.body.join("\n\n"), atts: m.atts.slice(), saved: m.hhmm || "" },
+        cWin: win, winMin: false, winMax: false, ribbon: win ? s.ribbon : "messaggio", winTab: "messaggio", err: "", toInput: "", ccInput: "" }));
+      return;
+    }
+    var p2 = this.paneDraftPatch();
+    var rd = Object.assign({}, s.rd);
+    rd[id] = true;
+    this.setState(Object.assign(p2, { sel: id, rd: rd, err: "" }));
+  }
+
+  moveMsg(id, dest) {
+    if (!id) return;
+    var s = this.state;
+    var list = this.listIn(s);
+    var i = list.findIndex(function (m) { return m.id === id; });
+    var mv = Object.assign({}, s.mv);
+    mv[id] = dest;
+    var patch = { mv: mv };
+    if (s.sel === id) {
+      var rest = list.filter(function (m) { return m.id !== id; });
+      var next = rest.length ? rest[Math.min(Math.max(i, 0), rest.length - 1)] : null;
+      patch.sel = next ? next.id : null;
+      if (next) { var rd = Object.assign({}, s.rd); rd[next.id] = true; patch.rd = rd; }
+    }
+    this.setState(patch);
+  }
+
+  toggleFlag(id) {
+    var m = id && this.find(id);
+    if (!m) return;
+    var fl = Object.assign({}, this.state.fl);
+    fl[id] = !m.flagged;
+    this.setState({ fl: fl });
+  }
+
+  toggleRead(id) {
+    var m = id && this.find(id);
+    if (!m) return;
+    var rd = Object.assign({}, this.state.rd);
+    rd[id] = m.unread;
+    this.setState({ rd: rd });
+  }
+
+  openCompose(kind) {
+    var s = this.state, P = s.prefs, m = null;
+    if (kind !== "new") { m = this.find(s.sel); if (!m) return; }
+    var c = { to: [], cc: [], subj: "", body: "", atts: [], saved: "" };
+    if (m) {
+      var clean = m.subject.replace(/^((re|i|r|fw|fwd):\s*)+/i, "");
+      c.body = "\n\n\nDa: " + m.from + (m.email ? " <" + m.email + ">" : "") + "\nInviato: " + m.dateLong + "\nOggetto: " + m.subject + "\n\n" + m.body.join("\n\n");
+      if (kind === "reply" || kind === "replyAll") { c.to = [m.from]; c.subj = "Re: " + clean; }
+      if (kind === "replyAll") {
+        var others = (m.to + "; " + m.cc).split("; ").map(function (n) { return n.trim(); }).filter(function (n) { return n && n !== "Chiara Valli" && n !== m.from; });
+        c.cc = others;
+      }
+      if (kind === "forward") { c.subj = "I: " + clean; c.atts = m.atts.slice(); }
+    }
+    var win = kind === "new" ? P.compose === "finestra" : (P.compose === "finestra" && P.replyWin);
+    this.setState(Object.assign(this.draftPatch(), { c: c, cWin: win, winMin: false, winMax: false, ribbon: win ? s.ribbon : "messaggio", winTab: "messaggio", toInput: "", ccInput: "", err: "" }));
+  }
+
+  setC(patch) {
+    if (!this.state.c) return;
+    this.setState({ c: Object.assign({}, this.state.c, patch, { saved: this.clock().hhmm }) });
+  }
+
+  addRecipient(key) {
+    var inputKey = key === "to" ? "toInput" : "ccInput";
+    var v = String(this.state[inputKey] || "").replace(/[,;]+$/, "").trim();
+    if (!v || !this.state.c) return;
+    var c = Object.assign({}, this.state.c);
+    c[key] = c[key].concat([v]);
+    var patch = { c: c, err: "" };
+    patch[inputKey] = "";
+    this.setState(patch);
+  }
+
+  recipientKey(key, e) {
+    var inputKey = key === "to" ? "toInput" : "ccInput";
+    if (e.key === "Enter" || e.key === "," || e.key === ";") { e.preventDefault(); this.addRecipient(key); return; }
+    if (e.key === "Backspace" && !this.state[inputKey] && this.state.c && this.state.c[key].length) {
+      var c = Object.assign({}, this.state.c);
+      c[key] = c[key].slice(0, -1);
+      this.setState({ c: c });
+    }
+  }
+
+  send() {
+    var s = this.state;
+    if (!s.c) return;
+    var to = s.c.to.slice();
+    var pending = String(s.toInput || "").replace(/[,;]+$/, "").trim();
+    if (pending) to.push(pending);
+    if (!to.length) { this.setState({ err: "Aggiungi almeno un destinatario." }); return; }
+    var c = Object.assign({}, s.c, { to: to });
+    var msg = this.msgFromCompose(c, "sent");
+    this.setState({ sent: [msg].concat(s.sent), c: null, cWin: false, winMin: false, winMax: false, toInput: "", err: "", toast: this.flash("sent", 6000), lastSent: { msg: msg, c: c, win: s.cWin } });
+  }
+
+  undoSend() {
+    var ls = this.state.lastSent;
+    if (!ls) return;
+    this.setState({ sent: this.state.sent.filter(function (m) { return m.id !== ls.msg.id; }), c: ls.c, cWin: ls.win, winMin: false, winMax: false, toast: null, lastSent: null,
+      ribbon: ls.win ? this.state.ribbon : "messaggio", winTab: "messaggio" });
+  }
+
+  closeWin() {
+    var s = this.state;
+    if (!s.c) return;
+    var c = s.c, had = c.to.length || c.subj || String(c.body).trim();
+    var patch = this.draftPatch();
+    patch.toast = had ? this.flash("draft", 5000) : null;
+    this.setState(patch);
+  }
+
+  setPref(k, v) {
+    var prefs = Object.assign({}, this.state.prefs);
+    prefs[k] = v;
+    if (k === "compose" && v === "pannello") prefs.replyWin = false;
+    var patch = { prefs: prefs };
+    if (k === "entry" && v === "ingranaggio") patch.backstage = false;
+    this.setState(patch);
+  }
+
+  applyPreset(name) {
+    var prefs = this.preset(name);
+    this.setState({ prefs: prefs, backstage: prefs.entry === "file" ? this.state.backstage : false });
+  }
+
+  renderVals() {
+    var self = this, s = this.state, P = s.prefs;
+    var theme = s.themeOverride || this.props.theme || "chiaro";
+    var all = this.allIn(s);
+    var count = function (f, unreadOnly) { return all.filter(function (m) { return m.folder === f && (!unreadOnly || m.unread); }).length; };
+    var inboxUnread = count("inbox", true), draftsN = count("drafts", false), junkUnread = count("junk", true);
+
+    var folder = function (key, id, label, icon) {
+      var n = key === "inbox" ? inboxUnread : key === "drafts" ? draftsN : key === "junk" ? junkUnread : 0;
+      var on = s.folderSel === id;
+      return { label: label, sel: on ? "si" : "no", cur: on ? "page" : "false", weight: on ? 600 : 400, count: n ? String(n) : "",
+        countColor: key === "drafts" ? "var(--ink-3)" : "var(--brand-ink)", pick: function () { self.pickFolder(key, id); },
+        icInbox: icon === "inbox", icSent: icon === "sent", icDrafts: icon === "drafts", icArchive: icon === "archive", icJunk: icon === "junk", icDeleted: icon === "deleted", icFolder: icon === "folder" };
+    };
+    var favs = [folder("inbox", "fav-inbox", "Posta in arrivo", "inbox"), folder("sent", "fav-sent", "Posta inviata", "sent"), folder("drafts", "fav-drafts", "Bozze", "drafts")];
+    var accFolders = [folder("inbox", "acc-inbox", "Posta in arrivo", "inbox"), folder("drafts", "acc-drafts", "Bozze", "drafts"), folder("sent", "acc-sent", "Posta inviata", "sent"),
+      folder("archive", "acc-archive", "Archivio", "archive"), folder("junk", "acc-junk", "Posta indesiderata", "junk"), folder("deleted", "acc-deleted", "Elementi eliminati", "deleted"),
+      folder("clienti", "acc-clienti", "Clienti", "folder"), folder("fornitori", "acc-fornitori", "Fornitori", "folder"), folder("amministrazione", "acc-amministrazione", "Amministrazione", "folder")];
+    var acct2Folders = [folder("ordini", "acc2-inbox", "Posta in arrivo", "inbox")];
+    var names = { inbox: "Posta in arrivo", sent: "Posta inviata", drafts: "Bozze", archive: "Archivio", junk: "Posta indesiderata", deleted: "Elementi eliminati", clienti: "Clienti", fornitori: "Fornitori", amministrazione: "Amministrazione", ordini: "Posta in arrivo" };
+
+    var paneCompose = !!s.c && !s.cWin;
+    var winOpen = !!s.c && s.cWin && !s.winMin;
+    var tabNames = { home: "Home", visualizza: "Visualizza", aiuto: "Aiuto", messaggio: "Messaggio", inserisci: "Inserisci" };
+    var tabIds = ["home", "visualizza", "aiuto"].concat(paneCompose ? ["messaggio", "inserisci"] : []);
+    var rib = tabIds.indexOf(s.ribbon) >= 0 ? s.ribbon : "home";
+    var mkTab = function (id, active, onPick) {
+      var on = id === active;
+      return { label: tabNames[id], on: on, weight: on ? 600 : 400, bar: on ? "inset 0 -3px 0 var(--brand)" : "none", pick: onPick };
+    };
+    var tabs = tabIds.map(function (id) { return mkTab(id, rib, function () { self.setState({ ribbon: id }); }); });
+    var winTabs = ["messaggio", "inserisci"].map(function (id) { return mkTab(id, s.winTab, function () { self.setState({ winTab: id }); }); });
+
+    var q = (s.q || "").trim();
+    var listTabs = [["prio", "Prioritaria"], ["altre", "Altre"]].map(function (t) {
+      var on = s.tab === t[0];
+      return { label: t[1], on: on, weight: on ? 600 : 400, color: on ? "var(--ink)" : "var(--ink-2)", bar: on ? "inset 0 -3px 0 var(--brand)" : "none", pick: function () { self.pickTab(t[0]); } };
+    });
+
+    var list = this.listIn(s);
+    var groups = ["Oggi", "Ieri", "Questa settimana"].map(function (g) {
+      var items = list.filter(function (m) { return m.group === g; }).map(function (m) {
+        var on = m.id === s.sel;
+        var t = self.tint(m.from);
+        return { from: m.from, ini: self.initials(m.from), tintBg: t[0], tintInk: t[1], time: m.time, subject: m.subject, preview: m.preview,
+          att: m.atts.length > 0, flagged: !!m.flagged, draft: !!m.draft, sel: on ? "si" : "no", cur: on ? "true" : "false",
+          bar: m.unread ? "var(--brand)" : "transparent", wFrom: m.unread ? 600 : 400, wSubj: m.unread ? 600 : 400, wTime: m.unread ? 600 : 400,
+          subjColor: (m.unread && !on) ? "var(--brand-ink)" : "var(--ink)", timeColor: (m.unread && !on) ? "var(--brand-ink)" : "var(--ink-3)",
+          label: (m.unread ? "Non letto. " : "") + (m.draft ? "Bozza. " : "") + m.from + ", " + m.subject + ", " + m.time,
+          pick: function () { self.pickMsg(m.id); }, del: function () { self.moveMsg(m.id, "deleted"); }, flag: function () { self.toggleFlag(m.id); }, read: function () { self.toggleRead(m.id); },
+          flagLabel: m.flagged ? "Rimuovi contrassegno" : "Contrassegna", readLabel: m.unread ? "Segna come letto" : "Segna come non letto" };
+      });
+      return { label: g, items: items };
+    }).filter(function (g) { return g.items.length > 0; });
+
+    var emptyCopy = {
+      inbox: ["Niente di nuovo qui", "Non ci sono messaggi in questa scheda."],
+      ordini: ["Niente di nuovo qui", "Non ci sono messaggi nuovi per ordini@valliarredi.it."],
+      sent: ["Nessun messaggio inviato", "I messaggi che invii compaiono qui."],
+      drafts: ["Nessuna bozza", "I messaggi che inizi e non invii restano qui."],
+      archive: ["L’archivio è vuoto", "Archivia un messaggio per toglierlo dalla posta in arrivo senza eliminarlo."],
+      junk: ["Nessun messaggio indesiderato", "Qui arrivano i messaggi che segnali come indesiderati."],
+      deleted: ["Nessun elemento eliminato", "I messaggi eliminati restano qui finché non svuoti la cartella."]
+    };
+    var ec = q ? ["Nessun risultato", "Nessun messaggio contiene “" + q + "”. Prova con un nome o con una parola dell’oggetto."] : (emptyCopy[s.folder] || ["Cartella vuota", "Usa Sposta in per archiviare qui i messaggi."]);
+
+    var selM = s.sel ? all.find(function (m) { return m.id === s.sel && m.folder === s.folder; }) : null;
+    var r = { subject: "", from: "", emailShown: "", ini: "", tintBg: "", tintInk: "", toLine: "", ccLine: "", hasCc: false, date: "", atts: [], hasAtts: false, paras: [], hasSig: false, sig: "", hasCat: false, cat: "" };
+    if (selM) {
+      var tt = selM.sent ? ["var(--av1-bg)", "var(--av1-fg)"] : self.tint(selM.from);
+      r = { subject: selM.subject, from: selM.sent ? "Chiara Valli" : selM.from, emailShown: selM.sent ? "<chiara.valli@valliarredi.it>" : (selM.email ? "<" + selM.email + ">" : ""),
+        ini: selM.sent ? "CV" : self.initials(selM.from), tintBg: tt[0], tintInk: tt[1],
+        toLine: "A: " + (selM.to || "Chiara Valli"), ccLine: "Cc: " + selM.cc, hasCc: !!selM.cc, date: selM.dateLong,
+        atts: selM.atts.map(function (a) { var zip = a.kind === "zip"; return { name: a.name, size: a.size, pdf: !zip, zip: zip, iconBg: "var(--rail)", iconInk: zip ? "var(--amber)" : "var(--danger)" }; }), hasAtts: selM.atts.length > 0,
+        paras: selM.body.map(function (t) { return { t: t }; }), hasSig: !!selM.sig, sig: selM.sig, hasCat: !!selM.cat, cat: selM.cat };
+    }
+
+    var c = s.c || { to: [], cc: [], subj: "", body: "", atts: [], saved: "" };
+    var chips = function (arr, key) {
+      return arr.map(function (n, i) {
+        return { name: n, ini: self.initials(n), remove: function () { var nc = Object.assign({}, self.state.c); nc[key] = nc[key].filter(function (x, j) { return j !== i; }); self.setState({ c: nc }); } };
+      });
+    };
+    var title = c.subj || "Nuovo messaggio";
+    var cv = { toChips: chips(c.to, "to"), ccChips: chips(c.cc, "cc"), subj: c.subj, body: c.body, hasErr: !!s.err, err: s.err,
+      atts: c.atts.map(function (a) { return { name: a.name, size: a.size }; }), hasAtts: c.atts.length > 0,
+      toPh: c.to.length ? "" : "Aggiungi destinatari", title: title, winTitle: title + " - Messaggio",
+      status: c.saved ? "Bozza salvata alle " + c.saved : "Bozza non ancora salvata" };
+
+    var isPreset = function (name) { var pp = self.preset(name); return pp.ribbon === P.ribbon && pp.entry === P.entry && pp.compose === P.compose; };
+    var presetName = isPreset("classico") ? "classico" : (isPreset("nuovo") ? "nuovo" : "");
+    var opt = function (group, on, title2, text, pick) { return { group: group, on: on ? "si" : "no", checked: !!on, title: title2, text: text, pick: pick }; };
+    var setP = function (k, v) { return function () { self.setPref(k, v); }; };
+    var presetCards = [
+      opt("tb-set-preset", presetName === "classico", "Outlook classico", "Barra estesa, menu File e nuovi messaggi in una finestra separata.", function () { self.applyPreset("classico"); }),
+      opt("tb-set-preset", presetName === "nuovo", "Nuovo Outlook", "Barra compatta, ingranaggio e nuovi messaggi nel riquadro di lettura.", function () { self.applyPreset("nuovo"); })
+    ];
+    var setGroups = [
+      { id: "tb-set-rib", legend: "Barra dei comandi", extra: false, opts: [
+        opt("tb-set-rib", P.ribbon === "estesa", "Estesa", "Icone grandi con il nome sotto, come in Outlook classico. Il pulsante Invia sta a sinistra dei destinatari.", setP("ribbon", "estesa")),
+        opt("tb-set-rib", P.ribbon === "compatta", "Compatta", "Una sola riga di comandi, come nel nuovo Outlook. Il pulsante Invia sta sopra i destinatari.", setP("ribbon", "compatta")) ] },
+      { id: "tb-set-entry", legend: "Accesso a impostazioni e account", extra: false, opts: [
+        opt("tb-set-entry", P.entry === "file", "Menu File", "Una scheda File a sinistra delle altre, come in Outlook classico.", setP("entry", "file")),
+        opt("tb-set-entry", P.entry === "ingranaggio", "Ingranaggio", "Un’icona in alto a destra, come nel nuovo Outlook.", setP("entry", "ingranaggio")) ] },
+      { id: "tb-set-cmp", legend: "Nuovi messaggi", extra: true, opts: [
+        opt("tb-set-cmp", P.compose === "finestra", "In una finestra separata", "Puoi continuare a leggere la posta mentre scrivi.", setP("compose", "finestra")),
+        opt("tb-set-cmp", P.compose === "pannello", "Nel riquadro di lettura", "Scrivi accanto all’elenco dei messaggi, nella stessa finestra.", setP("compose", "pannello")) ] },
+      { id: "tb-set-theme", legend: "Tema", extra: false, opts: [
+        opt("tb-set-theme", theme !== "scuro", "Chiaro", "Fondo chiaro, adatto alla luce del giorno.", function () { self.setState({ themeOverride: "chiaro" }); }),
+        opt("tb-set-theme", theme === "scuro", "Scuro", "Fondo scuro, più riposante la sera.", function () { self.setState({ themeOverride: "scuro" }); }) ] }
+    ];
+    var setNav = [["aspetto", "Aspetto"], ["account", "Account e sincronizzazione"], ["info", "Informazioni su Datini"]].map(function (n) {
+      var on = s.setPage === n[0];
+      return { label: n[1], sel: on ? "si" : "no", cur: on ? "page" : "false", weight: on ? 600 : 400, pick: function () { self.setState({ setPage: n[0] }); } };
+    });
+    var accts = [["imap", "chiara.valli@valliarredi.it", "IMAP"], ["pop", "ordini@valliarredi.it", "POP"]].map(function (a) {
+      var on = s.acctSel === a[0];
+      return { addr: a[1], kind: a[2], sel: on ? "si" : "no", cur: on ? "true" : "false", pick: function () { self.setState({ acctSel: a[0] }); } };
+    });
+    var pills = function (key, items) {
+      return items.map(function (it) {
+        var on = s.sync[key] === it[0];
+        return { label: it[1], on: on ? "si" : "no", checked: on, pick: function () { var ns = Object.assign({}, self.state.sync); ns[key] = it[0]; self.setState({ sync: ns }); } };
+      });
+    };
+    var srv = s.acctSel === "pop"
+      ? { proto: "POP3", inLine: "pop.valliarredi.it, porta 995, SSL/TLS", outLine: "smtp.valliarredi.it, porta 465, SSL/TLS" }
+      : { proto: "IMAP", inLine: "imap.valliarredi.it, porta 993, SSL/TLS", outLine: "smtp.valliarredi.it, porta 465, SSL/TLS" };
+    var bsItems = [["info", "Informazioni"], ["apri", "Apri ed esporta"]].map(function (b) {
+      var on = s.bsPage === b[0];
+      return { label: b[1], on: on ? "si" : "no", cur: on ? "page" : "false", pick: function () { self.setState({ bsPage: b[0] }); } };
+    });
+    var obCards = ["classico", "nuovo"].map(function (k) {
+      var on = s.obChoice === k;
+      var lines = k === "classico" ? ["Barra dei comandi estesa", "Menu File", "Nuovi messaggi in una finestra separata"] : ["Barra dei comandi compatta", "Impostazioni con l’ingranaggio", "Nuovi messaggi nel riquadro di lettura"];
+      return { on: on ? "si" : "no", checked: on, classic: k === "classico", nuovo: k === "nuovo", title: k === "classico" ? "Outlook classico" : "Nuovo Outlook",
+        lines: lines.map(function (t) { return { t: t }; }), pick: function () { self.setState({ obChoice: k }); } };
+    });
+    var toast = s.toast;
+    var ext = P.ribbon === "estesa";
+
+    return {
+      theme: theme, isDark: theme === "scuro", isLight: theme !== "scuro", themeLabel: theme === "scuro" ? "Tema chiaro" : "Tema scuro",
+      offline: (this.props.connection || "online") === "offline",
+      q: s.q, hasQ: !!s.q,
+      onSearch: function (e) { var v = e.target.value; var ns = Object.assign({}, self.state, { q: v }); var l = self.listIn(ns); self.setState({ q: v, sel: l.length ? l[0].id : null }); },
+      clearSearch: function () { var ns = Object.assign({}, self.state, { q: "" }); var l = self.listIn(ns); var keep = l.some(function (m) { return m.id === self.state.sel; }); self.setState({ q: "", sel: keep ? self.state.sel : (l.length ? l[0].id : null) }); },
+      showGear: P.entry === "ingranaggio", showFileTab: P.entry === "file",
+      openSettings: function () { self.setState({ settings: true, setPage: "aspetto" }); },
+      openAccountSettings: function () { self.setState({ settings: true, setPage: "account" }); },
+      openOptions: function () { self.setState({ settings: true, setPage: "aspetto" }); },
+      closeSettings: function () { self.setState({ settings: false }); },
+      setKey: function (e) { if (e.key === "Escape") { e.stopPropagation(); self.setState({ settings: false }); } },
+      openBackstage: function () { self.setState({ backstage: true, bsPage: "info" }); },
+      closeBackstage: function () { self.setState({ backstage: false }); },
+      bsKey: function (e) { if (e.key === "Escape" && !self.state.settings) self.setState({ backstage: false }); },
+      tabs: tabs, ribMode: P.ribbon, ribIsExt: ext, ribIsCompact: !ext,
+      ribToggleLabel: ext ? "Passa alla barra compatta" : "Passa alla barra estesa", ribSwitchLabel: ext ? "Barra compatta" : "Barra estesa",
+      toggleRibbon: function () { self.setPref("ribbon", self.state.prefs.ribbon === "estesa" ? "compatta" : "estesa"); },
+      ribHome: rib === "home", ribView: rib === "visualizza", ribHelp: rib === "aiuto", ribMsg: rib === "messaggio", ribIns: rib === "inserisci",
+      noSel: !selM,
+      newMsg: function () { self.openCompose("new"); }, reply: function () { self.openCompose("reply"); }, replyAll: function () { self.openCompose("replyAll"); }, forward: function () { self.openCompose("forward"); },
+      delSel: function () { self.moveMsg(s.sel, "deleted"); }, archiveSel: function () { self.moveMsg(s.sel, "archive"); }, junkSel: function () { self.moveMsg(s.sel, "junk"); },
+      readSel: function () { self.toggleRead(s.sel); }, flagSel: function () { self.toggleFlag(s.sel); },
+      showFolders: s.showFolders, foldersHidden: !s.showFolders, toggleFolders: function () { self.setState({ showFolders: !self.state.showFolders }); },
+      toggleTheme: function () { self.setState({ themeOverride: theme === "scuro" ? "chiaro" : "scuro" }); },
+      favs: favs, accFolders: accFolders, acct2Folders: acct2Folders, acct2Open: s.acct2Open, acct2Closed: !s.acct2Open,
+      toggleAcct2: function () { self.setState({ acct2Open: !self.state.acct2Open }); },
+      listTitle: q ? "Risultati della ricerca" : names[s.folder], hasListTabs: s.folder === "inbox" && !q, listTabs: listTabs,
+      groups: groups, empty: list.length === 0, emptyTitle: ec[0], emptyText: ec[1],
+      toastOn: !!toast, toastSent: !!toast && toast.kind === "sent", toastDraft: !!toast && toast.kind === "draft",
+      toastText: toast ? (toast.kind === "sent" ? "Messaggio inviato" : "Bozza salvata in Bozze") : "", toastUndo: !!toast && toast.kind === "sent",
+      undo: function () { self.undoSend(); },
+      modeRead: !paneCompose && !!selM, modeNone: !paneCompose && !selM, paneCompose: paneCompose,
+      r: r, cv: cv, sendPos: ext ? "sinistra" : "alto",
+      winOpen: winOpen, winMinimized: !!s.c && s.cWin && s.winMin, winMaxAttr: s.winMax ? "si" : "no",
+      winMaxLabel: s.winMax ? "Ripristina" : "Ingrandisci", winTabs: winTabs, winMsg: s.winTab === "messaggio", winIns: s.winTab === "inserisci",
+      winMinimize: function () { self.setState({ winMin: true }); }, winRestore: function () { self.setState({ winMin: false }); },
+      winMaxToggle: function () { self.setState({ winMax: !self.state.winMax }); }, winClose: function () { self.closeWin(); },
+      winKey: function (e) { if (e.key === "Escape") { e.stopPropagation(); self.closeWin(); } },
+      popOut: function () { self.setState({ cWin: true, winMin: false, winMax: false, winTab: "messaggio" }); },
+      toInput: s.toInput, ccInput: s.ccInput,
+      onToChange: function (e) { var v = e.target.value; self.setState({ toInput: v, err: "" }, function () { if (/[,;]$/.test(v)) self.addRecipient("to"); }); },
+      onCcChange: function (e) { var v = e.target.value; self.setState({ ccInput: v }, function () { if (/[,;]$/.test(v)) self.addRecipient("cc"); }); },
+      onToKey: function (e) { self.recipientKey("to", e); }, onCcKey: function (e) { self.recipientKey("cc", e); },
+      onSubj: function (e) { self.setC({ subj: e.target.value }); }, onBody: function (e) { self.setC({ body: e.target.value }); },
+      send: function () { self.send(); }, discard: function () { self.setState({ c: null, cWin: false, winMin: false, winMax: false, err: "" }); },
+      backstage: s.backstage, bsItems: bsItems, bsInfo: s.bsPage === "info", bsApri: s.bsPage === "apri", bsAbout: s.bsPage === "about",
+      bsAboutOn: s.bsPage === "about" ? "si" : "no", bsAboutCur: s.bsPage === "about" ? "page" : "false",
+      openAbout: function () { self.setState({ bsPage: "about" }); },
+      settings: s.settings, setNav: setNav, setAspetto: s.setPage === "aspetto", setAccount: s.setPage === "account", setInfo: s.setPage === "info",
+      presetCards: presetCards, isCustom: !presetName, setGroups: setGroups,
+      replyWin: !!P.replyWin, replyWinDisabled: P.compose !== "finestra", replyWinColor: P.compose === "finestra" ? "var(--ink)" : "var(--ink-3)",
+      toggleReplyWin: function () { self.setPref("replyWin", !self.state.prefs.replyWin); },
+      accts: accts, srv: srv, isImap: s.acctSel === "imap", isPop: s.acctSel === "pop",
+      imapWindow: pills("imapWindow", [["1m", "Ultimo mese"], ["3m", "Ultimi 3 mesi"], ["1a", "Ultimo anno"], ["tutto", "Tutta la posta"]]),
+      attachOpts: pills("attach", [["subito", "Scarica subito"], ["apertura", "Quando li apro"]]),
+      popKeep: pills("popKeep", [["mai", "Non lasciare copie"], ["14", "Lascia per 14 giorni"], ["sempre", "Lascia sempre"]]),
+      onboarding: s.onboarding, obCards: obCards,
+      obContinue: function () { self.setState({ prefs: self.preset(self.state.obChoice), onboarding: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

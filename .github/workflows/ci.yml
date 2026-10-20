@@ -1,0 +1,37 @@
+# Controlli a ogni modifica: tipi, test della logica, build dell'interfaccia
+# e compilazione del motore Rust.
+name: Controlli
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  controlli:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Librerie di sistema per Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - name: Compilazione Rust
+        run: cargo check --manifest-path src-tauri/Cargo.toml

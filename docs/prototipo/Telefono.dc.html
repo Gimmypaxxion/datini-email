@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Datini, posta in arrivo su telefono</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+.tp{--sheet:#FFFFFF;--rail:#F5F5F5;--ink:#242424;--ink-2:#424242;--ink-3:#616161;--rule:#E0E0E0;--brand:#0F6CBD;--brand-ink:#0F6CBD;--on-brand:#FFFFFF;--danger:#C50F1F;--head:#0F6CBD;--on-head:#FFFFFF;--lift:0 0 2px rgba(0,0,0,.12),0 4px 8px rgba(0,0,0,.14);
+--av1-bg:#DEECF9;--av1-fg:#0F548C;--av2-bg:#C7EBE8;--av2-fg:#00666D;--av3-bg:#E7DDF4;--av3-fg:#5C2E91;--av4-bg:#FCE0D4;--av4-fg:#8E3C0E;--av5-bg:#DFF0D6;--av5-fg:#2E6A0F}
+.tp button{font:inherit;color:inherit}
+.tp button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.tp header button:focus-visible{outline-color:var(--on-head)}
+</style>
+</helmet>
+<div class="tp" style="position:relative;width:390px;height:844px;display:flex;flex-direction:column;overflow:hidden;background:var(--sheet);color:var(--ink);font-family:'Segoe UI Variable Text','Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:14px;line-height:1.4">
+
+<header style="height:60px;flex:none;display:flex;align-items:center;gap:4px;padding:0 10px 0 6px;background:var(--head);color:var(--on-head)">
+<button aria-label="Cartelle" style="width:44px;height:44px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--on-head)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg></button>
+<h1 style="margin:0;flex:1;font-size:19px;font-weight:600">Posta in arrivo</h1>
+<button aria-label="Cerca" style="width:44px;height:44px;border:0;border-radius:4px;background:transparent;display:grid;place-items:center;color:var(--on-head)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg></button>
+<button aria-label="Account di Chiara Valli" style="width:44px;height:44px;border:0;background:transparent;display:grid;place-items:center"><span style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--av1-bg);color:var(--av1-fg);font-size:12.5px;font-weight:600">CV</span></button>
+</header>
+
+<div role="tablist" aria-label="Schede della posta in arrivo" style="flex:none;display:flex;gap:24px;padding:0 18px;background:var(--sheet);box-shadow:inset 0 -1px 0 var(--rule)">
+<button role="tab" aria-selected="true" style="height:44px;padding:0 2px;border:0;background:transparent;font-size:14.5px;font-weight:600;color:var(--ink);box-shadow:inset 0 -3px 0 var(--brand)">Prioritaria</button>
+<button role="tab" aria-selected="false" style="height:44px;padding:0 2px;border:0;background:transparent;font-size:14.5px;font-weight:400;color:var(--ink-2)">Altre</button>
+</div>
+
+<div style="flex:1;min-height:0;overflow:hidden;padding-bottom:80px">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+<h2 style="margin:14px 18px 4px;font-size:13px;font-weight:600;color:var(--ink-2)">{{g.label}}</h2>
+<sc-for list="{{g.items}}" as="m" hint-placeholder-count="3">
+<button aria-label="{{m.label}}" style="position:relative;width:100%;display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:12px;align-items:start;padding:11px 16px 12px 16px;border:0;background:transparent;text-align:left">
+<span aria-hidden="true" style="position:absolute;left:4px;top:12px;bottom:12px;width:3px;border-radius:2px;background:{{m.bar}}"></span>
+<span aria-hidden="true" style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:600;background:{{m.tintBg}};color:{{m.tintInk}}">{{m.ini}}</span>
+<span style="min-width:0;display:flex;flex-direction:column;gap:2px">
+<span style="display:flex;align-items:baseline;gap:10px">
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:{{m.wFrom}}">{{m.from}}</span>
+<span style="flex:none;font-size:12.5px;font-variant-numeric:tabular-nums;font-weight:{{m.wFrom}};color:{{m.timeColor}}">{{m.time}}</span>
+</span>
+<span style="display:flex;align-items:center;gap:6px">
+<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:{{m.wSubj}};color:{{m.subjColor}}">{{m.subject}}</span>
+<sc-if value="{{m.att}}" hint-placeholder-val="{{false}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--ink-3);flex:none"><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5" /></svg></sc-if>
+<sc-if value="{{m.flagged}}" hint-placeholder-val="{{false}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="color:var(--danger);flex:none"><path d="M4 5a1 1 0 0 1 .3 -.714a6 6 0 0 1 8.213 -.176l.351 .328a4 4 0 0 0 5.272 0l.249 -.227c.61 -.483 1.527 -.097 1.61 .676l.005 .113v9a1 1 0 0 1 -.3 .714a6 6 0 0 1 -8.213 .176l-.351 -.328a4 4 0 0 0 -5.136 -.114v6.552a1 1 0 0 1 -1.993 .117l-.007 -.117v-16z" /></svg></sc-if>
+</span>
+<span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13.5px;line-height:1.4;color:var(--ink-3)">{{m.preview}}</span>
+</span>
+</button>
+</sc-for>
+</sc-for>
+</div>
+
+<button title="Nuovo messaggio" style="position:absolute;right:16px;bottom:84px;height:52px;display:flex;align-items:center;gap:10px;padding:0 20px 0 16px;border:0;border-radius:8px;background:var(--brand);color:var(--on-brand);box-shadow:var(--lift);font-size:15px;font-weight:600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" /><path d="M13.5 6.5l4 4" /></svg>Nuovo messaggio</button>
+
+<nav aria-label="App" style="position:absolute;left:0;right:0;bottom:0;height:68px;display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));background:var(--rail);box-shadow:inset 0 1px 0 var(--rule)">
+<button aria-current="page" style="border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--brand-ink);font-size:12px;font-weight:600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10" /><path d="M3 7l9 6l9 -6" /></svg>Posta</button>
+<button style="border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink-2);font-size:12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12" /><path d="M16 3l0 4" /><path d="M8 3l0 4" /><path d="M4 11l16 0" /><path d="M8 15h2v2h-2l0 -2" /></svg>Calendario</button>
+<button style="border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink-2);font-size:12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0 -3 -3.85" /></svg>Contatti</button>
+<button style="border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ink-2);font-size:12px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3l8 -8" /><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9" /></svg>Attività</button>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var tint = function (name) {
+      var h = 0;
+      for (var i = 0; i < name.length; i++) h = (h * 37 + name.charCodeAt(i)) % 9973;
+      var k = (h % 5) + 1;
+      return ["var(--av" + k + "-bg)", "var(--av" + k + "-fg)"];
+    };
+    var row = function (from, ini, time, subject, preview, unread, att, flagged) {
+      var t = tint(from);
+      return { from: from, ini: ini, tintBg: t[0], tintInk: t[1], time: time, subject: subject, preview: preview, att: att, flagged: flagged,
+        bar: unread ? "var(--brand)" : "transparent", wFrom: unread ? 600 : 400, wSubj: unread ? 600 : 400,
+        subjColor: unread ? "var(--brand-ink)" : "var(--ink)", timeColor: unread ? "var(--brand-ink)" : "var(--ink-3)",
+        label: (unread ? "Non letto. " : "") + from + ", " + subject + ", " + time };
+    };
+    return {
+      groups: [
+        { label: "Oggi", items: [
+          row("Davide Orlandi", "DO", "08:42", "Preventivo uffici Bassano, revisione 3", "Ciao Chiara, ti allego la revisione 3 con le scrivanie da 160 al posto di quelle da 180 e le cassettiere su ruote.", true, true, false),
+          row("Studio Bassi & Rinaldi", "BR", "08:15", "Documenti mancanti per la chiusura del trimestre", "Buongiorno Chiara, per chiudere il terzo trimestre ci servono ancora le fatture passive di settembre.", true, false, true),
+          row("Lucia Marchetti", "LM", "07:58", "Re: Campionario tessuti per lo showroom", "Perfetto, allora spedisco lunedì i campioni del bouclé e del velluto a coste nelle sei tinte.", false, true, false)
+        ] },
+        { label: "Ieri", items: [
+          row("Tipografia Gualtieri", "TG", "gio 17:20", "Bozza del catalogo autunno da approvare", "Gentile Chiara, in allegato la seconda bozza del catalogo con le correzioni di pagina 12.", true, true, false),
+          row("Marco Ventura", "MV", "gio 15:02", "Riunione commerciale di lunedì", "Spostiamo la riunione alle 10:30, così riesce a esserci anche Giorgio dopo il sopralluogo.", false, false, false),
+          row("Elena Fabbri", "EF", "gio 11:47", "Fattura n. 418 del 15/10/2026", "Buongiorno, in allegato la fattura relativa alla fornitura di pannelli in rovere.", false, true, false)
+        ] }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

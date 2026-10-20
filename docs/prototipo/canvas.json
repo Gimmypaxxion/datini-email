@@ -1,0 +1,127 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Account.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Impostazioni: account e sincronizzazione",
+      "w": 1440,
+      "x": 1520,
+      "y": 3060
+    },
+    "Classico.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Vista classica",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Composizione.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Nuovo: risposta nel riquadro di lettura",
+      "w": 1440,
+      "x": 1520,
+      "y": 2040
+    },
+    "File.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Classico: menu File",
+      "w": 1440,
+      "x": 1520,
+      "y": 1020
+    },
+    "FinestraMessaggio.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Classico: nuovo messaggio in una finestra",
+      "w": 1440,
+      "x": 0,
+      "y": 2040
+    },
+    "Impostazioni.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Impostazioni: aspetto",
+      "w": 1440,
+      "x": 0,
+      "y": 3060
+    },
+    "Inviato.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Dopo l'invio, con Annulla",
+      "w": 1440,
+      "x": 0,
+      "y": 4080
+    },
+    "Main.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Prototipo interattivo, dal primo avvio",
+      "w": 1440,
+      "x": 18,
+      "y": 0
+    },
+    "Nuovo.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Vista nuova",
+      "w": 1440,
+      "x": 0,
+      "y": 1020
+    },
+    "Scuro.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "title": "Tema scuro",
+      "w": 1440,
+      "x": 1520,
+      "y": 4080
+    },
+    "Telefono.dc.html": {
+      "h": 844,
+      "title": "Telefono",
+      "w": 390,
+      "x": 0,
+      "y": 5100
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-15T23:10:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "titolo": {
+      "kind": "title1",
+      "maxW": 2960,
+      "text": "Datini, client di posta open source",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Classico.dc.html",
+    "Nuovo.dc.html",
+    "File.dc.html",
+    "FinestraMessaggio.dc.html",
+    "Composizione.dc.html",
+    "Impostazioni.dc.html",
+    "Account.dc.html",
+    "Inviato.dc.html",
+    "Scuro.dc.html",
+    "Telefono.dc.html"
+  ],
+  "pages": [],
+  "title": "Datini, client di posta"
+}
