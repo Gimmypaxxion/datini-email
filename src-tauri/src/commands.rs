@@ -1,0 +1,222 @@
+//! Comandi chiamati dall'interfaccia (invoke). I nomi dei parametri arrivano
+//! da JavaScript in camelCase.
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri_plugin_opener::OpenerExt;
+
+use crate::engine::{Engine, NewAccount, SavedDraft};
+use crate::error::{Error, Result};
+use crate::model::*;
+
+type E<'a> = State<'a, Arc<Engine>>;
+
+#[tauri::command]
+pub async fn accounts(e: E<'_>) -> Result<Vec<AccountInfo>> {
+    e.accounts()
+}
+
+#[tauri::command]
+pub async fn add_account(e: E<'_>, input: NewAccount) -> Result<AccountInfo> {
+    e.inner().clone().add_account(input).await
+}
+
+#[tauri::command]
+pub async fn update_account(e: E<'_>, config: AccountConfig) -> Result<()> {
+    e.update_account(config)
+}
+
+#[tauri::command]
+pub async fn set_password(e: E<'_>, id: String, password: String) -> Result<()> {
+    e.set_password(&id, &password)
+}
+
+#[tauri::command]
+pub async fn remove_account(e: E<'_>, id: String) -> Result<()> {
+    e.remove_account(&id)
+}
+
+#[tauri::command]
+pub async fn folders(e: E<'_>) -> Result<Vec<FolderInfo>> {
+    e.folders()
+}
+
+#[tauri::command]
+pub async fn messages(e: E<'_>, folder_id: i64, tab: Option<String>, offset: Option<i64>, limit: Option<i64>) -> Result<Vec<MessageSummary>> {
+    e.messages(folder_id, tab.as_deref(), offset.unwrap_or(0), limit.unwrap_or(500))
+}
+
+#[tauri::command]
+pub async fn search(e: E<'_>, query: String, account_id: Option<String>) -> Result<Vec<MessageSummary>> {
+    e.search(&query, account_id.as_deref())
+}
+
+#[tauri::command]
+pub async fn message(e: E<'_>, id: i64, allow_remote: bool) -> Result<MessageDetail> {
+    e.detail(id, allow_remote).await
+}
+
+#[tauri::command]
+pub async fn set_flags(e: E<'_>, ids: Vec<i64>, seen: Option<bool>, flagged: Option<bool>) -> Result<()> {
+    e.set_flags(&ids, seen, flagged, None)
+}
+
+#[tauri::command]
+pub async fn move_messages(e: E<'_>, ids: Vec<i64>, folder_id: i64) -> Result<()> {
+    e.move_messages(&ids, folder_id).await
+}
+
+#[tauri::command]
+pub async fn move_to_role(e: E<'_>, ids: Vec<i64>, role: String) -> Result<()> {
+    e.move_to_role(&ids, &role).await
+}
+
+#[tauri::command]
+pub async fn delete_messages(e: E<'_>, ids: Vec<i64>) -> Result<()> {
+    e.delete_messages(&ids).await
+}
+
+#[tauri::command]
+pub async fn save_draft(e: E<'_>, draft: Draft) -> Result<SavedDraft> {
+    e.save_draft(&draft).await
+}
+
+#[tauri::command]
+pub async fn close_draft(e: E<'_>, draft: Draft) -> Result<Option<SavedDraft>> {
+    e.close_draft(&draft).await
+}
+
+#[tauri::command]
+pub async fn discard_draft(e: E<'_>, account_id: String, key: String) -> Result<()> {
+    e.discard_draft(&account_id, &key)
+}
+
+#[tauri::command]
+pub async fn open_draft(e: E<'_>, id: i64) -> Result<Draft> {
+    e.open_draft(id).await
+}
+
+#[tauri::command]
+pub async fn send(e: E<'_>, draft: Draft) -> Result<i64> {
+    e.send(&draft).await
+}
+
+#[tauri::command]
+pub async fn cancel_send(e: E<'_>, id: i64) -> Result<Option<Draft>> {
+    e.cancel_send(id)
+}
+
+#[tauri::command]
+pub async fn outbox(e: E<'_>) -> Result<Vec<OutboxItem>> {
+    e.outbox()
+}
+
+#[tauri::command]
+pub async fn outbox_take(e: E<'_>, id: i64) -> Result<Option<Draft>> {
+    e.outbox_take(id)
+}
+
+#[tauri::command]
+pub async fn sync_now(e: E<'_>, account_id: Option<String>) -> Result<()> {
+    e.sync_now(account_id.as_deref());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn contacts(e: E<'_>, prefix: String) -> Result<Vec<Person>> {
+    e.contacts(&prefix)
+}
+
+/// Estensioni che possono eseguire codice: Datini non le apre, come Outlook.
+const BLOCKED: [&str; 28] = [
+    "exe", "bat", "cmd", "com", "scr", "pif", "vbs", "vbe", "js", "jse", "wsf", "wsh", "msi", "msp", "ps1", "psm1", "lnk", "reg", "hta",
+    "cpl", "jar", "app", "command", "sh", "dll", "inf", "url", "iso",
+];
+
+fn safe_name(name: &str) -> String {
+    let n: String = name.chars().map(|c| if "/\\:*?\"<>|".contains(c) || c.is_control() { '_' } else { c }).collect();
+    let n = n.trim().trim_matches('.').to_string();
+    if n.is_empty() {
+        "allegato".into()
+    } else {
+        n
+    }
+}
+
+#[tauri::command]
+pub async fn open_attachment(app: AppHandle, e: E<'_>, id: i64, index: u32) -> Result<()> {
+    let (name, _, bytes) = e.attachment(id, index).await?;
+    let name = safe_name(&name);
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    if BLOCKED.contains(&ext.as_str()) {
+        return Err(Error::user(format!(
+            "Per sicurezza Datini non apre i file .{ext}: potrebbero contenere programmi dannosi. Se sei sicuro della provenienza, salvalo e controllalo con l'antivirus."
+        )));
+    }
+    let dir = app.path().app_cache_dir().map_err(|e| Error::user(e.to_string()))?.join("allegati").join(id.to_string());
+    tokio::fs::create_dir_all(&dir).await?;
+    let path = dir.join(&name);
+    tokio::fs::write(&path, bytes).await?;
+    app.opener().open_path(path.to_string_lossy().to_string(), None::<&str>).map_err(|e| Error::user(format!("Impossibile aprire il file: {e}")))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_attachment(e: E<'_>, id: i64, index: u32, path: PathBuf) -> Result<()> {
+    let (_, _, bytes) = e.attachment(id, index).await?;
+    tokio::fs::write(path, bytes).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn export_eml(e: E<'_>, id: i64, path: PathBuf) -> Result<()> {
+    e.export_eml(id, &path).await
+}
+
+#[tauri::command]
+pub async fn export_mbox(e: E<'_>, folder_id: i64, path: PathBuf) -> Result<usize> {
+    e.export_mbox(folder_id, &path).await
+}
+
+#[tauri::command]
+pub async fn open_link(app: AppHandle, url: String) -> Result<()> {
+    let low = url.trim().to_ascii_lowercase();
+    if !(low.starts_with("https://") || low.starts_with("http://")) {
+        return Err(Error::user("Questo collegamento non si può aprire."));
+    }
+    app.opener().open_url(url, None::<&str>).map_err(|e| Error::user(format!("Impossibile aprire il collegamento: {e}")))
+}
+
+// ----------------------------------------------------------------------
+// Finestre separate per scrivere i messaggi
+// ----------------------------------------------------------------------
+
+#[derive(Default)]
+pub struct ComposeWindows {
+    drafts: Mutex<HashMap<String, Draft>>,
+    next: AtomicU32,
+}
+
+#[tauri::command]
+pub async fn open_compose_window(app: AppHandle, w: State<'_, ComposeWindows>, draft: Draft) -> Result<()> {
+    let n = w.next.fetch_add(1, Ordering::Relaxed) + 1;
+    let label = format!("messaggio-{n}");
+    let title = if draft.subject.trim().is_empty() { "Senza titolo - Messaggio".to_string() } else { format!("{} - Messaggio", draft.subject.trim()) };
+    w.drafts.lock().unwrap_or_else(|e| e.into_inner()).insert(label.clone(), draft);
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html?finestra=messaggio".into()))
+        .title(title)
+        .inner_size(980.0, 760.0)
+        .min_inner_size(640.0, 480.0)
+        .build()
+        .map_err(|e| Error::user(format!("Impossibile aprire la finestra: {e}")))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn take_compose_draft(window: WebviewWindow, w: State<'_, ComposeWindows>) -> Result<Option<Draft>> {
+    Ok(w.drafts.lock().unwrap_or_else(|e| e.into_inner()).remove(window.label()))
+}
