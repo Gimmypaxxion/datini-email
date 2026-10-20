@@ -1,8 +1,39 @@
 # Datini: documento di passaggio
 
-Stato al 19 ottobre 2026. Questo pacchetto raccoglie tutto ciò che è stato deciso e prodotto nella fase di progettazione dell'interfaccia, per continuare lo sviluppo in una nuova chat.
+Questo file raccoglie le decisioni di progetto e lo stato dello sviluppo. Le sezioni da 1 a 7 vengono dalla fase di progettazione dell'interfaccia (19 ottobre 2026); la sezione 0 dice a che punto è il codice.
 
-**Per la nuova chat:** leggi prima questo file, poi `PRODUCT.md` e `design/brief-interfaccia.md`. Il prototipo `prototipo/Main.dc.html` è la specifica visiva e di comportamento da cui partire.
+**Per una nuova chat:** leggi prima questo file, poi `PRODUCT.md` e `brief-interfaccia.md`, poi `CLAUDE.md` nella cartella principale.
+
+---
+
+## 0. Stato dello sviluppo (20 ottobre 2026)
+
+Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-email), personale e pubblico. È un progetto sperimentale, per scelta di Gimmy **non** sta nell'organizzazione Paxxion.
+
+**Fasi da 1 a 6 completate.** Il motore in Rust è collegato all'interfaccia con comandi Tauri.
+
+| Parte | Come è fatta |
+|---|---|
+| Archivio | SQLite in un file nella cartella dati dell'app: account, cartelle, messaggi, testo completo per la ricerca (FTS5), coda delle modifiche offline, posta in uscita. |
+| IMAP | `async-imap` con TLS (`rustls` e verifica dei certificati del sistema). Un lavoratore per account sincronizza ogni 2 minuti e subito dopo ogni modifica. I ruoli delle cartelle vengono da SPECIAL-USE o dai nomi (anche italiani); se mancano, Inviata, Bozze ed Eliminata vengono create. |
+| POP3 | Implementazione propria (USER/PASS, UIDL, RETR, DELE). Copia sul server tenuta secondo l'opzione scelta (mai, 14 giorni, sempre). |
+| SMTP | `lettre`. Invio dalla coda di uscita dopo 7 secondi, per poterlo annullare. Copia in Posta inviata se il server non la salva da solo. |
+| Offline | Le modifiche (letto, contrassegno, sposta, elimina, bozze) si applicano subito sul computer e partono verso il server quando c'è connessione. |
+| Messaggi | `mail-parser` (con tutte le codifiche dei caratteri) e `mail-builder`/`lettre` per scriverli. HTML ripulito con `ammonia` e mostrato in un iframe isolato, con CSP e immagini esterne bloccate. |
+| Riconoscimento dei server | Tabella dei provider noti (Aruba, Libero, Virgilio, Tiscali, Gmail...), configurazione automatica in stile Thunderbird, record MX, poi tentativi con `imap.` e `mail.`. I domini Microsoft vengono riconosciuti e rimandati a quando ci sarà OAuth. |
+| Password | Portachiavi del sistema (`keyring`). |
+| Finestre | Il nuovo messaggio si apre in una vera finestra del sistema (vista classica) o nel riquadro di lettura (vista nuova). |
+| PST | Libreria `outlook-pst` (Rust, MIT, pubblicata da Microsoft). Ogni messaggio viene ricostruito come email completa: intestazioni originali quando ci sono, testo, HTML (anche quello salvato solo come RTF), allegati e immagini. Si importano solo le cartelle di posta. |
+| MBOX ed EML | Import MBOX in un file di dati; export di una cartella in MBOX e di un messaggio in EML. |
+
+**Prove automatiche.** A ogni modifica GitHub Actions esegue i test dell'interfaccia (vitest), i test del motore e una prova completa contro un server di posta vero (Dovecot e un server SMTP di prova, in `tools/posta-di-prova`). Poi prepara gli installer per Windows, macOS (Apple Silicon e Intel) e Linux.
+
+**Limiti noti:**
+- Il PST non si modifica: "Apri PST" ne fa una copia nell'archivio di Datini, come file di dati separato. Spostare o eliminare messaggi lì non tocca il file originale.
+- I file `.ost` non si aprono (la libreria non legge il formato di Exchange 2013 e successivi).
+- Alcuni allegati di PST generati da programmi diversi da Outlook non sono leggibili dalla libreria: vengono contati e segnalati alla fine dell'importazione.
+- La scrittura è in testo semplice: formattazione, firma e modelli arriveranno dopo.
+- Calendario, Contatti e Attività sono solo icone.
 
 ---
 
@@ -48,7 +79,7 @@ Una ricerca veloce non ha trovato software di posta che si chiamano Datini. A Pr
 | Chiusura della finestra di scrittura | Salva in Bozze e lo segnala con un avviso. |
 | Account | **Ogni account si sincronizza direttamente con il proprio server**, senza server intermedi di Datini. |
 | Posta offline | La sceglie l'utente. **IMAP:** quanta posta tenere sul computer (ultimo mese, 3 mesi, ultimo anno, tutta) e allegati (scarica subito, quando li apro). **POP:** per quanto lasciare una copia sul server (mai, 14 giorni, sempre), con l'avviso di includere la cartella di Datini nei backup. |
-| PST | Supporto richiesto: **importa** da PST e **apri** un PST senza importarlo. In più c'è l'export in formati aperti (MBOX, EML). |
+| PST | Supporto richiesto: **importa** da PST e **apri** un PST senza importarlo. In più c'è l'export in formati aperti (MBOX, EML). *Realizzato come importazione in un file di dati separato, che si comporta come un PST aperto in Outlook ma non modifica l'originale (vedi sezione 0).* |
 | Componenti aggiuntivi COM e macro VBA | **Da decidere.** Gimmy li aveva chiesti. Claude ha sconsigliato entrambi, perché funzionano solo su Windows e sono un rischio di sicurezza, e ha proposto in alternativa regole, azioni rapide e un sistema di estensioni in JavaScript. La scelta non è stata confermata. |
 
 ### Aspetto
@@ -88,14 +119,14 @@ Se un giorno il codice dovesse essere mantenuto solo da sviluppatori JavaScript,
 - **IMAP:** `async-imap`.
 - **SMTP:** `lettre`.
 - **Lettura e scrittura dei messaggi:** `mail-parser` e `mail-builder`.
-- **POP3:** libreria da valutare. Il protocollo è semplice, quindi è possibile anche un'implementazione propria.
+- **POP3:** implementazione propria (scelta fatta: il protocollo è semplice).
 - **Archivio locale:** SQLite (`rusqlite`), con FTS5 per la ricerca nel testo.
 - **Password:** nel portachiavi del sistema operativo (`keyring`), mai in chiaro su disco.
 - **HTML delle email:**
   - pulito con `ammonia`;
   - mostrato in un iframe isolato con una Content Security Policy restrittiva;
   - **immagini remote bloccate di default**, perché sono usate per tracciare l'apertura.
-- **PST:** `libpff` (libreria C, LGPL) collegata via FFI, oppure un'implementazione basata sulla specifica pubblica Microsoft [MS-PST].
+- **PST:** scelta `outlook-pst` (Rust, MIT), che implementa la specifica pubblica Microsoft [MS-PST]. Niente librerie C da collegare.
 - **Build:** GitHub Actions con `tauri-action`, che a ogni modifica produce gli installer per Windows, macOS e Linux. Gimmy scarica e prova senza installare strumenti di sviluppo.
 
 ---
@@ -289,5 +320,5 @@ Tutta la logica sta in JavaScript semplice, nella classe `Component` e nel suo m
 1. Licenza: GPL-3.0 o MPL-2.0.
 2. Componenti COM e macro VBA, oppure solo regole, azioni rapide ed estensioni JavaScript.
 3. Domini.
-4. Repository GitHub e casella di prova (vedi piano, fase 1).
+4. ~~Repository GitHub e casella di prova.~~ Fatto: repository personale di Gimmy e server di prova automatico.
 5. Schermate non ancora progettate: Calendario, Contatti, Attività, regole, risposte automatiche, firma.
