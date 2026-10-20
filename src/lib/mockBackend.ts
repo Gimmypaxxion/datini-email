@@ -395,8 +395,34 @@ export class MockBackend implements Backend {
   async exportMbox() {
     return null;
   }
-  async importArchive() {
-    return null;
+  /** Messaggi e allegati illeggibili da segnalare alla prossima importazione (per le prove). */
+  importSkipped = 0;
+  importLostAttachments = 0;
+
+  async importArchive(kind: 'pst' | 'mbox') {
+    // Versione di esempio: un file di dati con alcuni messaggi della posta in arrivo.
+    const name = kind === 'pst' ? 'Archivio 2019' : 'Esportazione';
+    const a: Account = {
+      id: `a${this.nextId++}`,
+      name,
+      email: name,
+      kind: 'local',
+      incoming: null,
+      outgoing: null,
+      sync: { keep: 'tutto', attachments: 'subito', popKeep: 'mai' },
+      serverSavesSent: false,
+      sourceFile: `/esempio/${name}.${kind}`,
+      status: { state: 'pronto', message: null, lastSync: null },
+    };
+    this.accountsList.push(a);
+    this.emit({ type: 'accounts' });
+    const source = this.msgs.filter((m) => this.folderList.find((f) => f.id === m.folderId)?.role === 'inbox').slice(0, 3);
+    this.emit({ type: 'import', name, done: 0, total: source.length });
+    const f = this.roleFolder(a.id, 'inbox');
+    for (const m of source) this.msgs.push({ ...JSON.parse(JSON.stringify(m)), id: this.nextId++, folderId: f.id, accountId: a.id });
+    this.emit({ type: 'import', name, done: source.length, total: source.length });
+    this.changed(a.id, [f.id]);
+    return { ...a, skipped: this.importSkipped, lostAttachments: this.importLostAttachments };
   }
 
   async pickFiles(): Promise<DraftAttachment[]> {

@@ -309,6 +309,9 @@ pub enum Event {
     Outbox { account_id: String, outbox_id: i64, state: String, error: Option<String> },
     #[serde(rename_all = "camelCase")]
     Accounts,
+    /// Avanzamento dell'importazione di un archivio (total 0 se non si conosce).
+    #[serde(rename_all = "camelCase")]
+    Import { name: String, done: u32, total: u32 },
 }
 
 pub fn now_secs() -> i64 {

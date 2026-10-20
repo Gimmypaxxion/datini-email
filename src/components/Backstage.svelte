@@ -71,7 +71,7 @@
         <div class="rows">
           <div class="bs-row">
             <button class="btn bs-tile" onclick={() => store.importArchive('pst')}><Icon name="folder-open" size={30} stroke={1.5} />Apri PST</button>
-            <div><h2>Apri file di dati di Outlook</h2><p>Apri un archivio .pst: compare nel riquadro cartelle come file di dati. Puoi leggerlo e spostare i messaggi nelle cartelle del tuo account. Il file originale non viene modificato.</p></div>
+            <div><h2>Apri file di dati di Outlook</h2><p>Apri un archivio .pst: compare nel riquadro cartelle come file di dati. Puoi leggerlo e spostare i messaggi nelle cartelle del tuo account. Il file originale non viene modificato. Si importa solo la posta: calendario, contatti e attività restano fuori.</p></div>
           </div>
           <div class="bs-row">
             <button class="btn bs-tile" onclick={() => store.importArchive('mbox')}><Icon name="file-import" size={30} stroke={1.5} />Importa MBOX</button>

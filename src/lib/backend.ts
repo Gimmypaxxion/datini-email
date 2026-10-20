@@ -51,7 +51,8 @@ export interface Backend {
   exportEml(id: number, name: string): Promise<boolean>;
   exportMbox(folderId: number, name: string): Promise<number | null>;
   /** Chiede il file e lo importa come file di dati. */
-  importArchive(kind: 'pst' | 'mbox'): Promise<Account | null>;
+  /** Importa un archivio, con i messaggi e gli allegati che non si sono potuti leggere. */
+  importArchive(kind: 'pst' | 'mbox'): Promise<(Account & { skipped?: number; lostAttachments?: number }) | null>;
   /** Finestra di scelta dei file da allegare. */
   pickFiles(): Promise<DraftAttachment[]>;
   openLink(url: string): Promise<void>;
@@ -168,10 +169,10 @@ export class TauriBackend implements Backend {
   }
   async importArchive(kind: 'pst' | 'mbox') {
     const { open } = await import('@tauri-apps/plugin-dialog');
-    const filters = kind === 'pst' ? [{ name: 'File di dati di Outlook', extensions: ['pst', 'ost'] }] : [{ name: 'Archivio MBOX', extensions: ['mbox', 'mbx', 'txt'] }];
+    const filters = kind === 'pst' ? [{ name: 'File di dati di Outlook', extensions: ['pst'] }] : [{ name: 'Archivio MBOX', extensions: ['mbox', 'mbx', 'txt'] }];
     const path = await open({ multiple: false, directory: false, filters, title: kind === 'pst' ? 'Apri file di dati di Outlook' : 'Importa archivio MBOX' });
     if (!path || Array.isArray(path)) return null;
-    return this.call<Account>(kind === 'pst' ? 'import_pst' : 'import_mbox', { path });
+    return this.call<Account & { skipped: number; lostAttachments: number }>(kind === 'pst' ? 'import_pst' : 'import_mbox', { path });
   }
   async pickFiles() {
     const { open } = await import('@tauri-apps/plugin-dialog');

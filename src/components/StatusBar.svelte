@@ -20,7 +20,11 @@
     {/if}
   </span>
   <span class="right" role="status">
-    {#if store.offline}
+    {#if store.importing}
+      {@const i = store.importing}
+      <Icon name="loader-2" size={15} class="spin" style="color:var(--brand-ink)" />
+      Importazione di {i.name}: {i.total ? `${i.done.toLocaleString('it-IT')} di ${i.total.toLocaleString('it-IT')} elementi` : `${i.done.toLocaleString('it-IT')} elementi`}
+    {:else if store.offline}
       <Icon name="cloud-off" size={15} style="color:var(--warn)" />
       {waiting ? `Offline. ${waiting === 1 ? 'Un messaggio aspetta' : `${waiting} messaggi aspettano`} la connessione.` : 'Offline'}
     {:else if problem}

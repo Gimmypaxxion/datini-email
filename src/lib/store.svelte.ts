@@ -177,6 +177,8 @@ export class MailStore {
   /** Oggetto vuoto: Outlook chiede conferma prima di inviare. */
   askNoSubject = $state(false);
   toast = $state<Toast | null>(null);
+  /** Importazione di un archivio in corso (total 0 se non si conosce ancora). */
+  importing = $state<{ name: string; done: number; total: number } | null>(null);
   private lastSent: LastSent | null = null;
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -272,6 +274,11 @@ export class MailStore {
       }
       case 'accounts':
         void this.reloadAccounts().then(() => this.reloadFolders());
+        break;
+      case 'import':
+        // Appena parte si torna alla posta: l'avanzamento è nella barra di stato.
+        if (!this.importing) this.backstage = false;
+        this.importing = { name: e.name, done: e.done, total: e.total };
         break;
       case 'outbox':
         void this.reloadOutbox();
@@ -1096,14 +1103,26 @@ export class MailStore {
 
   async importArchive(kind: 'pst' | 'mbox') {
     await this.act(async () => {
-      const a = await this.backend.importArchive(kind);
-      if (!a) return;
-      await this.reloadAccounts();
-      await this.reloadFolders();
-      this.backstage = false;
-      const first = this.foldersOf(a.id).find((f) => f.total > 0) ?? this.foldersOf(a.id)[0];
-      if (first) await this.pickFolder(first.id, `acc-${first.id}`);
-      this.flash({ kind: 'info', text: `File di dati aperto: ${a.name}` });
+      try {
+        const a = await this.backend.importArchive(kind);
+        if (!a) return;
+        await this.reloadAccounts();
+        await this.reloadFolders();
+        this.backstage = false;
+        const first = this.foldersOf(a.id).find((f) => f.role === 'inbox' && f.total > 0) ?? this.foldersOf(a.id).find((f) => f.total > 0) ?? this.foldersOf(a.id)[0];
+        if (first) await this.pickFolder(first.id, `acc-${first.id}`);
+        const lost = [
+          [a.skipped ?? 0, 'messaggio', 'messaggi'],
+          [a.lostAttachments ?? 0, 'allegato', 'allegati'],
+        ]
+          .filter(([n]) => (n as number) > 0)
+          .map(([n, one, many]) => (n === 1 ? `un ${one}` : `${(n as number).toLocaleString('it-IT')} ${many}`));
+        const total = (a.skipped ?? 0) + (a.lostAttachments ?? 0);
+        const note = lost.length === 0 ? '' : ` Non si ${total === 1 ? 'è potuto' : 'sono potuti'} leggere ${lost.join(' e ')}.`;
+        this.flash({ kind: 'info', text: `File di dati aperto: ${a.name}.${note}` }, lost.length ? 12000 : 6000);
+      } finally {
+        this.importing = null;
+      }
     });
   }
 

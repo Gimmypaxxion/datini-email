@@ -153,7 +153,8 @@ export type EngineEvent =
   | { type: 'changed'; accountId: string; folders: number[] }
   | { type: 'status'; accountId: string; status: AccountStatus }
   | { type: 'outbox'; accountId: string; outboxId: number; state: string; error: string | null }
-  | { type: 'accounts' };
+  | { type: 'accounts' }
+  | { type: 'import'; name: string; done: number; total: number };
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {

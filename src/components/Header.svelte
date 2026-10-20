@@ -5,7 +5,8 @@
   import { store } from '../lib/store.svelte';
   import { initials } from '../lib/format';
 
-  const me = $derived(store.currentAccount);
+  // Un file di dati non è una persona: si mostra l'account di posta.
+  const me = $derived(store.currentAccount?.kind === 'local' ? (store.accounts.find((a) => a.kind !== 'local') ?? store.currentAccount) : store.currentAccount);
 
   let searchEl: HTMLInputElement | undefined = $state();
 

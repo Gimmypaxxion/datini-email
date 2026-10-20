@@ -15,6 +15,7 @@ pub mod model;
 pub mod net;
 pub mod pop3;
 pub mod pst;
+pub mod rtf;
 pub mod sanitize;
 pub mod secrets;
 pub mod smtp;

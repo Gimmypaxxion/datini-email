@@ -359,3 +359,42 @@ describe('preferenze', () => {
     expect(s.theme).toBe('chiaro');
   });
 });
+
+describe('archivi', () => {
+  it('aprire un PST mostra il file di dati, ne apre la posta e torna senza avanzamento', async () => {
+    const s = await fresh();
+    const seen: Array<{ done: number; total: number } | null> = [];
+    const stop = s.backend.onEvent((e) => {
+      if (e.type === 'import') seen.push({ done: e.done, total: e.total });
+    });
+    s.backstage = true;
+    await s.importArchive('pst');
+    stop();
+    expect(seen).toEqual([{ done: 0, total: 3 }, { done: 3, total: 3 }]);
+    const a = s.accounts.find((x) => x.kind === 'local');
+    expect(a?.name).toBe('Archivio 2019');
+    expect(s.currentFolder?.accountId).toBe(a?.id);
+    expect(s.list.length).toBe(3);
+    expect(s.backstage).toBe(false);
+    expect(s.importing).toBeNull();
+    expect(s.toast?.text).toBe('File di dati aperto: Archivio 2019.');
+  });
+
+  it('dice quanti messaggi e allegati non si sono potuti leggere', async () => {
+    const cases: Array<[number, number, string]> = [
+      [4, 0, 'Non si sono potuti leggere 4 messaggi.'],
+      [0, 1, 'Non si è potuto leggere un allegato.'],
+      [1, 36, 'Non si sono potuti leggere un messaggio e 36 allegati.'],
+    ];
+    for (const [skipped, lost, text] of cases) {
+      const backend = new MockBackend();
+      backend.importSkipped = skipped;
+      backend.importLostAttachments = lost;
+      const s = new MailStore({ persist: false, backend });
+      s.onboarding = false;
+      await s.init();
+      await s.importArchive('pst');
+      expect(s.toast?.text).toBe(`File di dati aperto: Archivio 2019. ${text}`);
+    }
+  });
+});

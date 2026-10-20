@@ -131,6 +131,15 @@ impl Engine {
         self.emit(Event::Changed { account_id: account_id.to_string(), folders });
     }
 
+    /// Segnala all'interfaccia che le cartelle di un account sono cambiate.
+    pub fn notify_changed(&self, account_id: &str) {
+        self.changed(account_id, Vec::new());
+    }
+
+    pub fn import_progress(&self, name: &str, done: u32, total: u32) {
+        self.emit(Event::Import { name: name.to_string(), done, total });
+    }
+
     /// Avvia i lavoratori. Va chiamata dentro il runtime tokio.
     pub fn start(self: &Arc<Self>) {
         if let Ok(accounts) = self.db.accounts() {

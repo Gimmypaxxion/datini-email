@@ -794,7 +794,7 @@ impl Db {
     /// Indirizzi già usati, per suggerire i destinatari mentre si scrive.
     pub fn contacts(&self, prefix: &str, limit: i64) -> Result<Vec<Person>> {
         let c = self.conn();
-        let like = format!("%{}%", prefix.replace('%', "").replace('_', ""));
+        let like = format!("%{}%", prefix.replace(['%', '_'], ""));
         let mut st = c.prepare(
             "SELECT from_name, from_email, COUNT(*) AS n FROM messages
              WHERE from_email != '' AND (from_email LIKE ?1 OR from_name LIKE ?1)
