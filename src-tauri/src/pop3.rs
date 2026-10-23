@@ -83,7 +83,7 @@ impl Pop3 {
     }
 
     pub async fn uidl(&mut self) -> Result<Vec<(u32, String)>> {
-        self.cmd("UIDL").await.map_err(|_| Error::user("Il server POP non supporta UIDL: Datini non può sapere quali messaggi ha già scaricato."))?;
+        self.cmd("UIDL").await.map_err(|_| Error::user("Il server POP non supporta UIDL: Better-Look non può sapere quali messaggi ha già scaricato."))?;
         let body = self.multiline().await?;
         Ok(String::from_utf8_lossy(&body)
             .lines()

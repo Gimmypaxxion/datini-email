@@ -45,5 +45,5 @@ jobs:
 
       - name: Collaudo IMAP, SMTP e POP3
         env:
-          DATINI_SERVER_PROVA: '1'
+          BETTERLOOK_SERVER_PROVA: '1'
         run: cargo test --manifest-path src-tauri/Cargo.toml --test server_prova -- --test-threads=1

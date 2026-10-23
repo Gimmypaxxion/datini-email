@@ -1,23 +1,23 @@
 //! Collaudo completo contro il server di posta di prova (tools/posta-di-prova).
-//! Parte solo se il server è attivo e si imposta DATINI_SERVER_PROVA=1:
+//! Parte solo se il server è attivo e si imposta BETTERLOOK_SERVER_PROVA=1:
 //!
 //!   sudo tools/posta-di-prova/avvia.sh
-//!   DATINI_SERVER_PROVA=1 cargo test --test server_prova -- --nocapture
+//!   BETTERLOOK_SERVER_PROVA=1 cargo test --test server_prova -- --nocapture
 
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use datini_lib::db::Db;
-use datini_lib::engine::{Engine, NewAccount};
-use datini_lib::imap;
-use datini_lib::model::*;
-use datini_lib::secrets::Memory;
+use better_look_lib::db::Db;
+use better_look_lib::engine::{Engine, NewAccount};
+use better_look_lib::imap;
+use better_look_lib::model::*;
+use better_look_lib::secrets::Memory;
 use futures::StreamExt;
 
 fn enabled() -> bool {
-    std::env::var("DATINI_SERVER_PROVA").is_ok()
+    std::env::var("BETTERLOOK_SERVER_PROVA").is_ok()
 }
 
 fn tools() -> PathBuf {
@@ -45,7 +45,7 @@ where
 }
 
 fn server() -> ServerConfig {
-    ServerConfig { host: "mail.datini.test".into(), port: 993, security: Security::Ssl, username: "prova@datini.test".into() }
+    ServerConfig { host: "mail.better-look.test".into(), port: 993, security: Security::Ssl, username: "prova@better-look.test".into() }
 }
 
 /// Messaggi in una cartella del server, con un filtro opzionale.
@@ -81,11 +81,11 @@ fn find(eng: &Engine, folder_id: i64, subject: &str) -> Option<MessageSummary> {
 }
 
 fn engine() -> (Arc<Engine>, Arc<Mutex<Vec<Event>>>) {
-    let dir = std::env::temp_dir().join(format!("datini-prova-{}", datini_lib::mime::random_id()));
+    let dir = std::env::temp_dir().join(format!("better-look-prova-{}", better_look_lib::mime::random_id()));
     std::fs::create_dir_all(&dir).unwrap();
     let events = Arc::new(Mutex::new(Vec::new()));
     let ev = events.clone();
-    let eng = Engine::new(Db::open(&dir.join("datini.db")).unwrap(), Arc::new(Memory::default()), dir, Arc::new(move |e| ev.lock().unwrap().push(e)));
+    let eng = Engine::new(Db::open(&dir.join("better-look.db")).unwrap(), Arc::new(Memory::default()), dir, Arc::new(move |e| ev.lock().unwrap().push(e)));
     eng.start();
     (eng, events)
 }
@@ -101,7 +101,7 @@ async fn ciclo_completo_imap() {
 
     // Password sbagliata: errore chiaro, nessun account creato.
     let err = eng
-        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@datini.test".into(), password: "sbagliata".into(), kind: None, incoming: None, outgoing: None })
+        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@better-look.test".into(), password: "sbagliata".into(), kind: None, incoming: None, outgoing: None })
         .await
         .unwrap_err();
     assert_eq!(err.kind(), "credenziali", "{err}");
@@ -109,12 +109,12 @@ async fn ciclo_completo_imap() {
 
     // Configurazione automatica dai nomi più comuni (imap.dominio, smtp.dominio).
     let info = eng
-        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@datini.test".into(), password: "prova-123".into(), kind: None, incoming: None, outgoing: None })
+        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@better-look.test".into(), password: "prova-123".into(), kind: None, incoming: None, outgoing: None })
         .await
         .unwrap();
     let a = info.config.id.clone();
     assert_eq!(info.config.kind, AccountKind::Imap);
-    assert_eq!(info.config.incoming.as_ref().unwrap().host, "imap.datini.test");
+    assert_eq!(info.config.incoming.as_ref().unwrap().host, "imap.better-look.test");
 
     wait_for("prima sincronizzazione", 60, || {
         let eng = eng.clone();
@@ -198,7 +198,7 @@ async fn ciclo_completo_imap() {
 
     // Bozze: salvataggio sul server, sostituzione della versione precedente, eliminazione.
     let mut draft = Draft {
-        key: datini_lib::mime::random_id(),
+        key: better_look_lib::mime::random_id(),
         account_id: a.clone(),
         to: vec![Person::new("Davide Orlandi", "d.orlandi@studiorlandi.it")],
         cc: vec![],
@@ -245,15 +245,15 @@ async fn ciclo_completo_imap() {
 
     // Invio annullato: non parte nulla.
     let mut msg = draft.clone();
-    msg.key = datini_lib::mime::random_id();
-    msg.to = vec![Person::new("Chiara Valli", "prova@datini.test")];
+    msg.key = better_look_lib::mime::random_id();
+    msg.to = vec![Person::new("Chiara Valli", "prova@better-look.test")];
     msg.subject = "Messaggio annullato".into();
     let out = eng.send(&msg).await.unwrap();
     let back = eng.cancel_send(out).unwrap().unwrap();
     assert_eq!(back.subject, "Messaggio annullato");
 
     // Invio vero a se stessi: arriva in Posta in arrivo, la copia in Posta inviata.
-    msg.subject = "Prova di invio da Datini".into();
+    msg.subject = "Prova di invio da Better-Look".into();
     msg.attachments = vec![DraftAttachment {
         name: "Contratto.pdf".into(),
         size: 0,
@@ -266,7 +266,7 @@ async fn ciclo_completo_imap() {
     // Testo formattato con un'immagine incollata: viaggia come parte incorporata.
     const PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
     msg.html = Some(format!(
-        "<div class=\"datini-corpo\" style=\"font-family: Aptos; font-size: 11pt;\"><div>Ciao Davide, riesci a portarli <b>giovedì</b>?</div><img src=\"data:image/png;base64,{PNG}\" width=\"1\"><div class=\"datini-firma\"><div>Chiara Valli</div></div></div>"
+        "<div class=\"better-look-corpo\" style=\"font-family: Aptos; font-size: 11pt;\"><div>Ciao Davide, riesci a portarli <b>giovedì</b>?</div><img src=\"data:image/png;base64,{PNG}\" width=\"1\"><div class=\"better-look-firma\"><div>Chiara Valli</div></div></div>"
     ));
     eng.send(&msg).await.unwrap();
     wait_for("inviato", 40, || {
@@ -274,20 +274,20 @@ async fn ciclo_completo_imap() {
         async move { events.lock().unwrap().iter().any(|e| matches!(e, Event::Outbox { state, .. } if state == "inviato")) }
     })
     .await;
-    wait_for("arrivato in posta in arrivo", 40, || async { server_count("INBOX", "SUBJECT \"Prova di invio da Datini\"").await == 1 }).await;
-    wait_for("copia in posta inviata sul server", 40, || async { server_count("Sent", "SUBJECT \"Prova di invio da Datini\"").await == 1 }).await;
+    wait_for("arrivato in posta in arrivo", 40, || async { server_count("INBOX", "SUBJECT \"Prova di invio da Better-Look\"").await == 1 }).await;
+    wait_for("copia in posta inviata sul server", 40, || async { server_count("Sent", "SUBJECT \"Prova di invio da Better-Look\"").await == 1 }).await;
     eng.sync_now(None);
     let sent = folder(&eng, &a, "sent");
     wait_for("posta inviata e in arrivo sincronizzate", 40, || {
         let eng = eng.clone();
         async move {
             let s = eng.messages(sent.id, None, 0, 10).unwrap();
-            let got = find(&eng, inbox.id, "Prova di invio da Datini");
-            s.iter().filter(|m| m.subject == "Prova di invio da Datini").count() == 1 && got.map(|m| m.has_attachments).unwrap_or(false)
+            let got = find(&eng, inbox.id, "Prova di invio da Better-Look");
+            s.iter().filter(|m| m.subject == "Prova di invio da Better-Look").count() == 1 && got.map(|m| m.has_attachments).unwrap_or(false)
         }
     })
     .await;
-    let got = find(&eng, inbox.id, "Prova di invio da Datini").unwrap();
+    let got = find(&eng, inbox.id, "Prova di invio da Better-Look").unwrap();
     let d = eng.detail(got.id, false).await.unwrap();
     let h = d.html.expect("parte HTML");
     assert!(h.contains("<b>giovedì</b>"), "formattazione conservata");
@@ -327,7 +327,7 @@ async fn account_pop3() {
     // Un messaggio nella casella "altro" tramite SMTP.
     let (eng, _) = engine();
     let info = eng
-        .add_account(NewAccount { name: "Altro".into(), email: "altro@datini.test".into(), password: "altro-456".into(), kind: Some(AccountKind::Pop3), incoming: None, outgoing: None })
+        .add_account(NewAccount { name: "Altro".into(), email: "altro@better-look.test".into(), password: "altro-456".into(), kind: Some(AccountKind::Pop3), incoming: None, outgoing: None })
         .await
         .unwrap();
     let a = info.config.id.clone();
@@ -336,10 +336,10 @@ async fn account_pop3() {
     let draft = Draft {
         key: "pop".into(),
         account_id: a.clone(),
-        to: vec![Person::new("", "altro@datini.test")],
+        to: vec![Person::new("", "altro@better-look.test")],
         cc: vec![],
         bcc: vec![],
-        subject: format!("POP {}", datini_lib::mime::random_id()),
+        subject: format!("POP {}", better_look_lib::mime::random_id()),
         body: "Prova POP".into(),
         html: None,
         plain: false,

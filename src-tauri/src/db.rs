@@ -1020,7 +1020,7 @@ mod tests {
         let cfg = AccountConfig {
             id: "a1".into(),
             name: "Prova".into(),
-            email: "prova@datini.test".into(),
+            email: "prova@better-look.test".into(),
             kind: AccountKind::Imap,
             incoming: None,
             outgoing: None,
@@ -1114,7 +1114,7 @@ mod tests {
             references: vec![],
             reply_to_message: None,
         };
-        let env = Envelope { from: "prova@datini.test".into(), to: vec!["x@y.it".into()] };
+        let env = Envelope { from: "prova@better-look.test".into(), to: vec!["x@y.it".into()] };
         let id = db.outbox_add(&a, b"raw", b"copy", &env, &draft, 0).unwrap();
         assert_eq!(db.outbox_cancel(id).unwrap().unwrap().subject, "Prova");
         let id = db.outbox_add(&a, b"raw", b"copy", &env, &draft, 0).unwrap();

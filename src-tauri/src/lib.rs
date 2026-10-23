@@ -1,8 +1,8 @@
-//! Datini: punto d'ingresso dell'applicazione desktop.
+//! Better-Look: punto d'ingresso dell'applicazione desktop.
 //!
 //! Il motore di posta (IMAP, POP3, SMTP, archivio locale) sta in `engine` e
 //! nei moduli che usa; l'interfaccia lo chiama con i comandi di `commands` e
-//! riceve le notifiche sull'evento "datini://evento".
+//! riceve le notifiche sull'evento "better-look://evento".
 
 pub mod autoconfig;
 pub mod commands;
@@ -10,6 +10,7 @@ pub mod db;
 pub mod engine;
 pub mod error;
 pub mod imap;
+pub mod legacy;
 pub mod mime;
 pub mod model;
 pub mod net;
@@ -29,29 +30,8 @@ use crate::db::Db;
 use crate::engine::Engine;
 use crate::secrets::{Keyring, Memory, Secrets};
 
-/// Le prime versioni salvavano i dati in una cartella con un altro
-/// identificativo dell'app: se c'è ancora, diventa la cartella di Datini.
-fn migrate_old_data_dir(dir: &std::path::Path) {
-    const OLD_ID: &str = "com.paxxion.datini";
-    let Some(parent) = dir.parent() else { return };
-    let old = parent.join(OLD_ID);
-    if old == dir || !old.join("datini.db").exists() || dir.join("datini.db").exists() {
-        return;
-    }
-    // La cartella nuova può esistere già (il sistema ci mette i dati della
-    // finestra): si spostano i file uno per uno, senza toccare quelli presenti.
-    if std::fs::create_dir_all(dir).is_err() {
-        return;
-    }
-    let Ok(entries) = std::fs::read_dir(&old) else { return };
-    for e in entries.flatten() {
-        let dest = dir.join(e.file_name());
-        if !dest.exists() {
-            let _ = std::fs::rename(e.path(), dest);
-        }
-    }
-    let _ = std::fs::remove_dir(&old);
-}
+/// Nome del file dell'archivio nella cartella dei dati.
+const DB_FILE: &str = "better-look.db";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -60,17 +40,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let dir = match std::env::var_os("DATINI_DATI") {
+            let dir = match std::env::var_os("BETTERLOOK_DATI") {
                 Some(d) => std::path::PathBuf::from(d),
                 None => {
                     let dir = app.path().app_data_dir()?;
-                    migrate_old_data_dir(&dir);
+                    legacy::migrate_data_dir(&dir, DB_FILE);
                     dir
                 }
             };
             std::fs::create_dir_all(&dir)?;
-            let db = Db::open(&dir.join("datini.db"))?;
-            let secrets: Arc<dyn Secrets> = if std::env::var("DATINI_PORTACHIAVI").as_deref() == Ok("memoria") {
+            let db = Db::open(&dir.join(DB_FILE))?;
+            let secrets: Arc<dyn Secrets> = if std::env::var("BETTERLOOK_PORTACHIAVI").as_deref() == Ok("memoria") {
                 Arc::new(Memory::default())
             } else {
                 Arc::new(Keyring)
@@ -81,7 +61,7 @@ pub fn run() {
                 secrets,
                 dir,
                 Arc::new(move |e| {
-                    let _ = handle.emit("datini://evento", e);
+                    let _ = handle.emit("better-look://evento", e);
                 }),
             );
             app.manage(engine.clone());
@@ -129,27 +109,5 @@ pub fn run() {
             pst::import_mbox,
         ])
         .run(tauri::generate_context!())
-        .expect("errore durante l'avvio di Datini");
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn old_data_folder_moves_to_the_new_one() {
-        let base = std::env::temp_dir().join(format!("datini-migra-{}", crate::mime::random_id()));
-        let old = base.join("com.paxxion.datini");
-        let new = base.join("app.datini");
-        std::fs::create_dir_all(&old).unwrap();
-        std::fs::create_dir_all(&new).unwrap();
-        std::fs::write(old.join("datini.db"), b"archivio").unwrap();
-        std::fs::write(new.join("finestra.dat"), b"x").unwrap();
-        super::migrate_old_data_dir(&new);
-        assert_eq!(std::fs::read(new.join("datini.db")).unwrap(), b"archivio");
-        assert!(new.join("finestra.dat").exists());
-        assert!(!old.exists());
-        // Una seconda volta non fa nulla.
-        super::migrate_old_data_dir(&new);
-        assert!(new.join("datini.db").exists());
-        let _ = std::fs::remove_dir_all(&base);
-    }
+        .expect("errore durante l'avvio di Better-Look");
 }

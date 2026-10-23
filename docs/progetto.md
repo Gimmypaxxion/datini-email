@@ -1,4 +1,4 @@
-# Datini: documento di passaggio
+# Better-Look: documento di passaggio
 
 Questo file raccoglie le decisioni di progetto e lo stato dello sviluppo. Le sezioni da 1 a 7 vengono dalla fase di progettazione dell'interfaccia (19 ottobre 2026); la sezione 0 dice a che punto è il codice.
 
@@ -6,9 +6,11 @@ Questo file raccoglie le decisioni di progetto e lo stato dello sviluppo. Le sez
 
 ---
 
-## 0. Stato dello sviluppo (20 ottobre 2026)
+## 0. Stato dello sviluppo (23 ottobre 2026)
 
-Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-email), personale e pubblico. È un progetto personale e sperimentale di Gimmy.
+Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-email), personale e pubblico. È un progetto personale e sperimentale di Gimmy. Va rinominato per il nuovo nome; GitHub reindirizza i vecchi indirizzi, poi si aggiornano `REPO_URL` in `src/lib/platform.ts` e i collegamenti nel README.
+
+**Nome (23 ottobre 2026).** Il programma si chiama Better-Look: identificativo `app.betterlook`, archivio `better-look.db`, servizio del portachiavi `Better-Look`, variabili d'ambiente `BETTERLOOK_…`. Al primo avvio `legacy.rs` sposta cartella dei dati, archivio e password delle anteprime uscite con il nome precedente. Le preferenze dell'interfaccia non si spostano (il sistema le tiene per identificativo): ricompare la scelta tra Outlook classico e nuovo. Su Windows e macOS il nuovo programma si installa accanto a quello vecchio, che va disinstallato a mano dopo il primo avvio.
 
 **Fasi da 1 a 6 completate.** Il motore in Rust è collegato all'interfaccia con comandi Tauri.
 
@@ -25,13 +27,13 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 | Finestre | Il nuovo messaggio si apre in una vera finestra del sistema (vista classica) o nel riquadro di lettura (vista nuova). |
 | PST | Libreria `outlook-pst` (Rust, MIT, pubblicata da Microsoft). Ogni messaggio viene ricostruito come email completa: intestazioni originali quando ci sono, testo, HTML (anche quello salvato solo come RTF), allegati e immagini. Si importano solo le cartelle di posta. |
 | MBOX ed EML | Import MBOX in un file di dati; export di una cartella in MBOX e di un messaggio in EML. |
-| Editor di testo | [RoosterJS](https://github.com/microsoft/roosterjs) (MIT), lo stesso motore della versione web e del nuovo Outlook, dentro un iframe con una Content-Security-Policy che vieta script e immagini esterne: l'HTML citato non può cambiare l'aspetto di Datini né scaricare immagini di tracciamento. Schede Messaggio, Inserisci e Formato testo come in Outlook; formato HTML o Testo normale. Le immagini nel testo partono come parti incorporate (cid), non come dati. |
-| Firme | Più firme con un nome, salvate nell'archivio. Ogni account sceglie la firma per i nuovi messaggi e quella per risposte e inoltri; il pulsante Firma la cambia mentre si scrive. La prima firma parte da nome e indirizzo dell'account. Nel testo la firma è il blocco `id="datini-firma"`, la citazione `id="datini-citazione"`: nei messaggi citati questi segni si tolgono. |
+| Editor di testo | [RoosterJS](https://github.com/microsoft/roosterjs) (MIT), lo stesso motore della versione web e del nuovo Outlook, dentro un iframe con una Content-Security-Policy che vieta script e immagini esterne: l'HTML citato non può cambiare l'aspetto di Better-Look né scaricare immagini di tracciamento. Schede Messaggio, Inserisci e Formato testo come in Outlook; formato HTML o Testo normale. Le immagini nel testo partono come parti incorporate (cid), non come dati. |
+| Firme | Più firme con un nome, salvate nell'archivio. Ogni account sceglie la firma per i nuovi messaggi e quella per risposte e inoltri; il pulsante Firma la cambia mentre si scrive. La prima firma parte da nome e indirizzo dell'account. Nel testo la firma è il blocco `id="better-look-firma"`, la citazione `id="better-look-citazione"`: nei messaggi citati questi segni si tolgono. |
 
 **Prove automatiche.** A ogni modifica GitHub Actions esegue i test dell'interfaccia (vitest), i test del motore e una prova completa contro un server di posta vero (Dovecot e un server SMTP di prova, in `tools/posta-di-prova`). Poi prepara gli installer per Windows, macOS (Apple Silicon e Intel) e Linux.
 
 **Limiti noti:**
-- Il PST non si modifica: "Apri PST" ne fa una copia nell'archivio di Datini, come file di dati separato. Spostare o eliminare messaggi lì non tocca il file originale.
+- Il PST non si modifica: "Apri PST" ne fa una copia nell'archivio di Better-Look, come file di dati separato. Spostare o eliminare messaggi lì non tocca il file originale.
 - I file `.ost` non si aprono (la libreria non legge il formato di Exchange 2013 e successivi).
 - Alcuni allegati di PST generati da programmi diversi da Outlook non sono leggibili dalla libreria: vengono contati e segnalati alla fine dell'importazione.
 - Mancano ancora regole, risposte automatiche, invio programmato e modelli.
@@ -41,7 +43,7 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 
 ## 1. Il progetto
 
-**Datini** è un client di posta desktop **gratuito e open source**, pensato per le PMI italiane che usano Outlook ogni giorno.
+**Better-Look** è un client di posta desktop **gratuito e open source**, pensato per le PMI italiane che usano Outlook ogni giorno.
 
 L'obiettivo è che un utente di Outlook trovi ogni comando dove se lo aspetta, sia che venga da **Outlook classico** sia dal **nuovo Outlook**, senza doversi riabituare. Si riprendono posizioni dei comandi, scorciatoie da tastiera e sensazione cromatica di Outlook, ma **non** nomi, loghi o icone Microsoft.
 
@@ -52,16 +54,11 @@ L'obiettivo è che un utente di Outlook trovi ogni comando dove se lo aspetta, s
 
 ### Il nome
 
-Il nome viene da **Francesco Datini**, mercante di Prato del Trecento. Il suo archivio conserva circa **143.000 lettere d'affari** scambiate con quasi trecento città. Gimmy ha scelto il nome perché la sua storia si sposa con i valori dell'open source.
+**Better-Look**, con il trattino. Il nome dice l'obiettivo: un'alternativa migliore per chi arriva da Outlook. Prima della pubblicazione conviene una verifica del marchio, perché il nome richiama Outlook.
 
-Prima di scegliere Datini sono stati scartati alcuni nomi per conflitti nel settore della posta:
-- Missiva (troppo vicino a Missive);
-- Brevia (troppo vicino a Brevo, ex Sendinblue);
-- Pigeon Mail (esiste già);
-- Sigillo (troppo vicino a Sigilium);
-- Envelo (app delle Poste polacche).
+### Gratuito per sempre
 
-Una ricerca veloce non ha trovato software di posta che si chiamano Datini. A Prato esiste la Fondazione Datini (Istituto Internazionale di Storia Economica): non è un concorrente, ma potrebbe valere la pena avvisarla del progetto.
+Decisione di Gimmy (ottobre 2026): Better-Look sarà **sempre gratuito, libero e open source**. Eventuali servizi di intelligenza artificiale potranno arrivare come prodotto separato in abbonamento, offerto accanto al programma; il programma resta completo senza.
 
 ---
 
@@ -79,28 +76,29 @@ Una ricerca veloce non ha trovato software di posta che si chiamano Datini. A Pr
 | Pulsante Invia | Con la barra estesa sta a sinistra dei destinatari (come in Outlook classico). Con la barra compatta sta sopra i destinatari (come nel nuovo Outlook). |
 | Invio | Immediato. Compare l'avviso "Messaggio inviato" con il pulsante **Annulla**, che riapre il messaggio. |
 | Chiusura della finestra di scrittura | Salva in Bozze e lo segnala con un avviso. |
-| Account | **Ogni account si sincronizza direttamente con il proprio server**, senza server intermedi di Datini. |
-| Posta offline | La sceglie l'utente. **IMAP:** quanta posta tenere sul computer (ultimo mese, 3 mesi, ultimo anno, tutta) e allegati (scarica subito, quando li apro). **POP:** per quanto lasciare una copia sul server (mai, 14 giorni, sempre), con l'avviso di includere la cartella di Datini nei backup. |
+| Account | **Ogni account si sincronizza direttamente con il proprio server**, senza server intermedi di Better-Look. |
+| Posta offline | La sceglie l'utente. **IMAP:** quanta posta tenere sul computer (ultimo mese, 3 mesi, ultimo anno, tutta) e allegati (scarica subito, quando li apro). **POP:** per quanto lasciare una copia sul server (mai, 14 giorni, sempre), con l'avviso di includere la cartella di Better-Look nei backup. |
 | PST | Supporto richiesto: **importa** da PST e **apri** un PST senza importarlo. In più c'è l'export in formati aperti (MBOX, EML). *Realizzato come importazione in un file di dati separato, che si comporta come un PST aperto in Outlook ma non modifica l'originale (vedi sezione 0).* |
 | Componenti aggiuntivi COM e macro VBA | **Da decidere.** Gimmy li aveva chiesti. Claude ha sconsigliato entrambi, perché funzionano solo su Windows e sono un rischio di sicurezza, e ha proposto in alternativa regole, azioni rapide e un sistema di estensioni in JavaScript. La scelta non è stata confermata. |
 
 ### Aspetto
 
 - **Colori come Outlook**, sia in vista classica sia nuova, in tema chiaro e scuro. Si usa la palette **Fluent 2**: il design system di Microsoft è pubblicato con licenza MIT, i colori si possono richiamare.
+- **Colore di accento a scelta** (ottobre 2026): in Impostazioni › Aspetto, oltre al tema chiaro, scuro o come il sistema, si sceglie un colore qualsiasi (8 proposte, selettore del sistema o codice esadecimale). Il blu di Outlook resta il predefinito. Dal colore scelto si ricavano barra in alto, pulsanti, selezione e collegamenti per ciascun tema, regolando la luminosità in OKLCH finché ogni testo raggiunge il contrasto 4,5:1 (`src/lib/accent.ts`).
 - **Carattere di sistema:** "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui. Non si distribuiscono font.
 - **Niente metafora postale:** niente timbri, annulli postali, strisce di posta aerea o animazioni di timbratura. Erano nella prima versione e sono stati tolti.
 - **Integrato nel sistema operativo:** l'interfaccia di lavoro **non mostra né il nome né il logo**. La barra blu in alto contiene solo ricerca, guida, account e (vista nuova) ingranaggio.
 - **Il logo compare solo in due punti:**
-  - in alto nella finestra del **primo avvio** (scritta completa DATINI);
-  - nella pagina **"Informazioni su Datini"**, che si apre dal menu File nella vista classica e da Impostazioni nella vista nuova.
-- La "D" da sola potrà servire come **icona del programma** (desktop, barra delle applicazioni).
+  - in alto nella finestra del **primo avvio** (scritta completa Better-Look);
+  - nella pagina **"Informazioni su Better-Look"**, che si apre dal menu File nella vista classica e da Impostazioni nella vista nuova.
+- Logo e icona sono **provvisori**: la scritta Better-Look con il trattino nel colore di accento, e come icona un quadrato blu con la "B" e il trattino.
 
 ### Rinviato a dopo
 
 - **Accesso Microsoft 365 e Gmail con OAuth.** Arriverà dopo la registrazione dell'app presso Microsoft (Entra) e Google; Google richiede anche una verifica dell'app per accedere a Gmail. In Exchange Online IMAP e POP con la sola password sono già disattivati. L'invio con password (SMTP AUTH) sarà disattivato di default da fine dicembre 2026, e la data di rimozione definitiva verrà annunciata nel 2027 (comunicazione Microsoft MC786329).
 - **Firma del codice** (certificati Windows e notarizzazione Apple). Si fa quando il programma sarà pronto.
-- **Licenza.** Da scegliere prima di rendere pubblico il codice. Le candidate sono **GPL-3.0** (chi modifica e distribuisce deve rilasciare le modifiche) e **MPL-2.0** (la licenza di Thunderbird, più flessibile).
-- **Domini.** Da verificare su un registrar: datini.it, datini.app. breviaemail.com risultava già registrato, ma è irrilevante dopo la scelta del nome.
+- **Licenza.** Non ancora scelta. Deve essere una licenza open source, visto che il programma resterà libero per sempre.
+- **Domini e marchio.** Da verificare per il nome Better-Look.
 
 ---
 
@@ -141,10 +139,10 @@ Se un giorno il codice dovesse essere mantenuto solo da sviluppatori JavaScript,
 4. **Scrittura completa.** Bozze, allegati, risposte e inoltri, salvataggio automatico, Annulla invio.
 5. **Più account.** POP3, più account insieme e opzioni di sincronizzazione.
 6. **PST.** Import, apertura e export MBOX/EML.
-7. **Quando sarà il momento.** OAuth Microsoft 365 e Gmail, firma del codice, aggiornamenti automatici, icona con la "D", licenza e pubblicazione.
+7. **Quando sarà il momento.** OAuth Microsoft 365 e Gmail, firma del codice, aggiornamenti automatici, logo definitivo, licenza e pubblicazione.
 
 **Cosa serve da Gimmy per partire:**
-- account GitHub collegato a Claude, con un repository vuoto (per esempio `datini`), all'inizio privato;
+- account GitHub collegato a Claude, con un repository vuoto, all'inizio privato;
 - una casella di posta **di prova** con IMAP e SMTP attivi; la password si inserisce solo nell'app, mai in chat;
 - il sistema operativo su cui farà le prove.
 
@@ -180,8 +178,8 @@ Tutta la logica sta in JavaScript semplice, nella classe `Component` e nel suo m
 | `prototipo/Scuro.dc.html` | Tema scuro. |
 | `prototipo/Telefono.dc.html` | Posta in arrivo su telefono (schermata statica, 390×844). |
 | `prototipo/canvas.json` | Disposizione delle tavole nel canvas. |
-| `logo/datini-logo.svg` | Logo completo (scritta DATINI), originale fornito da Gimmy. |
-| `logo/datini-d.svg` | La sola "D", originale fornito da Gimmy. |
+| `../assets/better-look-logo.svg` | Scritta Better-Look provvisoria (Plus Jakarta Sans ExtraBold, licenza OFL, convertita in tracciati). |
+| `../assets/app-icon.svg` | Icona provvisoria del programma. |
 | `design/brief-interfaccia.md` | Brief di design aggiornato (direzione visiva). |
 | `PRODUCT.md` | Contesto di prodotto aggiornato. |
 
@@ -213,11 +211,11 @@ Tutta la logica sta in JavaScript semplice, nella classe `Component` e nel suo m
   - nella finestra separata: riduci, ingrandisci, chiudi salvando in Bozze;
   - nel riquadro: pulsante per staccarlo in una finestra;
   - le bozze si riaprono dalla cartella Bozze.
-- **Menu File:** Informazioni (account, risposte automatiche, pulizia, regole), Apri ed esporta (PST, MBOX/EML), Informazioni su Datini, Opzioni.
+- **Menu File:** Informazioni (account, risposte automatiche, pulizia, regole), Apri ed esporta (PST, MBOX/EML), Informazioni su Better-Look, Opzioni.
 - **Impostazioni:**
   - Aspetto: preset, barra, accesso, nuovi messaggi, tema;
   - Account e sincronizzazione: dati del server e opzioni IMAP/POP;
-  - Informazioni su Datini.
+  - Informazioni su Better-Look.
 - **Altro:** tema scuro e avviso offline.
 
 ### Scorciatoie da tastiera indicate nell'interfaccia

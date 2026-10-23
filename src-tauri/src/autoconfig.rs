@@ -18,7 +18,7 @@ pub struct Candidate {
 pub fn unsupported(domain: &str) -> Option<&'static str> {
     const MS: [&str; 8] = ["outlook.com", "outlook.it", "hotmail.com", "hotmail.it", "live.com", "live.it", "msn.com", "office365.com"];
     if MS.contains(&domain) {
-        return Some("Gli account Microsoft (Outlook.com, Hotmail, Microsoft 365) richiedono l'accesso con Microsoft, che arriverà in una prossima versione di Datini.");
+        return Some("Gli account Microsoft (Outlook.com, Hotmail, Microsoft 365) richiedono l'accesso con Microsoft, che arriverà in una prossima versione di Better-Look.");
     }
     None
 }

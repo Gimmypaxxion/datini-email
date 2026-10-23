@@ -23,6 +23,7 @@ if (params.get('finestra') === 'messaggio') {
         stile: (params.get('stile') as StyleName) || undefined,
         view: params.get('view') || undefined,
         tema: (params.get('tema') as ThemeChoice) || undefined,
+        accento: params.get('accento') || undefined,
         avvio: params.has('avvio') ? params.get('avvio') === '1' : undefined,
         offline: params.has('offline') ? params.get('offline') === '1' : undefined,
       });

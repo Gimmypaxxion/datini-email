@@ -447,36 +447,36 @@ describe('archivi', () => {
 describe('testo formattato e firma', () => {
   it('trova, cambia e toglie il blocco della firma senza toccare la citazione', async () => {
     const { replaceSignature, findBlock, htmlToText, unwrapBody, newMessageHtml } = await import('../src/lib/compose-html');
-    const html = `${newMessageHtml('<div>Chiara</div><div><div>Valli</div></div>')}<div id="datini-citazione"><div>Originale</div></div>`;
-    expect(findBlock(html, 'datini-firma')).not.toBeNull();
+    const html = `${newMessageHtml('<div>Chiara</div><div><div>Valli</div></div>')}<div id="better-look-citazione"><div>Originale</div></div>`;
+    expect(findBlock(html, 'better-look-firma')).not.toBeNull();
     const swapped = replaceSignature(html, '<div>Marco</div>');
-    expect(swapped).toContain('<div id="datini-firma"><div>Marco</div></div>');
-    expect(swapped).toContain('<div id="datini-citazione"><div>Originale</div></div>');
+    expect(swapped).toContain('<div id="better-look-firma"><div>Marco</div></div>');
+    expect(swapped).toContain('<div id="better-look-citazione"><div>Originale</div></div>');
     expect(swapped).not.toContain('Chiara');
     const removed = replaceSignature(html, null);
-    expect(removed).not.toContain('datini-firma');
+    expect(removed).not.toContain('better-look-firma');
     expect(removed).toContain('Originale');
-    const added = replaceSignature('<div>Testo</div><div id="datini-citazione">X</div>', '<b>Firma</b>');
-    expect(added.indexOf('Firma')).toBeLessThan(added.indexOf('datini-citazione'));
-    // La firma dentro il messaggio citato (di chi ci ha scritto con Datini) non si tocca.
-    const quoted = '<div>Ciao</div><div id="datini-citazione"><div>Sotto</div><div id="datini-firma"><div>Davide</div></div></div>';
+    const added = replaceSignature('<div>Testo</div><div id="better-look-citazione">X</div>', '<b>Firma</b>');
+    expect(added.indexOf('Firma')).toBeLessThan(added.indexOf('better-look-citazione'));
+    // La firma dentro il messaggio citato (di chi ci ha scritto con Better-Look) non si tocca.
+    const quoted = '<div>Ciao</div><div id="better-look-citazione"><div>Sotto</div><div id="better-look-firma"><div>Davide</div></div></div>';
     const mine = replaceSignature(quoted, '<div>Chiara</div>');
-    expect(mine).toContain('<div id="datini-firma"><div>Davide</div></div>');
-    expect(mine.indexOf('Chiara')).toBeLessThan(mine.indexOf('datini-citazione'));
+    expect(mine).toContain('<div id="better-look-firma"><div>Davide</div></div>');
+    expect(mine.indexOf('Chiara')).toBeLessThan(mine.indexOf('better-look-citazione'));
     expect(replaceSignature(quoted, null)).toContain('Davide');
     // Le bozze salvate con la versione precedente usavano una classe.
-    expect(replaceSignature('<div class="datini-firma"><div>Vecchia</div></div>', '<div>Nuova</div>')).toContain('Nuova');
+    expect(replaceSignature('<div class="better-look-firma"><div>Vecchia</div></div>', '<div>Nuova</div>')).toContain('Nuova');
     expect(htmlToText('<div>Prezzo &lt; 100&nbsp;€</div><div><br></div><div>Grazie &amp; saluti</div>')).toBe('Prezzo < 100 €\n\nGrazie & saluti');
     expect(htmlToText('<ul><li><div>Uno</div></li><li><div>Due</div></li></ul><ol><li>A</li><li>B</li></ol><div>Fine</div>')).toBe('• Uno\n• Due\n1. A\n2. B\nFine');
     expect(htmlToText('<div><br></div><div><br></div><div>Firma</div>', true)).toBe('\n\nFirma');
-    expect(unwrapBody('<div class="datini-corpo" style="font-size: 11pt;"><div>a</div></div>')).toBe('<div>a</div>');
-    expect(unwrapBody('<div class="datini-corpo"><div>a</div></div><div>b</div>')).toContain('<div>b</div>');
+    expect(unwrapBody('<div class="better-look-corpo" style="font-size: 11pt;"><div>a</div></div>')).toBe('<div>a</div>');
+    expect(unwrapBody('<div class="better-look-corpo"><div>a</div></div><div>b</div>')).toContain('<div>b</div>');
   });
 
   it('il nuovo messaggio ha la firma dell’account; senza altro testo non diventa una bozza', async () => {
     const s = await fresh('nuovo');
     await s.openCompose('new');
-    expect(s.c?.html).toContain('datini-firma');
+    expect(s.c?.html).toContain('better-look-firma');
     expect(s.c?.body).toContain('Ufficio acquisti, Valli Arredi');
     expect(MailStore.isEmpty($snap(s))).toBe(true);
     await s.discard();
@@ -491,7 +491,7 @@ describe('testo formattato e firma', () => {
     const s = await fresh('nuovo');
     await s.openCompose('reply');
     const h = s.c!.html!;
-    expect(h.indexOf('datini-firma')).toBeLessThan(h.indexOf('datini-citazione'));
+    expect(h.indexOf('better-look-firma')).toBeLessThan(h.indexOf('better-look-citazione'));
     expect(h).toContain('<b>Oggetto:</b> Preventivo uffici Bassano, revisione 3');
   });
 
@@ -499,7 +499,7 @@ describe('testo formattato e firma', () => {
     const s = await fresh('nuovo');
     await s.openCompose('new');
     s.setAccount('ordini');
-    expect(s.c?.html).not.toContain('datini-firma');
+    expect(s.c?.html).not.toContain('better-look-firma');
     s.setAccount('valli');
     expect(s.c?.html).toContain('Ufficio acquisti');
   });
@@ -510,7 +510,7 @@ describe('testo formattato e firma', () => {
     expect(nuova?.id).toBeTruthy();
     await s.openCompose('new');
     s.insertSignature(nuova!.id);
-    expect(s.c?.html).toContain('<div id="datini-firma"><div>C. Valli</div></div>');
+    expect(s.c?.html).toContain('<div id="better-look-firma"><div>C. Valli</div></div>');
     expect(s.c?.html).not.toContain('Ufficio acquisti');
   });
 

@@ -10,7 +10,7 @@ import sys
 from aiosmtpd.controller import Controller
 from aiosmtpd.smtp import AuthResult, LoginPassword
 
-CONF = sys.argv[1] if len(sys.argv) > 1 else "/etc/datini-prova"
+CONF = sys.argv[1] if len(sys.argv) > 1 else "/etc/better-look-prova"
 USERS = {}
 with open(f"{CONF}/users", encoding="utf-8") as f:
     for line in f:
@@ -19,7 +19,7 @@ with open(f"{CONF}/users", encoding="utf-8") as f:
             user, pw = line.split(":", 1)
             USERS[user] = pw.replace("{PLAIN}", "")
 
-LOCAL_DOMAIN = "datini.test"
+LOCAL_DOMAIN = "better-look.test"
 
 
 def authenticator(server, session, envelope, mechanism, auth_data):
@@ -52,7 +52,7 @@ async def main():
         hostname="127.0.0.1",
         authenticator=authenticator,
         auth_required=True,
-        server_hostname="mail.datini.test",
+        server_hostname="mail.better-look.test",
     )
     # Sulla 465 la connessione è già cifrata dall'inizio: aiosmtpd non lo sa,
     # quindi non serve chiedergli di pretendere TLS prima dell'autenticazione.

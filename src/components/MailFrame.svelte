@@ -2,7 +2,7 @@
   // Testo HTML di un messaggio, in un iframe isolato: niente script
   // (sandbox senza allow-scripts), e la Content-Security-Policy messa dal
   // motore nel documento blocca le risorse esterne non consentite.
-  // I collegamenti si aprono nel browser predefinito, mai dentro Datini.
+  // I collegamenti si aprono nel browser predefinito, mai dentro Better-Look.
 
   let { html, onlink }: { html: string; onlink: (url: string) => void } = $props();
 

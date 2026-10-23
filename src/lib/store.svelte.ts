@@ -7,6 +7,7 @@ import type { Backend, Tab } from './backend';
 import { TauriBackend } from './backend';
 import { MockBackend } from './mockBackend';
 import { inTauri } from './platform';
+import { DEFAULT_ACCENT, normalizeHex } from './accent';
 import { addPlainSignature, hasQuote, htmlToText, newMessageHtml, plainFromHtml, replaceSignature, replyHtml, textToHtml } from './compose-html';
 import { DEFAULT_FONT, composeEditor } from './editor.svelte';
 import {
@@ -98,12 +99,14 @@ interface Saved {
   prefs: Prefs;
   onboardingDone: boolean;
   themeChoice: ThemeChoice;
+  /** Colore di accento scelto ("#RRGGBB"); assente o null per il blu predefinito. */
+  accent?: string | null;
   showFolders: boolean;
   collapsed?: Record<string, boolean>;
   font?: { family: string; size: number };
 }
 
-const STORAGE_KEY = 'datini.interfaccia.v1';
+const STORAGE_KEY = 'better-look.interfaccia.v1';
 
 function readSaved(): Partial<Saved> | null {
   try {
@@ -147,6 +150,8 @@ export class MailStore {
   // Aspetto
   prefs = $state<Prefs>({ ...PRESETS.classico });
   themeChoice = $state<ThemeChoice>('sistema');
+  /** Colore di accento ("#RRGGBB"); null per il blu predefinito. */
+  accent = $state<string | null>(null);
   systemDark = $state(false);
   showFolders = $state(true);
   ribbonTab = $state<RibbonTab>('home');
@@ -208,6 +213,7 @@ export class MailStore {
         if (saved.prefs) this.prefs = { ...PRESETS.classico, ...saved.prefs };
         if (saved.onboardingDone) this.onboarding = false;
         if (saved.themeChoice) this.themeChoice = saved.themeChoice;
+        this.accent = (saved.accent && normalizeHex(saved.accent)) || null;
         if (typeof saved.showFolders === 'boolean') this.showFolders = saved.showFolders;
         if (saved.collapsed) this.collapsed = saved.collapsed;
         if (saved.font?.family && saved.font.size) this.font = { ...saved.font };
@@ -220,6 +226,16 @@ export class MailStore {
         void this.backend.syncNow(null);
       });
       window.addEventListener('offline', () => (this.netOffline = true));
+      // Tema e colore cambiati in un'altra finestra (per esempio quella principale
+      // mentre è aperto un messaggio in scrittura).
+      if (this.persist) {
+        window.addEventListener('storage', (e) => {
+          if (e.key !== STORAGE_KEY) return;
+          const saved = readSaved();
+          if (saved?.themeChoice) this.themeChoice = saved.themeChoice;
+          if (saved) this.accent = (saved.accent && normalizeHex(saved.accent)) || null;
+        });
+      }
     }
     const mq = globalThis.matchMedia?.('(prefers-color-scheme: dark)');
     if (mq) {
@@ -234,6 +250,7 @@ export class MailStore {
       prefs: { ...this.prefs },
       onboardingDone: !this.onboarding,
       themeChoice: this.themeChoice,
+      accent: this.accent,
       showFolders: this.showFolders,
       collapsed: { ...this.collapsed },
       font: { ...this.font },
@@ -960,7 +977,7 @@ export class MailStore {
     return hasQuote(this.c?.html) ? 'reply' : 'new';
   }
 
-  /** Cambiando mittente cambia anche la firma aggiunta da Datini, come in Outlook. */
+  /** Cambiando mittente cambia anche la firma aggiunta da Better-Look, come in Outlook. */
   setAccount(accountId: string) {
     if (!this.c) return;
     const kind = this.composeKind();
@@ -1381,6 +1398,14 @@ export class MailStore {
     this.save();
   }
 
+  /** Colore di accento: null (o il blu predefinito) torna ai colori di Outlook. */
+  setAccent(hex: string | null) {
+    const v = hex ? normalizeHex(hex) : null;
+    if (hex && !v) return;
+    this.accent = v && v !== DEFAULT_ACCENT ? v : null;
+    this.save();
+  }
+
   toggleTheme() {
     this.setTheme(this.theme === 'scuro' ? 'chiaro' : 'scuro');
   }
@@ -1408,8 +1433,9 @@ export class MailStore {
    * Porta l'interfaccia in uno degli stati del prototipo, per le schermate di
    * prova. Va chiamata dopo init(); non salva nulla.
    */
-  async applyDemo(opts: { stile?: StyleName; view?: string; tema?: ThemeChoice; avvio?: boolean; offline?: boolean }) {
+  async applyDemo(opts: { stile?: StyleName; view?: string; tema?: ThemeChoice; accento?: string; avvio?: boolean; offline?: boolean }) {
     if (opts.offline !== undefined) this.netOffline = opts.offline;
+    if (opts.accento) this.accent = normalizeHex(opts.accento);
     if (opts.stile) this.prefs = { ...PRESETS[opts.stile] };
     if (opts.tema) this.themeChoice = opts.tema;
     if (opts.avvio !== undefined) {

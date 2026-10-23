@@ -14,10 +14,10 @@ use crate::db::{Envelope, NewMessage};
 use crate::error::{Error, Result};
 use crate::model::*;
 
-pub const DRAFT_HEADER: &str = "X-Datini-Draft-Id";
+pub const DRAFT_HEADER: &str = "X-Better-Look-Draft-Id";
 /// Destinatari di una bozza scritti in modo incompleto (per esempio solo un
 /// nome): non sono indirizzi validi, ma la bozza deve conservarli.
-pub const PENDING_HEADER: &str = "X-Datini-Draft-Pending";
+pub const PENDING_HEADER: &str = "X-Better-Look-Draft-Pending";
 
 /// Identificativo casuale (non crittografico) per Message-ID e bozze.
 pub fn random_id() -> String {
@@ -245,9 +245,9 @@ impl Parsed<'_> {
     /// frammento HTML ripulito (senza script né stili globali).
     pub fn quote_fragment(&self) -> String {
         match self.html() {
-            // Firma e citazione di un messaggio scritto con Datini restano testo
+            // Firma e citazione di un messaggio scritto con Better-Look restano testo
             // normale: i segni servono solo per il messaggio che si sta scrivendo.
-            Some(h) => crate::sanitize::clean_fragment(&h, &self.inline_images()).replace(" id=\"datini-firma\"", "").replace(" id=\"datini-citazione\"", ""),
+            Some(h) => crate::sanitize::clean_fragment(&h, &self.inline_images()).replace(" id=\"better-look-firma\"", "").replace(" id=\"better-look-citazione\"", ""),
             None => text_fragment(&self.text()),
         }
     }
@@ -334,7 +334,7 @@ impl lettre::message::header::Header for XMailer {
         Ok(XMailer)
     }
     fn display(&self) -> HeaderValue {
-        HeaderValue::new(Self::name(), format!("Datini {}", env!("CARGO_PKG_VERSION")))
+        HeaderValue::new(Self::name(), format!("Better-Look {}", env!("CARGO_PKG_VERSION")))
     }
 }
 
@@ -419,7 +419,7 @@ pub fn extract_data_images(html: &str) -> (String, Vec<InlineImage>) {
         let cid = if let Some(c) = seen.get(value) {
             Some(c.clone())
         } else if let Some((mime, bytes)) = parse_data_url(value) {
-            let cid = format!("img{}.{}@datini", images.len() + 1, &tag[..12]);
+            let cid = format!("img{}.{}@better-look", images.len() + 1, &tag[..12]);
             images.push(InlineImage { cid: cid.clone(), mime, bytes });
             seen.insert(value, cid.clone());
             Some(cid)
@@ -477,7 +477,7 @@ pub struct AttachmentData {
 
 pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_draft: bool) -> Result<BuiltMessage> {
     let from = mailbox(&Person::new(account.name.clone(), account.email.clone()))?;
-    let domain = account.email.split('@').nth(1).unwrap_or("datini.local").to_string();
+    let domain = account.email.split('@').nth(1).unwrap_or("better-look.local").to_string();
     let message_id = format!("{}@{}", random_id(), domain);
 
     // In una bozza gli indirizzi non validi non fermano il salvataggio:
@@ -696,7 +696,7 @@ mod tests {
         let mut d = draft();
         let png = base64::engine::general_purpose::STANDARD.encode([137u8, 80, 78, 71, 1, 2, 3]);
         d.html = Some(format!(
-            "<div class=\"datini-corpo\" style=\"font-family: Aptos; font-size: 11pt\"><div><b>Ciao</b> Davide</div><img src=\"data:image/png;base64,{png}\" width=\"120\"><div id=\"datini-firma\"><img src='data:image/png;base64,{png}'></div><img src=\"https://x.it/a.png\"></div>"
+            "<div class=\"better-look-corpo\" style=\"font-family: Aptos; font-size: 11pt\"><div><b>Ciao</b> Davide</div><img src=\"data:image/png;base64,{png}\" width=\"120\"><div id=\"better-look-firma\"><img src='data:image/png;base64,{png}'></div><img src=\"https://x.it/a.png\"></div>"
         ));
         let b = build(&account(), &d, &[], false).unwrap();
         let p = parse(&b.copy).unwrap();
@@ -715,7 +715,7 @@ mod tests {
         let back = parse(&saved.copy).unwrap().to_draft("a", 1);
         let h = back.html.unwrap();
         assert!(h.contains("<b>Ciao</b>"));
-        assert!(h.contains("id=\"datini-firma\""));
+        assert!(h.contains("id=\"better-look-firma\""));
         assert!(h.contains(&format!("data:image/png;base64,{png}")));
     }
 
@@ -736,13 +736,13 @@ mod tests {
     }
 
     #[test]
-    fn quoting_a_datini_message_drops_its_markers() {
+    fn quoting_a_better_look_message_drops_its_markers() {
         let mut d = draft();
-        d.html = Some("<div>Ciao</div><div id=\"datini-firma\"><div>Davide</div></div><div id=\"datini-citazione\"><div>Prima</div></div>".into());
+        d.html = Some("<div>Ciao</div><div id=\"better-look-firma\"><div>Davide</div></div><div id=\"better-look-citazione\"><div>Prima</div></div>".into());
         let b = build(&account(), &d, &[], false).unwrap();
         let q = parse(&b.copy).unwrap().quote_fragment();
         assert!(q.contains("Davide") && q.contains("Prima"));
-        assert!(!q.contains("datini-firma") && !q.contains("datini-citazione"));
+        assert!(!q.contains("better-look-firma") && !q.contains("better-look-citazione"));
     }
 
     #[test]

@@ -79,7 +79,7 @@
       {#if m.remoteImages > 0 && !m.remoteAllowed}
         <div class="note-bar info privacy" role="note">
           <Icon name="photo-off" style="color:var(--brand-ink)" />
-          <span class="t">Per proteggere la tua privacy, Datini non ha scaricato le immagini esterne di questo messaggio.</span>
+          <span class="t">Per proteggere la tua privacy, Better-Look non ha scaricato le immagini esterne di questo messaggio.</span>
           <button class="act" onclick={() => store.showRemoteImages()}>Scarica immagini</button>
         </div>
       {/if}
@@ -143,8 +143,8 @@
     <div class="sheet none">
       <Icon name="mail-opened" size={64} stroke={1.1} style="color:var(--brand-ink)" />
       {#if store.ready && !store.accounts.length}
-        <p class="t">Benvenuto in Datini</p>
-        <p class="d">Aggiungi il tuo account di posta: Datini trova da solo le impostazioni dei provider più diffusi.</p>
+        <p class="t">Benvenuto in Better-Look</p>
+        <p class="d">Aggiungi il tuo account di posta: Better-Look trova da solo le impostazioni dei provider più diffusi.</p>
         <button class="primary-btn" style="margin-top:18px" onclick={() => store.openWizard(false)}><Icon name="user-plus" size={17} />Aggiungi account</button>
       {:else}
         <p class="t">Nessun messaggio selezionato</p>

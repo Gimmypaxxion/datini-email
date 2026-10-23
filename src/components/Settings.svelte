@@ -1,12 +1,13 @@
 <script lang="ts">
   // Impostazioni: Aspetto, Account e sincronizzazione, Composizione e
-  // risposta (firme e carattere), Informazioni su Datini.
+  // risposta (firme e carattere), Informazioni su Better-Look.
   import Icon from '../lib/Icon.svelte';
   import About from './About.svelte';
   import RichEditor from './RichEditor.svelte';
   import LinkDialog from './LinkDialog.svelte';
   import { store, type Prefs, type ThemeChoice } from '../lib/store.svelte';
   import { EditorCtl, FONTS, SIZES, fontStack } from '../lib/editor.svelte';
+  import { ACCENT_SWATCHES, DEFAULT_ACCENT, accentPalette, accentShift, normalizeHex, readableOn } from '../lib/accent';
   import type { ServerConfig, Signature, SyncOptions } from '../lib/types';
 
   interface Opt {
@@ -54,11 +55,28 @@
     ] },
   ]);
 
+  // ---------- Colore di accento ----------
+  const accentNow = $derived(store.accent ?? DEFAULT_ACCENT);
+  const accentCustom = $derived(!ACCENT_SWATCHES.some((s) => s.hex === accentNow));
+  /** Il colore usato davvero si allontana da quello scelto, per la leggibilità. */
+  const accentAdapted = $derived(accentShift(accentNow, accentPalette(accentNow, store.theme)['--brand'] ?? accentNow) > 0.05);
+  let hexDraft = $state('');
+  let hexFocus = $state(false);
+  const hexBad = $derived(hexFocus && !!hexDraft.trim() && !normalizeHex(hexDraft));
+  $effect(() => {
+    const v = accentNow;
+    if (!hexFocus) hexDraft = v;
+  });
+  function typeHex(v: string) {
+    hexDraft = v;
+    if (normalizeHex(v)) store.setAccent(v);
+  }
+
   const nav = [
     ['aspetto', 'Aspetto'],
     ['account', 'Account e sincronizzazione'],
     ['composizione', 'Composizione e risposta'],
-    ['info', 'Informazioni su Datini'],
+    ['info', 'Informazioni su Better-Look'],
   ] as const;
 
   const SEC: Record<string, string> = { ssl: 'SSL/TLS', starttls: 'STARTTLS' };
@@ -205,7 +223,7 @@
 
         {#if store.setPage === 'aspetto'}
           <h3>Aspetto</h3>
-          <p class="intro">Scegli dove trovare i comandi. Le modifiche valgono subito.</p>
+          <p class="intro">Scegli dove trovare i comandi, il tema e il colore. Le modifiche valgono subito.</p>
           <div role="radiogroup" aria-labelledby="set-preset" style="margin-top:26px">
             <h4 id="set-preset">Stile di Outlook</h4>
             <div class="two">
@@ -227,9 +245,47 @@
               {/if}
             </div>
           {/each}
+          <div class="group">
+            <h4 id="set-accent">Colore di accento</h4>
+            <p class="hint">Colora la barra in alto, i pulsanti principali e la selezione, nel tema chiaro e in quello scuro.</p>
+            <div class="accent-row">
+              <div role="radiogroup" aria-labelledby="set-accent" class="swatches">
+                {#each ACCENT_SWATCHES as s (s.hex)}
+                  {@const on = accentNow === s.hex}
+                  <label class="sw" data-on={on ? 'si' : 'no'} title={s.hex === DEFAULT_ACCENT ? `${s.name} (predefinito)` : s.name} style:background={s.hex} style:color={readableOn(s.hex)}>
+                    <input type="radio" name="set-accent" checked={on} onchange={() => store.setAccent(s.hex)} aria-label={s.hex === DEFAULT_ACCENT ? `${s.name} (predefinito)` : s.name} />
+                    {#if on}<Icon name="check" size={18} stroke={2.5} />{/if}
+                  </label>
+                {/each}
+              </div>
+              <label class="sw pick" data-on={accentCustom ? 'si' : 'no'} title="Altro colore" style:background={accentCustom ? accentNow : null} style:color={accentCustom ? readableOn(accentNow) : null}>
+                <input type="color" aria-label="Altro colore" value={accentNow.toLowerCase()} oninput={(e) => store.setAccent(e.currentTarget.value)} />
+                <Icon name={accentCustom ? 'check' : 'color-picker'} size={18} stroke={accentCustom ? 2.5 : 2} />
+              </label>
+              <label class="tf hex" data-bad={hexBad ? 'si' : 'no'}>
+                <span class="sr">Codice del colore</span>
+                <input
+                  value={hexDraft}
+                  maxlength="7"
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-invalid={hexBad}
+                  title="Codice esadecimale, per esempio #0F6CBD"
+                  onfocus={() => (hexFocus = true)}
+                  onblur={() => { hexFocus = false; hexDraft = accentNow; }}
+                  oninput={(e) => typeHex(e.currentTarget.value)}
+                />
+              </label>
+            </div>
+            {#if hexBad}
+              <p class="custom">Scrivi un codice come #0F6CBD: il cancelletto e sei cifre o lettere da A a F.</p>
+            {:else if accentAdapted}
+              <p class="custom">Nel tema {store.theme} questo colore è leggermente adattato, per tenere leggibili testi e icone.</p>
+            {/if}
+          </div>
         {:else if store.setPage === 'account'}
           <h3>Account e sincronizzazione</h3>
-          <p class="intro">La posta viaggia direttamente tra questo computer e il server del tuo provider. Datini non usa server intermedi.</p>
+          <p class="intro">La posta viaggia direttamente tra questo computer e il server del tuo provider. Better-Look non usa server intermedi.</p>
           <div class="acc-grid">
             <div class="acc-list">
               {#each store.accounts as a (a.id)}
@@ -246,7 +302,7 @@
                   <div class="srv">
                     <span class="k">Tipo</span><span style="font-weight:600">File di dati</span>
                     {#if acct.sourceFile}<span class="k">Importato da</span><span class="path">{acct.sourceFile}</span>{/if}
-                    <span class="k">Dove si trova</span><span>Solo su questo computer, nell’archivio di Datini</span>
+                    <span class="k">Dove si trova</span><span>Solo su questo computer, nell’archivio di Better-Look</span>
                   </div>
                 {:else}
                   <div class="srv">
@@ -281,7 +337,7 @@
                       {@render pills('attachments', attachOpts)}
                     </div>
                   {:else}
-                    <div role="note" class="note"><Icon name="alert-triangle" style="color:var(--warn);margin-top:1px" /><span>Con POP la posta viene scaricata su questo computer, che ne conserva l’unica copia completa. Includi la cartella di Datini nei backup.</span></div>
+                    <div role="note" class="note"><Icon name="alert-triangle" style="color:var(--warn);margin-top:1px" /><span>Con POP la posta viene scaricata su questo computer, che ne conserva l’unica copia completa. Includi la cartella di Better-Look nei backup.</span></div>
                     <div role="radiogroup" aria-labelledby="sync-pop" class="group-a">
                       <h4 id="sync-pop" class="tight">Copia sul server</h4>
                       <p class="hint">Per quanto tempo lasciare i messaggi anche sul server dopo averli scaricati.</p>
@@ -302,10 +358,10 @@
                   {#if confirmRemove}
                     <p class="warn-t">
                       {acct.kind === 'local'
-                        ? 'Il file di dati verrà tolto da Datini. Il file originale sul disco resta dov’è.'
+                        ? 'Il file di dati verrà tolto da Better-Look. Il file originale sul disco resta dov’è.'
                         : acct.kind === 'pop3'
-                          ? 'L’account e la posta scaricata su questo computer verranno tolti da Datini. I messaggi ancora sul server restano lì.'
-                          : 'L’account verrà tolto da Datini. La posta resta sul server del tuo provider.'}
+                          ? 'L’account e la posta scaricata su questo computer verranno tolti da Better-Look. I messaggi ancora sul server restano lì.'
+                          : 'L’account verrà tolto da Better-Look. La posta resta sul server del tuo provider.'}
                     </p>
                     <div class="rm-acts">
                       <button class="sec-btn danger-btn" onclick={() => { const id = acct.id; confirmRemove = false; void store.removeAccount(id); }}>{acct.kind === 'local' ? 'Chiudi file di dati' : 'Rimuovi account'}</button>
@@ -443,7 +499,7 @@
             <p class="preview" style:font-family={fontStack(store.font.family)} style:font-size="{store.font.size}pt">Gentile cliente, le invio il preventivo aggiornato.</p>
           </div>
         {:else}
-          <h3>Informazioni su Datini</h3>
+          <h3>Informazioni su Better-Look</h3>
           <div style="margin-top:30px"><About /></div>
         {/if}
       </div>
@@ -467,6 +523,17 @@
   .otext { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .ot { font-size: 14.5px; font-weight: 600; }
   .od { font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+  .accent-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sw { position: relative; width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 4px; cursor: pointer; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent); transition: box-shadow .15s ease-out; }
+  .sw:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent), 0 0 0 2px var(--sheet), 0 0 0 3px var(--rule-2); }
+  .sw[data-on="si"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent), 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink); }
+  .sw:focus-within { outline: 2px solid var(--focus); outline-offset: 6px; }
+  .sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .sw.pick { margin-left: 8px; background: var(--sheet); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--rule-2); }
+  .sw.pick:hover { box-shadow: inset 0 0 0 1px var(--rule-2), 0 0 0 2px var(--sheet), 0 0 0 3px var(--rule-2); }
+  .sw.pick[data-on="si"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent), 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink); }
+  .hex input { width: 96px; font-variant-numeric: tabular-nums; text-transform: uppercase; }
   .check { margin-top: 14px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
   .check input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); }
   .acc-grid { margin-top: 24px; display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 28px; align-items: start; }

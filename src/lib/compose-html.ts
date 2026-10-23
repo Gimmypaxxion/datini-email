@@ -6,12 +6,12 @@ import type { MessageDetail } from './types';
 import { longDate, peopleText, personFull } from './format';
 
 /** Contenitore con il carattere predefinito (versioni precedenti dell'editor). */
-export const BODY_CLASS = 'datini-corpo';
-/** Firma aggiunta da Datini: si sostituisce cambiando account o firma. È un
+export const BODY_CLASS = 'better-look-corpo';
+/** Firma aggiunta da Better-Look: si sostituisce cambiando account o firma. È un
  *  id e non una classe perché l'editor conserva gli id dei blocchi. */
-export const SIG_ID = 'datini-firma';
+export const SIG_ID = 'better-look-firma';
 /** Messaggio originale citato sotto una risposta o un inoltro. */
-export const QUOTE_ID = 'datini-citazione';
+export const QUOTE_ID = 'better-look-citazione';
 
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -135,7 +135,7 @@ export function replyHtml(sig: string | null | undefined, m: MessageDetail, quot
   return `${head}<div id="${QUOTE_ID}">${quoteHeader(m)}${quote}</div>`;
 }
 
-/** Mette, cambia o toglie la firma aggiunta da Datini. */
+/** Mette, cambia o toglie la firma aggiunta da Better-Look. */
 export function replaceSignature(html: string, sig: string | null): string {
   // Solo la firma sopra il messaggio citato: quella dentro è di chi ha scritto.
   const q = findBlock(html, QUOTE_ID);

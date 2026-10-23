@@ -1,7 +1,7 @@
 """Riempie la casella di prova con messaggi realistici (tutti inventati),
 con date relative a oggi. Uso:
 
-    python3 tools/posta-di-prova/popola.py            # svuota e riempie prova@datini.test
+    python3 tools/posta-di-prova/popola.py            # svuota e riempie prova@better-look.test
     python3 tools/posta-di-prova/popola.py --vuota    # svuota soltanto
 """
 
@@ -16,8 +16,8 @@ from email.message import EmailMessage
 from email.utils import format_datetime, make_msgid
 from datetime import datetime, timedelta, timezone
 
-HOST = "mail.datini.test"
-USER = "prova@datini.test"
+HOST = "mail.better-look.test"
+USER = "prova@better-look.test"
 PASSWORD = "prova-123"
 ME = ("Chiara Valli", USER)
 

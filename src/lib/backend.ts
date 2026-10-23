@@ -218,7 +218,7 @@ export class TauriBackend implements Backend {
     let stop: (() => void) | null = null;
     let cancelled = false;
     import('@tauri-apps/api/event').then(({ listen }) =>
-      listen<EngineEvent>('datini://evento', (ev) => cb(ev.payload)).then((un) => {
+      listen<EngineEvent>('better-look://evento', (ev) => cb(ev.payload)).then((un) => {
         if (cancelled) un();
         else stop = un;
       }),

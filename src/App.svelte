@@ -13,19 +13,22 @@
   import Icon from './lib/Icon.svelte';
   import { store } from './lib/store.svelte';
   import { setWindowTitle } from './lib/platform';
+  import { applyAccent } from './lib/accent';
   import { handleShortcut } from './lib/shortcuts';
 
   let header: Header | undefined = $state();
 
-  // Tema: l'attributo sull'elemento <html> attiva i colori chiari o scuri.
+  // Tema: l'attributo sull'elemento <html> attiva i colori chiari o scuri;
+  // il colore di accento sostituisce il blu nelle variabili CSS.
   $effect(() => {
     document.documentElement.dataset.theme = store.theme;
+    applyAccent(document.documentElement, store.accent, store.theme);
   });
 
-  // Titolo della finestra del sistema, come in Outlook: "Posta in arrivo - Datini".
+  // Titolo della finestra del sistema, come in Outlook: "Posta in arrivo - Better-Look".
   $effect(() => {
     const where = store.c && store.cWin ? store.c.subject || 'Nuovo messaggio' : store.listTitle || 'Posta';
-    setWindowTitle(`${where} - Datini`);
+    setWindowTitle(`${where} - Better-Look`);
   });
 
   const apps = [

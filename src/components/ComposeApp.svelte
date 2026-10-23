@@ -9,6 +9,7 @@
   import Icon from '../lib/Icon.svelte';
   import { store, type WinTab } from '../lib/store.svelte';
   import { setWindowTitle } from '../lib/platform';
+  import { applyAccent } from '../lib/accent';
 
   let ready = $state(false);
   let closing = false;
@@ -23,6 +24,7 @@
 
   $effect(() => {
     document.documentElement.dataset.theme = store.theme;
+    applyAccent(document.documentElement, store.accent, store.theme);
   });
 
   $effect(() => {

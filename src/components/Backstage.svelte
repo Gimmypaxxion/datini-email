@@ -33,7 +33,7 @@
         <button class="bs-it" data-on={store.bsPage === id ? 'si' : 'no'} aria-current={store.bsPage === id ? 'page' : undefined} onclick={() => (store.bsPage = id)}>{label}</button>
       {/each}
       <span style="flex:1"></span>
-      <button class="bs-it" data-on={store.bsPage === 'about' ? 'si' : 'no'} aria-current={store.bsPage === 'about' ? 'page' : undefined} onclick={() => (store.bsPage = 'about')}>Informazioni su Datini</button>
+      <button class="bs-it" data-on={store.bsPage === 'about' ? 'si' : 'no'} aria-current={store.bsPage === 'about' ? 'page' : undefined} onclick={() => (store.bsPage = 'about')}>Informazioni su Better-Look</button>
       <button class="bs-it" onclick={() => store.openSettings('aspetto')}>Opzioni</button>
     </nav>
     <div class="scroll main">
@@ -75,7 +75,7 @@
           </div>
           <div class="bs-row">
             <button class="btn bs-tile" onclick={() => store.importArchive('mbox')}><Icon name="file-import" size={30} stroke={1.5} />Importa MBOX</button>
-            <div><h2>Importa da file MBOX</h2><p>Porta in Datini la posta esportata da Thunderbird, Apple Mail o da un altro programma in formato MBOX.</p></div>
+            <div><h2>Importa da file MBOX</h2><p>Porta in Better-Look la posta esportata da Thunderbird, Apple Mail o da un altro programma in formato MBOX.</p></div>
           </div>
           <div class="bs-row">
             <button class="btn bs-tile" onclick={() => store.exportFolder()} disabled={!store.currentFolder}><Icon name="file-export" size={30} stroke={1.5} />Esporta cartella</button>
@@ -83,7 +83,7 @@
           </div>
         </div>
       {:else}
-        <h1>Informazioni su Datini</h1>
+        <h1>Informazioni su Better-Look</h1>
         <div style="margin-top:36px"><About /></div>
       {/if}
     </div>

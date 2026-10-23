@@ -103,7 +103,7 @@
     "titolo": {
       "kind": "title1",
       "maxW": 2960,
-      "text": "Datini, client di posta open source",
+      "text": "Better-Look, client di posta open source",
       "w": 240,
       "x": 0,
       "y": -300
@@ -123,5 +123,5 @@
     "Telefono.dc.html"
   ],
   "pages": [],
-  "title": "Datini, client di posta"
+  "title": "Better-Look, client di posta"
 }

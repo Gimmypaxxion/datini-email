@@ -156,7 +156,7 @@ pub async fn contacts(e: E<'_>, prefix: String) -> Result<Vec<Person>> {
     e.contacts(&prefix)
 }
 
-/// Estensioni che possono eseguire codice: Datini non le apre, come Outlook.
+/// Estensioni che possono eseguire codice: Better-Look non le apre, come Outlook.
 const BLOCKED: [&str; 28] = [
     "exe", "bat", "cmd", "com", "scr", "pif", "vbs", "vbe", "js", "jse", "wsf", "wsh", "msi", "msp", "ps1", "psm1", "lnk", "reg", "hta",
     "cpl", "jar", "app", "command", "sh", "dll", "inf", "url", "iso",
@@ -179,7 +179,7 @@ pub async fn open_attachment(app: AppHandle, e: E<'_>, id: i64, index: u32) -> R
     let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
     if BLOCKED.contains(&ext.as_str()) {
         return Err(Error::user(format!(
-            "Per sicurezza Datini non apre i file .{ext}: potrebbero contenere programmi dannosi. Se sei sicuro della provenienza, salvalo e controllalo con l'antivirus."
+            "Per sicurezza Better-Look non apre i file .{ext}: potrebbero contenere programmi dannosi. Se sei sicuro della provenienza, salvalo e controllalo con l'antivirus."
         )));
     }
     let dir = app.path().app_cache_dir().map_err(|e| Error::user(e.to_string()))?.join("allegati").join(id.to_string());

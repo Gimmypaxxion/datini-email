@@ -555,7 +555,7 @@ fn convert_message(m: &dyn PstMessage, atts: &[Rc<dyn PstAttachment>], depth: u8
         b = b.bcc(Address::new_list(bcc));
     }
     let clean_id = |s: String| s.trim().trim_matches(['<', '>']).to_string();
-    b = b.message_id(MessageId::new(p.str(INTERNET_MESSAGE_ID).map(clean_id).unwrap_or_else(|| format!("{}@pst.datini", mime::random_id()))));
+    b = b.message_id(MessageId::new(p.str(INTERNET_MESSAGE_ID).map(clean_id).unwrap_or_else(|| format!("{}@pst.better-look", mime::random_id()))));
     if let Some(r) = p.str(IN_REPLY_TO) {
         b = b.in_reply_to(MessageId::new(clean_id(r)));
     }
@@ -788,10 +788,10 @@ mod tests {
         assert!(!is_mail_folder(Some("IPF.Appointment")));
     }
 
-    /// Prova su file PST veri: DATINI_PST=percorso cargo test pst_reale -- --nocapture
+    /// Prova su file PST veri: BETTERLOOK_PST=percorso cargo test pst_reale -- --nocapture
     #[test]
     fn pst_reale() {
-        let Ok(path) = std::env::var("DATINI_PST") else { return };
+        let Ok(path) = std::env::var("BETTERLOOK_PST") else { return };
         let pst = Pst::open(Path::new(&path)).expect("PST leggibile");
         let store = pst.store();
         let root = store.open_folder(&store.properties().ipm_sub_tree_entry_id().unwrap()).unwrap();
@@ -826,7 +826,7 @@ mod tests {
         }
         let mut n = 0;
         walk(&pst, &root, 0, &mut n);
-        if let Ok(dir) = std::env::var("DATINI_PST_EML") {
+        if let Ok(dir) = std::env::var("BETTERLOOK_PST_EML") {
             if let Some(t) = root.hierarchy_table() {
                 let mut k = 0;
                 for row in t.rows_matrix() {

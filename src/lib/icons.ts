@@ -3,6 +3,7 @@
 // nell'app finiscono solo quelle usate.
 import Highlight from '@tabler/icons-svelte/icons/highlight';
 import Palette from '@tabler/icons-svelte/icons/palette';
+import ColorPicker from '@tabler/icons-svelte/icons/color-picker';
 import TextColor from '@tabler/icons-svelte/icons/text-color';
 import ClearFormatting from '@tabler/icons-svelte/icons/clear-formatting';
 import IndentIncrease from '@tabler/icons-svelte/icons/indent-increase';
@@ -131,6 +132,7 @@ import X from '@tabler/icons-svelte/icons/x';
 export const icons = {
   highlight: Highlight,
   palette: Palette,
+  'color-picker': ColorPicker,
   'text-color': TextColor,
   'clear-formatting': ClearFormatting,
   'indent-increase': IndentIncrease,

@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Contenuto della pagina "Informazioni su Datini", condiviso tra il menu
+  // Contenuto della pagina "Informazioni su Better-Look", condiviso tra il menu
   // File (vista classica) e le Impostazioni (vista nuova).
   import Icon from '../lib/Icon.svelte';
   import Wordmark from './Wordmark.svelte';
@@ -15,8 +15,7 @@
 <div class="about">
   <Wordmark height={32} />
   <p class="ver">{version ? `Versione ${version} (anteprima)` : 'Versione di anteprima'}</p>
-  <p class="lead">Datini è un programma di posta libero e open source. La posta viaggia direttamente tra il tuo computer e il server del tuo provider.</p>
-  <p class="story">Porta il nome di Francesco Datini, mercante di Prato del Trecento. Il suo archivio conserva circa 143.000 lettere d’affari scambiate con quasi trecento città.</p>
+  <p class="lead">Better-Look è un programma di posta gratuito, libero e open source, per chi arriva da Outlook. La posta viaggia direttamente tra il tuo computer e il server del tuo provider.</p>
   <div class="links">
     <button class="btn obtn" onclick={() => store.openLink(REPO_URL)}><Icon name="code" size={17} style="color:var(--brand-ink)" />Codice sorgente</button>
     <button class="btn obtn" onclick={() => store.openLink(`${REPO_URL}#licenza`)}><Icon name="file-text" size={17} style="color:var(--brand-ink)" />Licenza</button>
@@ -28,6 +27,5 @@
   .about { max-width: 640px; }
   .ver { margin: 14px 0 0; font-size: 13.5px; color: var(--ink-3); }
   .lead { margin: 26px 0 0; max-width: 60ch; font-size: 15px; line-height: 1.55; }
-  .story { margin: 12px 0 0; max-width: 60ch; font-size: 15px; line-height: 1.55; color: var(--ink-2); }
   .links { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px; }
 </style>

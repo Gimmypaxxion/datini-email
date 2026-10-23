@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Datini",
+  "productName": "Better-Look",
   "version": "0.1.0",
-  "identifier": "app.datini",
+  "identifier": "app.betterlook",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Posta in arrivo - Datini",
+        "title": "Posta in arrivo - Better-Look",
         "width": 1360,
         "height": 860,
         "minWidth": 960,
@@ -29,9 +29,9 @@
     "active": true,
     "targets": "all",
     "category": "Productivity",
-    "publisher": "Datini",
+    "publisher": "Better-Look",
     "shortDescription": "Client di posta libero e open source",
-    "longDescription": "Datini è un client di posta desktop libero e open source, con i comandi dove li mette Outlook, in vista classica o nuova.",
+    "longDescription": "Better-Look è un client di posta desktop libero e open source, con i comandi dove li mette Outlook, in vista classica o nuova.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

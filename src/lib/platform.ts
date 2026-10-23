@@ -16,7 +16,7 @@ export async function appVersion(): Promise<string> {
   }
 }
 
-/** Titolo della finestra del sistema, come in Outlook: "Posta in arrivo - Datini". */
+/** Titolo della finestra del sistema, come in Outlook: "Posta in arrivo - Better-Look". */
 export async function setWindowTitle(title: string): Promise<void> {
   if (typeof document !== 'undefined') document.title = title;
   if (!inTauri) return;

@@ -14,11 +14,11 @@ Raccomandato: Tauri 2, motore in Rust, interfaccia in HTML/CSS/TypeScript. Il co
 
 ## Users
 
-Primari: le PMI italiane. Sono impiegati che usano Outlook (classico o nuovo) tutti i giorni e devono passare a Datini senza riabituarsi. Secondari: chiunque voglia un client di posta desktop gratuito e open source.
+Primari: le PMI italiane. Sono impiegati che usano Outlook (classico o nuovo) tutti i giorni e devono passare a Better-Look senza riabituarsi. Secondari: chiunque voglia un client di posta desktop gratuito e open source.
 
 ## Product Purpose
 
-Datini è un client di posta gratuito e open source. Ha successo quando un utente di Outlook, il primo giorno, trova ogni comando dove se lo aspetta e lavora senza formazione.
+Better-Look è un client di posta gratuito e open source. Ha successo quando un utente di Outlook, il primo giorno, trova ogni comando dove se lo aspetta e lavora senza formazione.
 
 ## Positioning
 
@@ -49,8 +49,9 @@ Account:
 
 ## Brand Commitments
 
-- Nome: Datini, in onore di Francesco Datini, mercante di Prato.
-- Logo: scritta DATINI e "D" fornite da Gimmy (cartella `logo/`). Si usano solo nel primo avvio e nella pagina "Informazioni su Datini"; la D in futuro come icona del programma.
+- Nome: Better-Look, con il trattino: un'alternativa migliore per chi arriva da Outlook.
+- Gratuito, libero e open source per sempre. Eventuali servizi di IA saranno un prodotto separato.
+- Logo provvisorio: scritta Better-Look con il trattino nel colore di accento; icona con la "B" su quadrato blu. Il logo si usa solo nel primo avvio e nella pagina "Informazioni su Better-Look".
 - Branding volutamente discreto.
 
 ## Evidence on Hand

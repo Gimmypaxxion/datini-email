@@ -5,7 +5,7 @@
 // versione web e nel nuovo Outlook. Il testo si scrive in un iframe isolato
 // (niente script, risorse esterne bloccate dalla Content-Security-Policy),
 // così l'HTML citato da un altro messaggio non può cambiare l'aspetto di
-// Datini né scaricare immagini di tracciamento.
+// Better-Look né scaricare immagini di tracciamento.
 
 import { Editor, createModelFromHtml, exportContent, paste, redo, undo } from 'roosterjs-content-model-core';
 import {
@@ -295,7 +295,7 @@ export class EditorCtl {
     const defaults = { fontFamily: fontStack(font.family), fontSize: `${font.size}pt`, textColor: '#000000' };
     const ctl = this;
     const bridge: EditorPlugin = {
-      getName: () => 'Datini',
+      getName: () => 'Better-Look',
       initialize: () => {},
       dispose: () => {},
       onPluginEvent: (e: PluginEvent) => ctl.onEvent(e),

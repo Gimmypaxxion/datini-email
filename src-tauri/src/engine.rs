@@ -490,7 +490,7 @@ impl Engine {
             return Err(Error::user("Scrivi la password della casella."));
         }
         if self.db.accounts()?.iter().any(|a| a.email.eq_ignore_ascii_case(&email) && a.kind != AccountKind::Local) {
-            return Err(Error::user("Questo indirizzo è già in Datini."));
+            return Err(Error::user("Questo indirizzo è già in Better-Look."));
         }
 
         let manual = input.incoming.is_some() && input.outgoing.is_some();

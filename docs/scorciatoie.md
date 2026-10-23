@@ -1,6 +1,6 @@
 # Scorciatoie da tastiera
 
-Datini usa le stesse scorciatoie di Outlook in italiano. Su macOS, al posto di **Ctrl** si può usare anche **Cmd**.
+Better-Look usa le stesse scorciatoie di Outlook in italiano. Su macOS, al posto di **Ctrl** si può usare anche **Cmd**.
 
 Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegnare...) funzionano quando non stai scrivendo in un campo di testo, così non disturbano la digitazione.
 

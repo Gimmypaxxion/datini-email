@@ -1,14 +1,14 @@
-# Datini
+# Better-Look
 
-Datini è un client di posta desktop **libero e open source** per Windows, macOS e Linux. È pensato per chi usa Outlook ogni giorno: i comandi stanno dove li mette Outlook, sia nella **vista classica** sia nella **nuova**, così si lavora dal primo giorno senza riabituarsi.
+Better-Look è un client di posta desktop **libero e open source** per Windows, macOS e Linux. È pensato per chi usa Outlook ogni giorno: i comandi stanno dove li mette Outlook, sia nella **vista classica** sia nella **nuova**, così si lavora dal primo giorno senza riabituarsi.
 
-Porta il nome di Francesco Datini, mercante di Prato del Trecento. Il suo archivio conserva circa 143.000 lettere d'affari.
+Better-Look è e resterà **gratuito, libero e open source**.
 
-> Datini non è affiliato a Microsoft. "Outlook" è un marchio di Microsoft Corporation e qui è citato solo per descrivere la disposizione dei comandi e la compatibilità con i file PST.
+> Better-Look non è affiliato a Microsoft. "Outlook" è un marchio di Microsoft Corporation e qui è citato solo per descrivere la disposizione dei comandi e la compatibilità con i file PST.
 
 ## A che punto siamo
 
-**Versione di anteprima, da provare con caselle di prova.** Datini si collega a caselle vere con IMAP o POP3 e invia con SMTP.
+**Versione di anteprima, da provare con caselle di prova.** Better-Look si collega a caselle vere con IMAP o POP3 e invia con SMTP.
 
 Cosa funziona:
 - **Account:**
@@ -40,7 +40,8 @@ Cosa funziona:
   - esportazione di un messaggio in EML e di una cartella in MBOX.
 - **Interfaccia:**
   - primo avvio con la scelta tra Outlook classico e nuovo Outlook;
-  - barra estesa o compatta, menu File o ingranaggio, tema chiaro o scuro;
+  - barra estesa o compatta, menu File o ingranaggio;
+  - tema chiaro o scuro e colore di accento a scelta (il blu è quello predefinito): i colori si adattano da soli per restare leggibili;
   - [scorciatoie da tastiera](docs/scorciatoie.md) di Outlook.
 
 Cosa manca ancora:
@@ -52,12 +53,12 @@ Cosa manca ancora:
 
 ## Sicurezza e privacy
 
-- La posta va **direttamente** dal computer al server del provider. Non ci sono server di Datini in mezzo e niente tracciamento.
+- La posta va **direttamente** dal computer al server del provider. Non ci sono server di Better-Look in mezzo e niente tracciamento.
 - Le password stanno nel **portachiavi del sistema** (Gestione credenziali di Windows, Portachiavi di macOS, Secret Service su Linux), mai in chiaro su disco.
 - Le connessioni sono sempre cifrate (SSL/TLS o STARTTLS) e i certificati vengono verificati.
 - L'HTML delle email viene ripulito e mostrato in un riquadro isolato, senza script.
 - Le **immagini esterne restano bloccate** finché non scegli di scaricarle: servono spesso a sapere quando e dove apri un messaggio.
-- Datini non apre gli allegati eseguibili (`.exe`, `.bat`, `.js` e simili). I link si aprono nel browser.
+- Better-Look non apre gli allegati eseguibili (`.exe`, `.bat`, `.js` e simili). I link si aprono nel browser.
 
 ## Scaricare e provare
 
@@ -65,13 +66,13 @@ A ogni modifica GitHub prepara gli installer da solo:
 
 1. Apri [Actions › Installer](https://github.com/Gimmypaxxion/datini-email/actions/workflows/installer.yml) e scegli l'esecuzione più recente con il segno verde.
 2. In fondo, nella sezione **Artifacts**, scarica il file del tuo sistema:
-   - `datini-windows`: installer `.exe` e `.msi`;
-   - `datini-macos-apple-silicon` o `datini-macos-intel`: `.dmg`;
-   - `datini-linux`: `.deb`, `.rpm`, `.AppImage`.
+   - `better-look-windows`: installer `.exe` e `.msi`;
+   - `better-look-macos-apple-silicon` o `better-look-macos-intel`: `.dmg`;
+   - `better-look-linux`: `.deb`, `.rpm`, `.AppImage`.
 
 Gli installer **non sono ancora firmati**, quindi al primo avvio compare un avviso:
 - **Windows:** nella finestra "Windows ha protetto il PC", clicca *Ulteriori informazioni* e poi *Esegui comunque*.
-- **macOS:** apri Datini dalla cartella Applicazioni con il tasto destro, poi scegli *Apri*.
+- **macOS:** apri Better-Look dalla cartella Applicazioni con il tasto destro, poi scegli *Apri*.
 
 Per pubblicare una versione basta creare un tag, per esempio `v0.1.0`: GitHub prepara una release in bozza con tutti gli installer.
 
@@ -98,23 +99,24 @@ Per collaudare il motore senza toccare caselle vere c'è un server di prova (Ubu
 ```bash
 sudo apt-get install dovecot-imapd dovecot-pop3d
 pip install aiosmtpd
-sudo tools/posta-di-prova/avvia.sh          # IMAP, POP3 e SMTP su mail.datini.test
+sudo tools/posta-di-prova/avvia.sh          # IMAP, POP3 e SMTP su mail.better-look.test
 python3 tools/posta-di-prova/popola.py      # 54 messaggi di esempio
-DATINI_SERVER_PROVA=1 cargo test --manifest-path src-tauri/Cargo.toml --test server_prova -- --test-threads=1
+BETTERLOOK_SERVER_PROVA=1 cargo test --manifest-path src-tauri/Cargo.toml --test server_prova -- --test-threads=1
 ```
 
-Le caselle sono `prova@datini.test` (password `prova-123`) e `altro@datini.test` (password `altro-456`).
+Le caselle sono `prova@better-look.test` (password `prova-123`) e `altro@better-look.test` (password `altro-456`).
 
-Per provare l'apertura di un file PST: `DATINI_PST=/percorso/file.pst cargo test --manifest-path src-tauri/Cargo.toml --test importa_pst -- --nocapture`.
+Per provare l'apertura di un file PST: `BETTERLOOK_PST=/percorso/file.pst cargo test --manifest-path src-tauri/Cargo.toml --test importa_pst -- --nocapture`.
 
 ### Interfaccia nel browser
 
-Per lavorare solo sull'interfaccia basta `npm run dev`, poi aprire http://localhost:1420. Nel browser Datini usa messaggi di esempio, senza collegarsi a nessuna casella.
+Per lavorare solo sull'interfaccia basta `npm run dev`, poi aprire http://localhost:1420. Nel browser Better-Look usa messaggi di esempio, senza collegarsi a nessuna casella.
 
 Gli stati si aprono aggiungendo parametri all'indirizzo, per esempio `?stile=nuovo&view=composizione&tema=scuro&avvio=0`:
 - `stile`: `classico`, `nuovo`;
 - `view`: `composizione`, `inviato`, `file`, `impostazioni`, `account`, `informazioni`, `aggiungi`, `newsletter`, `uscita`;
 - `tema`: `chiaro`, `scuro`, `sistema`;
+- `accento`: un colore in esadecimale senza `#`, per esempio `038387`;
 - `avvio`: `1` per mostrare il primo avvio, `0` per saltarlo;
 - `offline`: `1` per mostrare l'avviso di connessione assente.
 
@@ -131,6 +133,7 @@ src/                     interfaccia (Svelte 5 + TypeScript)
   lib/shortcuts.ts       scorciatoie da tastiera
   lib/editor.svelte.ts   editor di testo formattato (RoosterJS in un iframe isolato)
   lib/compose-html.ts    nuovo messaggio, citazione, firma e testo normale
+  lib/accent.ts          colore di accento: dal colore scelto alle variabili CSS dei due temi
 src-tauri/src/           motore (Rust)
   engine.rs              account, sincronizzazione, posta in uscita, bozze
   imap.rs, pop3.rs, smtp.rs   protocolli di posta
@@ -140,6 +143,7 @@ src-tauri/src/           motore (Rust)
   sanitize.rs            pulizia dell'HTML delle email
   pst.rs, rtf.rs         apertura dei file PST e importazione MBOX
   secrets.rs             password nel portachiavi del sistema
+  legacy.rs              dati delle versioni di anteprima con il nome precedente
 tests/                   test dell'interfaccia
 src-tauri/tests/         prove del motore con un server vero e con file PST
 tools/posta-di-prova/    server di posta per le prove
@@ -161,7 +165,7 @@ I dettagli e le decisioni prese sono in [`docs/progetto.md`](docs/progetto.md).
 
 ## Licenza
 
-Da definire prima della pubblicazione (in valutazione GPL-3.0 o MPL-2.0).
+Da definire. Sarà una licenza open source: Better-Look resterà gratuito e libero per sempre.
 
 ## Riconoscimenti
 
@@ -170,4 +174,5 @@ Da definire prima della pubblicazione (in valutazione GPL-3.0 o MPL-2.0).
 - Editor di testo: [RoosterJS](https://github.com/microsoft/roosterjs), licenza MIT.
 - Archivio: [SQLite](https://sqlite.org) con [rusqlite](https://github.com/rusqlite/rusqlite).
 - Icone [Tabler Icons](https://tabler.io/icons), licenza MIT.
+- Logo provvisorio composto con [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans), licenza SIL Open Font License.
 - Colori ispirati alla palette [Fluent 2](https://fluent2.microsoft.design) di Microsoft, pubblicata con licenza MIT.

@@ -132,7 +132,7 @@
         <div class="done">
           <Icon name="circle-check" size={48} stroke={1.4} style="color:var(--green)" />
           <h2 id="wiz-title">Account aggiunto</h2>
-          <p>Datini sta scaricando la posta di <strong>{added}</strong>. I messaggi compaiono man mano, a partire dai più recenti.</p>
+          <p>Better-Look sta scaricando la posta di <strong>{added}</strong>. I messaggi compaiono man mano, a partire dai più recenti.</p>
           <div class="done-acts">
             {#if !store.signatures.length}
               <button class="sec-btn" onclick={() => { close(); store.openSettings('composizione'); }}><Icon name="signature" size={17} />Aggiungi la tua firma</button>
@@ -146,7 +146,7 @@
           <button class="ibtn btn" onclick={close} disabled={step === 'cerco'} aria-label="Chiudi" title="Chiudi (Esc)"><Icon name="x" /></button>
         </header>
         <form class="scroll body" onsubmit={submit} novalidate>
-          <p class="intro">Scrivi indirizzo e password: Datini trova da solo le impostazioni dei provider più diffusi, come Aruba, Libero, Register.it e Gmail.</p>
+          <p class="intro">Scrivi indirizzo e password: Better-Look trova da solo le impostazioni dei provider più diffusi, come Aruba, Libero, Register.it e Gmail.</p>
 
           <fieldset disabled={step === 'cerco'}>
             <label class="tf" data-bad={errorField === 'email' ? 'si' : 'no'}>

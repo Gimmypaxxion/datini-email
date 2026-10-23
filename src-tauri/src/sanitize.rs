@@ -233,10 +233,10 @@ mod tests {
 
     #[test]
     fn fragments_drop_style_blocks_and_keep_links() {
-        let f = clean_fragment("<html><head><style>body{display:none}</style><title>x</title></head><body><div id=\"datini-firma\" class=\"x\" style=\"color:red\"><img src=\"https://x.it/logo.png\"><img src=\"cid:a@b\"><script>alert(1)</script></div></body></html>", &[("a@b".into(), "image/png".into(), vec![1, 2, 3])]);
+        let f = clean_fragment("<html><head><style>body{display:none}</style><title>x</title></head><body><div id=\"better-look-firma\" class=\"x\" style=\"color:red\"><img src=\"https://x.it/logo.png\"><img src=\"cid:a@b\"><script>alert(1)</script></div></body></html>", &[("a@b".into(), "image/png".into(), vec![1, 2, 3])]);
         assert!(!f.contains("display:none"));
         assert!(!f.contains("alert"));
-        assert!(f.contains("id=\"datini-firma\""));
+        assert!(f.contains("id=\"better-look-firma\""));
         assert!(f.contains("src=\"https://x.it/logo.png\""));
         assert!(f.contains("src=\"data:image/png;base64,AQID\""));
     }
