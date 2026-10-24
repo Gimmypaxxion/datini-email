@@ -2,17 +2,22 @@
 // comandi, stessi eventi) ma senza rete: serve nel browser e nei test.
 
 import type { Backend, Tab } from './backend';
-import { mockData, type MockMessage } from './mock';
+import { mockData, mockEvents, type MockMessage } from './mock';
+import { addDays, isMine } from './calendar';
 import { textToHtml } from './compose-html';
 import { hasActions, ruleMatches } from './rules';
 import { contactName } from './contacts';
 import type {
   Account,
   AutoReply,
+  CalEvent,
+  CalImport,
   Category,
   Contact,
   ContactImport,
   FolderUsage,
+  InviteAction,
+  PartStat,
   Rule,
   Draft,
   DraftAttachment,
@@ -34,6 +39,10 @@ interface Outgoing {
   item: OutboxItem;
   draft: Draft;
   timer: ReturnType<typeof setTimeout>;
+}
+
+function clone<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v)) as T;
 }
 
 function err(kind: string, message: string) {
@@ -102,6 +111,9 @@ export class MockBackend implements Backend {
   ];
   private ruleList: Rule[] = [];
   private book: Contact[] = SAMPLE_CONTACTS.map((c) => ({ ...c, emails: [...c.emails], phones: c.phones.map((p) => ({ ...p })) }));
+  private cal: CalEvent[];
+  /** Messaggi di calendario messi in uscita (inviti, risposte, annullamenti), per i test. */
+  itip: { method: string; to: string[]; subject: string; event: CalEvent }[] = [];
   /** Avvisi sul desktop mandati (per i test). */
   notified: { title: string; body: string }[] = [];
   /** Ritardo simulato per la ricerca dei server. */
@@ -112,6 +124,7 @@ export class MockBackend implements Backend {
     this.accountsList = d.accounts;
     this.folderList = d.folders;
     this.msgs = d.messages;
+    this.cal = mockEvents(now);
   }
 
   private emit(e: EngineEvent) {
@@ -325,6 +338,11 @@ export class MockBackend implements Backend {
       });
     }
     const { sig: _sig, ...detail } = m;
+    if (m.invite) {
+      const ev = m.invite.event;
+      const local = this.cal.find((e) => e.uid === ev.uid && e.recurrenceId === ev.recurrenceId) ?? null;
+      detail.invite = { ...clone(m.invite), local: local ? clone(local) : null, outdated: !!local && local.sequence > ev.sequence, forMe: ev.attendees.some((a) => this.mine().includes(a.email.toLowerCase())) };
+    }
     return { ...detail, html: html ? `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:system-ui,sans-serif;font-size:14.5px;line-height:1.5;color:#242424;background:#fff}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>${html}</body></html>` : null, remoteImages: remote, remoteAllowed: allowRemote };
   }
 
@@ -641,6 +659,167 @@ export class MockBackend implements Backend {
 
   async exportContacts(ids: string[] | null) {
     return ids ? ids.length : this.book.length;
+  }
+
+  // ---------- Calendario ----------
+
+  private mine(): string[] {
+    return this.accountsList.filter((a) => a.kind !== 'local').map((a) => a.email.toLowerCase());
+  }
+
+  private storeEvent(ev: CalEvent) {
+    const i = this.cal.findIndex((x) => x.id === ev.id);
+    if (i >= 0) this.cal[i] = clone(ev);
+    else this.cal.push(clone(ev));
+    if (ev.recurrenceId !== null) {
+      for (const m of this.cal) if (m.uid === ev.uid && m.recurrenceId === null && m.repeat && !m.exceptions.includes(ev.recurrenceId)) m.exceptions = [...m.exceptions, ev.recurrenceId].sort((a, b) => a - b);
+    }
+  }
+
+  private others(list: { name: string; email: string }[]) {
+    const mine = this.mine();
+    return list.filter((a) => !mine.includes(a.email.toLowerCase())).map((a) => a.email);
+  }
+
+  async events(from: number, to: number) {
+    return this.cal
+      .filter((e) => {
+        if (e.start >= to) return false;
+        if (!e.repeat) return Math.max(e.end, e.start + 1) > from;
+        if (e.repeat.count) return true;
+        return e.repeat.until === null || e.repeat.until + (e.end - e.start) > from;
+      })
+      .map(clone);
+  }
+
+  async saveEvent(input: CalEvent, send: boolean) {
+    const ev = clone(input);
+    ev.title = ev.title.trim();
+    if (ev.end < ev.start) throw err('utente', "La fine deve venire dopo l'inizio.");
+    if (ev.allDay && ev.end <= ev.start) ev.end = addDays(ev.start, 1);
+    if (ev.repeat) {
+      ev.repeat.interval = Math.max(1, ev.repeat.interval || 1);
+      if (ev.repeat.freq === 'weekly' && !ev.repeat.days.length) ev.repeat.days = [new Date(ev.start).getDay()];
+      if (ev.repeat.until !== null && ev.repeat.until < ev.start) throw err('utente', 'La ripetizione deve finire dopo il primo appuntamento.');
+    }
+    const seen = new Set<string>();
+    ev.attendees = ev.attendees.filter((a) => a.email.trim() && !seen.has(a.email.toLowerCase()) && seen.add(a.email.toLowerCase()));
+    const old = ev.id ? this.cal.find((x) => x.id === ev.id) : undefined;
+    if (!ev.id) ev.id = `ev${this.nextId++}`;
+    if (!ev.uid) ev.uid = `${ev.id}@better-look`;
+    let sending = false;
+    if (ev.attendees.length && isMine(ev, this.mine())) {
+      const acct = this.accountsList.find((a) => a.id === ev.accountId && a.kind !== 'local') ?? this.accountsList.find((a) => a.kind !== 'local');
+      if (!acct) throw err('utente', 'Per inviare gli inviti serve un account di posta.');
+      ev.accountId = acct.id;
+      ev.organizer = { name: acct.name, email: acct.email };
+      ev.response = null;
+      if (send) {
+        if (old) ev.sequence = Math.max(old.sequence, ev.sequence) + 1;
+        sending = true;
+      }
+    }
+    this.storeEvent(ev);
+    if (sending) {
+      this.itip.push({ method: 'REQUEST', to: this.others(ev.attendees), subject: ev.title || '(senza titolo)', event: clone(ev) });
+      const gone = (old?.attendees ?? []).filter((x) => !ev.attendees.some((y) => y.email.toLowerCase() === x.email.toLowerCase()));
+      if (gone.length) this.itip.push({ method: 'CANCEL', to: this.others(gone), subject: `Annullato: ${ev.title}`, event: clone(ev) });
+    }
+    this.emit({ type: 'calendar' });
+    return clone(ev);
+  }
+
+  async deleteEvent(id: string, occurrence: number | null, send: boolean) {
+    const ev = this.cal.find((x) => x.id === id);
+    if (!ev) return;
+    if (occurrence !== null && ev.repeat) {
+      if (!ev.exceptions.includes(occurrence)) ev.exceptions = [...ev.exceptions, occurrence].sort((a, b) => a - b);
+    } else if (ev.recurrenceId === null) {
+      this.cal = this.cal.filter((x) => x.uid !== ev.uid);
+    } else {
+      this.cal = this.cal.filter((x) => x.id !== id);
+    }
+    if (send && ev.attendees.length) {
+      if (isMine(ev, this.mine())) this.itip.push({ method: 'CANCEL', to: this.others(ev.attendees), subject: `Annullato: ${ev.title}`, event: clone(ev) });
+      else if (ev.organizer && ev.response !== 'declined') this.itip.push({ method: 'REPLY', to: [ev.organizer.email], subject: `Rifiutato: ${ev.title}`, event: clone(ev) });
+    }
+    this.emit({ type: 'calendar' });
+  }
+
+  async respondInvite(messageId: number, action: InviteAction, send: boolean) {
+    const m = this.find(messageId);
+    if (!m.invite) throw err('utente', "Nel messaggio non c'è un invito.");
+    const inv = clone(m.invite.event);
+    const local = this.cal.find((e) => e.uid === inv.uid && e.recurrenceId === inv.recurrenceId);
+    const takeOut = () => {
+      if (local) this.cal = this.cal.filter((e) => (local.recurrenceId === null ? e.uid !== local.uid : e.id !== local.id));
+    };
+    if (action === 'remove') {
+      takeOut();
+      this.emit({ type: 'calendar' });
+      return null;
+    }
+    if (local && local.sequence > inv.sequence) throw err('utente', "Questo invito è superato: nel calendario c'è già una versione più recente.");
+    const status: PartStat | null = action === 'add' ? null : action;
+    inv.id = local?.id ?? `ev${this.nextId++}`;
+    inv.accountId = m.accountId;
+    if (local) {
+      inv.reminder = local.reminder;
+      inv.categories = [...local.categories];
+    } else if (inv.reminder === null && !inv.allDay) inv.reminder = 15;
+    if (status) {
+      inv.response = status;
+      const mine = this.mine();
+      for (const a of inv.attendees) if (mine.includes(a.email.toLowerCase())) a.status = status;
+    }
+    if (status === 'declined') takeOut();
+    else this.storeEvent(inv);
+    if (send && status && inv.organizer && !isMine(inv, this.mine())) {
+      const prefix = status === 'accepted' ? 'Accettato' : status === 'tentative' ? 'Provvisorio' : 'Rifiutato';
+      this.itip.push({ method: 'REPLY', to: [inv.organizer.email], subject: `${prefix}: ${inv.title}`, event: clone(inv) });
+    }
+    m.answered = m.answered || (send && !!status);
+    this.emit({ type: 'calendar' });
+    return status === 'declined' ? null : clone(inv);
+  }
+
+  async respondEvent(id: string, action: InviteAction, send: boolean) {
+    const ev = this.cal.find((x) => x.id === id);
+    if (!ev) throw err('non-trovato', 'Evento non trovato.');
+    if (isMine(ev, this.mine())) throw err('utente', "Sei tu l'organizzatore di questo evento.");
+    if (action !== 'accepted' && action !== 'tentative' && action !== 'declined') throw err('utente', 'Risposta non valida.');
+    ev.response = action;
+    const mine = this.mine();
+    for (const a of ev.attendees) if (mine.includes(a.email.toLowerCase())) a.status = action;
+    if (action === 'declined') this.cal = this.cal.filter((x) => (ev.recurrenceId === null ? x.uid !== ev.uid : x.id !== id));
+    if (send && ev.organizer) {
+      const prefix = action === 'accepted' ? 'Accettato' : action === 'tentative' ? 'Provvisorio' : 'Rifiutato';
+      this.itip.push({ method: 'REPLY', to: [ev.organizer.email], subject: `${prefix}: ${ev.title}`, event: clone(ev) });
+    }
+    this.emit({ type: 'calendar' });
+    return action === 'declined' ? null : clone(ev);
+  }
+
+  async importCalendar(): Promise<CalImport> {
+    // Nel browser non si leggono file: si aggiungono due eventi di esempio.
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth() + 1, 12).getTime();
+    const extra: CalEvent[] = [
+      { ...mockEvents(now)[0], id: '', uid: 'fiera-milano@example.test', title: 'Fiera Arredo Milano', location: 'Fiera Milano, Rho', start: first, end: addDays(first, 3), allDay: true, repeat: null, reminder: 1440, categories: ['c5'] },
+      { ...mockEvents(now)[0], id: '', uid: 'corso-sicurezza@example.test', title: 'Corso sicurezza sul lavoro', location: 'Confartigianato, Prato', start: new Date(first).setHours(9, 0, 0, 0), end: new Date(first).setHours(13, 0, 0, 0), repeat: null, reminder: 60, categories: [] },
+    ];
+    let added = 0;
+    for (const e of extra) {
+      if (this.cal.some((x) => x.uid === e.uid)) continue;
+      this.cal.push({ ...e, id: `ev${this.nextId++}` });
+      added++;
+    }
+    this.emit({ type: 'calendar' });
+    return { added, updated: 0, unchanged: extra.length - added };
+  }
+
+  async exportCalendar() {
+    return this.cal.length;
   }
 
   async notify(title: string, body: string) {

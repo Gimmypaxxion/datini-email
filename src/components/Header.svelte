@@ -9,15 +9,19 @@
   const me = $derived(store.currentAccount?.kind === 'local' ? (store.accounts.find((a) => a.kind !== 'local') ?? store.currentAccount) : store.currentAccount);
 
   let searchEl: HTMLInputElement | undefined = $state();
-  // Nei contatti la ricerca filtra la rubrica, come nel nuovo Outlook.
+  // Nei contatti la ricerca filtra la rubrica e nel calendario gli appuntamenti,
+  // come nel nuovo Outlook.
   const people = $derived(store.module === 'contatti');
-  const value = $derived(people ? store.contactQuery : store.q);
+  const agenda = $derived(store.module === 'calendario');
+  const value = $derived(people ? store.contactQuery : agenda ? store.cal.query : store.q);
   function type(v: string) {
     if (people) store.contactQuery = v;
+    else if (agenda) void store.cal.search(v);
     else void store.search(v);
   }
   function clear() {
     if (people) store.contactQuery = '';
+    else if (agenda) void store.cal.search('');
     else void store.clearSearch();
   }
 
@@ -31,7 +35,7 @@
   <div class="side" aria-hidden="true"></div>
   <div class="search-wrap">
     <label class="search">
-      <span class="sr">{people ? 'Cerca nei contatti' : 'Cerca nella posta'}</span>
+      <span class="sr">{people ? 'Cerca nei contatti' : agenda ? 'Cerca nel calendario' : 'Cerca nella posta'}</span>
       <Icon name="search" class="lens" />
       <input
         bind:this={searchEl}
@@ -45,7 +49,7 @@
             clear();
           }
         }}
-        placeholder={people ? 'Cerca contatti' : 'Cerca'}
+        placeholder={people ? 'Cerca contatti' : agenda ? 'Cerca appuntamenti' : 'Cerca'}
         title="Cerca (Ctrl+E)"
       />
       {#if value}

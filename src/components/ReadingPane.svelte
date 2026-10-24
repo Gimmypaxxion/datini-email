@@ -6,6 +6,7 @@
   import type { IconName } from '../lib/icons';
   import Composer from './Composer.svelte';
   import MailFrame from './MailFrame.svelte';
+  import InviteCard from './InviteCard.svelte';
   import Menu from './Menu.svelte';
   import { categoryItems, type MenuItem } from '../lib/menus';
   import { store } from '../lib/store.svelte';
@@ -15,7 +16,8 @@
   const m = $derived(store.detail && store.detail.id === store.sel ? store.detail : null);
   const name = $derived(m ? personLabel(m.from) || 'Mittente sconosciuto' : '');
   const t = $derived(tint(name));
-  const files = $derived(m ? m.attachments.filter((a) => !a.inline) : []);
+  // Con un invito, la parte iCalendar è già nella scheda dell'invito.
+  const files = $derived(m ? m.attachments.filter((a) => !a.inline && !(m.invite && (a.mime === 'text/calendar' || a.mime === 'application/ics'))) : []);
   const paragraphs = $derived(m && !m.html ? m.text.replace(/\r\n/g, '\n').split(/\n\s*\n/).filter((p) => p.trim()) : []);
 
   let moreBtn: HTMLButtonElement | undefined = $state();
@@ -93,6 +95,8 @@
           <span class="date">{longDate(m.date)}</span>
         </div>
       </div>
+
+      {#if m.invite}<InviteCard invite={m.invite} />{/if}
 
       {#if store.speech !== 'off'}
         <div class="note-bar info speech" role="status">

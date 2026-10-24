@@ -326,6 +326,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .note-bar .act { flex: none; height: 30px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 600; }
 .note-bar .act:hover { background: var(--hover); }
 
+/* Calendario: appuntamenti nei colori della categoria, o dell'accento */
+.ev { --ev-bg: var(--brand-soft); --ev-fg: var(--ink); --ev-line: var(--brand); box-sizing: border-box; border: 0; border-radius: 4px; background: var(--ev-bg); color: var(--ev-fg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ev-line) 42%, transparent); font-size: 12.5px; line-height: 1.3; text-align: left; overflow: hidden; transition: background-color .15s ease-out; }
+.ev:hover { background-color: color-mix(in srgb, var(--ev-line) 12%, var(--ev-bg)); }
+.ev[data-sel="si"] { box-shadow: inset 0 0 0 2px var(--ev-line), var(--lift); }
+.ev[data-state="tentative"] { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ev-line) 20%, transparent) 0 4px, transparent 4px 9px); }
+.ev[data-state="needs-action"] { background: var(--sheet); box-shadow: none; outline: 1px dashed var(--ev-line); outline-offset: -1px; }
+.ev[data-state="needs-action"][data-sel="si"] { outline-width: 2px; outline-offset: -2px; }
+.ev[data-state="cancelled"] { opacity: .72; }
+.ev[data-state="cancelled"] .ev-t { text-decoration: line-through; }
+.ev-t { font-weight: 600; }
+.ev:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
 /* Movimento */
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes win-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
@@ -336,7 +348,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 @media (prefers-reduced-motion: reduce) {
   .rise, .win-in, .fade-in, .skel, .spin { animation: none; }
   .progress::after { animation-duration: 3s; }
-  .btn, .primary, .rb, .hbtn, .row .row-main, .dot, .opt, .obc { transition: none; }
+  .btn, .primary, .rb, .hbtn, .row .row-main, .dot, .opt, .obc, .ev { transition: none; }
 }
 
 /* Larghezze ridotte */

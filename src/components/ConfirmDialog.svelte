@@ -38,6 +38,7 @@
       {/if}
       <div class="acts">
         <button class="primary-btn" class:danger={c.danger} bind:this={okBtn} onclick={() => store.answer(true)}>{c.ok}</button>
+        {#if c.alt}<button class="sec-btn" onclick={() => store.answer('alt')}>{c.alt}</button>{/if}
         <button class="sec-btn" bind:this={cancelBtn} onclick={() => store.answer(false)}>Annulla</button>
       </div>
     </div>

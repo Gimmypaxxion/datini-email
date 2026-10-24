@@ -17,9 +17,28 @@ Cosa funziona:
   - IMAP e POP3, anche più account insieme.
 - **Posta:**
   - cartelle e ruoli (arrivo, inviata, bozze, eliminata, indesiderata, archivio), anche con nomi italiani;
+  - cartelle personali: crea, rinomina, elimina, svuota, segna tutto come letto;
   - schede Prioritaria e Altre: newsletter e notifiche automatiche vanno in Altre;
   - lettura, risposta, risposta a tutti, inoltro;
-  - sposta, elimina, archivia, contrassegna, letto e da leggere.
+  - sposta, elimina, archivia, contrassegna, letto e da leggere;
+  - categorie colorate, vista per conversazione, stampa, lettura ad alta voce.
+- **Organizzazione:**
+  - regole e avvisi: per mittente, destinatari, oggetto, parole o allegati; spostano, eliminano, segnano come letti, contrassegnano, assegnano una categoria o mandano un avviso; si possono eseguire subito su una cartella;
+  - avviso sul desktop quando arriva posta nuova;
+  - risposte automatiche (fuori sede) con periodo facoltativo, una sola risposta per mittente;
+  - invio programmato a un giorno e un'ora;
+  - pulizia della casella: spazio occupato per cartella, messaggi più grandi, archiviazione dei messaggi vecchi.
+- **Contatti:**
+  - rubrica con nome, azienda, indirizzi email, telefoni, indirizzo, compleanno e note;
+  - importazione da Outlook, Gmail, Apple e Thunderbird (vCard, CSV, LDIF), senza doppioni; esportazione in vCard;
+  - "Aggiungi ai contatti" da un messaggio e messaggi recenti nella scheda del contatto.
+- **Calendario** (sul computer, non collegato a Google o Microsoft):
+  - viste giorno, settimana lavorativa, settimana e mese, con il mese per spostarsi e i prossimi appuntamenti;
+  - appuntamenti, eventi di tutto il giorno, ripetizioni come in Outlook (ogni giorno, giorni feriali, ogni settimana, ogni mese per data o "il secondo martedì", ogni anno), luogo, note e categorie;
+  - promemoria con avviso sul desktop: Apri, Posticipa, Ignora;
+  - inviti ricevuti da Outlook, Google e Apple: Accetta, Provvisorio o Rifiuta, con la risposta all'organizzatore e gli impegni in conflitto;
+  - riunioni organizzate da te: invito ai partecipanti, aggiornamenti, annullamento; le risposte aggiornano l'elenco dei partecipanti;
+  - importazione ed esportazione di file iCalendar (`.ics`).
 - **Offline e ricerca:**
   - archivio sul computer con ricerca nel testo;
   - uso offline: le modifiche partono quando torna la connessione.
@@ -46,8 +65,10 @@ Cosa funziona:
 
 Cosa manca ancora:
 - **Microsoft 365, Outlook.com e Gmail con accesso moderno (OAuth).** Su queste caselle l'accesso IMAP con la sola password è già disattivato o lo sarà presto. Gmail per ora si può usare solo con una "password per le app", se Google la consente sull'account.
-- Regole, risposte automatiche, invio programmato.
-- Calendario, contatti e attività.
+- Calendari online (Google Calendar, Microsoft 365, CalDAV) e calendari condivisi; Attività.
+- Traduci: il pulsante c'è, la traduzione arriverà con i servizi di intelligenza artificiale, che saranno un prodotto separato.
+- Risposte automatiche, regole sui messaggi in arrivo, invio programmato e promemoria funzionano solo mentre Better-Look è aperto: lavorano sul computer, non sul server.
+- Dai file PST si importa solo la posta: i contatti vanno esportati da Outlook in CSV e il calendario in `.ics`.
 - File `.ost` (copie locali di Exchange): non si aprono, va esportato un `.pst`.
 - Firma del codice e aggiornamenti automatici.
 
@@ -114,7 +135,7 @@ Per lavorare solo sull'interfaccia basta `npm run dev`, poi aprire http://localh
 
 Gli stati si aprono aggiungendo parametri all'indirizzo, per esempio `?stile=nuovo&view=composizione&tema=scuro&avvio=0`:
 - `stile`: `classico`, `nuovo`;
-- `view`: `composizione`, `inviato`, `file`, `impostazioni`, `account`, `informazioni`, `aggiungi`, `newsletter`, `uscita`;
+- `view`: `composizione`, `inviato`, `file`, `impostazioni`, `account`, `informazioni`, `aggiungi`, `newsletter`, `uscita`, `contatti`, `calendario`, `calendario-giorno`, `calendario-mese`, `appuntamento`, `riunione`, `invito`, `promemoria`;
 - `tema`: `chiaro`, `scuro`, `sistema`;
 - `accento`: un colore in esadecimale senza `#`, per esempio `038387`;
 - `avvio`: `1` per mostrare il primo avvio, `0` per saltarlo;
@@ -134,8 +155,14 @@ src/                     interfaccia (Svelte 5 + TypeScript)
   lib/editor.svelte.ts   editor di testo formattato (RoosterJS in un iframe isolato)
   lib/compose-html.ts    nuovo messaggio, citazione, firma e testo normale
   lib/accent.ts          colore di accento: dal colore scelto alle variabili CSS dei due temi
+  lib/calendar.ts        calendario: date, ripetizioni, disposizione nella griglia, testi
+  lib/calendar.svelte.ts stato del calendario, modulo dell'appuntamento, promemoria
+  lib/rules.ts, lib/contacts.ts   regole e rubrica lato interfaccia
 src-tauri/src/           motore (Rust)
-  engine.rs              account, sincronizzazione, posta in uscita, bozze
+  engine.rs              account, sincronizzazione, posta in uscita, bozze, regole, rubrica
+  engine/agenda.rs       calendario, inviti e risposte all'organizzatore
+  calendar.rs            file iCalendar (.ics) e inviti iTIP, con le zone orarie
+  rules.rs, contacts.rs   regole sui messaggi; vCard, CSV e LDIF
   imap.rs, pop3.rs, smtp.rs   protocolli di posta
   autoconfig.rs          riconoscimento automatico dei server
   db.rs                  archivio locale SQLite con ricerca
@@ -159,7 +186,8 @@ assets/                  logo e icona del programma
 4. **Scrittura completa:** bozze, allegati, finestre separate vere, testo formattato, firme. *(fatto)*
 5. **POP3 e più account.** *(fatto)*
 6. **Archivi:** apertura dei file PST, import MBOX, export MBOX ed EML. *(fatto)*
-7. Accesso Microsoft 365 e Gmail (OAuth), firma del codice, aggiornamenti automatici, licenza.
+7. **Organizzazione:** cartelle, categorie, conversazioni, regole e avvisi, risposte automatiche, invio programmato, pulizia, rubrica, calendario e inviti. *(fatto)*
+8. Accesso Microsoft 365 e Gmail (OAuth), firma del codice, aggiornamenti automatici, licenza.
 
 I dettagli e le decisioni prese sono in [`docs/progetto.md`](docs/progetto.md).
 

@@ -14,7 +14,7 @@
     {#if store.module === 'contatti'}
       Contatti: {store.contactQuery.trim() ? `${store.filteredContacts.length} di ${store.book.length}` : store.book.length}
     {:else if store.module === 'calendario'}
-      {''}
+      {store.cal.query.trim() ? `Risultati: ${store.cal.found.length}` : `Elementi: ${store.cal.occs.length}`}
     {:else if store.q.trim()}
       Risultati: {store.list.length}
     {:else if store.view === 'uscita'}

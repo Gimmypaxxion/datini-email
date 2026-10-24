@@ -311,6 +311,7 @@ dependencies = [
  "encoding_rs",
  "futures",
  "hickory-resolver",
+ "iana-time-zone",
  "keyring",
  "lettre",
  "log",

@@ -5,7 +5,7 @@ use std::hash::{BuildHasher, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
-use lettre::message::header::{ContentType, HeaderName, HeaderValue};
+use lettre::message::header::{ContentTransferEncoding, ContentType, HeaderName, HeaderValue};
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
 use base64::Engine;
 use mail_parser::{Address, HeaderValue as PHeader, Message, MessageParser, MimeHeaders};
@@ -145,6 +145,32 @@ impl Parsed<'_> {
                 inline: part_is_inline(p),
             })
             .collect()
+    }
+
+    /// Testo iCalendar di un invito: la parte text/calendar (Outlook, Google)
+    /// o un allegato .ics. Si preferisce quella con il metodo (REQUEST, CANCEL…).
+    pub fn calendar(&self) -> Option<String> {
+        let mut found: Option<String> = None;
+        for p in &self.msg.parts {
+            let mime = part_mime(p);
+            let named_ics = p.attachment_name().is_some_and(|n| n.to_ascii_lowercase().ends_with(".ics"));
+            if mime != "text/calendar" && mime != "application/ics" && !named_ics {
+                continue;
+            }
+            let text = match p.text_contents() {
+                Some(t) => t.to_string(),
+                None => String::from_utf8_lossy(p.contents()).to_string(),
+            };
+            if !text.to_ascii_uppercase().contains("BEGIN:VEVENT") {
+                continue;
+            }
+            let method = p.content_type().and_then(|c| c.attribute("method")).is_some() || text.to_ascii_uppercase().contains("\nMETHOD:");
+            if method {
+                return Some(text);
+            }
+            found.get_or_insert(text);
+        }
+        found
     }
 
     pub fn has_real_attachments(&self) -> bool {
@@ -538,16 +564,22 @@ pub struct AttachmentData {
 }
 
 pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_draft: bool) -> Result<BuiltMessage> {
-    build_message(account, d, atts, as_draft, false)
+    build_message(account, d, atts, as_draft, false, None)
+}
+
+/// Invito, risposta o annullamento di una riunione: il testo per le persone e
+/// la parte text/calendar per i programmi (come fanno Outlook e Google).
+pub fn build_calendar(account: &AccountConfig, d: &Draft, method: &str, ics: &str) -> Result<BuiltMessage> {
+    build_message(account, d, &[], false, false, Some((method, ics)))
 }
 
 /// Risposta automatica: un messaggio come gli altri, con le intestazioni che
 /// dicono agli altri programmi di non rispondere a loro volta (RFC 3834).
 pub fn build_auto_reply(account: &AccountConfig, d: &Draft) -> Result<BuiltMessage> {
-    build_message(account, d, &[], false, true)
+    build_message(account, d, &[], false, true, None)
 }
 
-fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_draft: bool, auto_reply: bool) -> Result<BuiltMessage> {
+fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_draft: bool, auto_reply: bool, calendar: Option<(&str, &str)>) -> Result<BuiltMessage> {
     let from = mailbox(&Person::new(account.name.clone(), account.email.clone()))?;
     let domain = account.email.split('@').nth(1).unwrap_or("better-look.local").to_string();
     let message_id = format!("{}@{}", random_id(), domain);
@@ -642,6 +674,10 @@ fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as
             }
             alt.multipart(related)
         };
+        if let Some((method, ics)) = calendar {
+            let ct = ContentType::parse(&format!("text/calendar; method={method}; charset=utf-8")).map_err(|e| Error::user(format!("Impossibile preparare l'invito: {e}")))?;
+            alt = alt.singlepart(SinglePart::builder().header(ct).header(ContentTransferEncoding::Base64).body(ics.as_bytes().to_vec()));
+        }
         let msg = if atts.is_empty() { b.multipart(alt) } else { b.multipart(with_atts(MultiPart::mixed().multipart(alt))) }
         .map_err(|e| Error::user(format!("Impossibile preparare il messaggio: {e}")))?;
         Ok(msg.formatted())

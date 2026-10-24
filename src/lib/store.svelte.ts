@@ -22,6 +22,7 @@ import {
 } from './format';
 import { emptyRule } from './rules';
 import { contactName } from './contacts';
+import { CalendarState } from './calendar.svelte';
 import {
   errorKind,
   errorMessage,
@@ -29,6 +30,7 @@ import {
   type AutoReply,
   type Category,
   type Contact,
+  type InviteAction,
   type Rule,
   type Draft,
   type EngineEvent,
@@ -114,7 +116,9 @@ export interface Confirm {
   danger?: boolean;
   /** Casella da spuntare (per esempio "Non chiedere più"): il valore resta qui. */
   check?: { label: string; value: boolean };
-  resolve: (yes: boolean) => void;
+  /** Seconda scelta, accanto a quella principale (per esempio "Tutta la serie"). */
+  alt?: string;
+  resolve: (answer: boolean | 'alt') => void;
 }
 
 /** Nome di una cartella che si sta scrivendo nel riquadro (nuova o da rinominare). */
@@ -190,6 +194,8 @@ export class MailStore {
   collapsed = $state<Record<string, boolean>>({});
   categories = $state<Category[]>([]);
   module = $state<AppModule>('posta');
+  /** Calendario: vista, appuntamenti, modulo e promemoria. */
+  cal: CalendarState = new CalendarState(this);
   // Rubrica
   book = $state<Contact[]>([]);
   contactSel = $state<string | null>(null);
@@ -339,6 +345,7 @@ export class MailStore {
     this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
     await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules()]);
     if (this.mode === 'principale') {
+      if (this.persist) this.cal.startReminders();
       const inbox = this.defaultInbox();
       if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
       if (!this.onboarding && this.backend.real && !this.accounts.length) this.openWizard(true);
@@ -391,6 +398,12 @@ export class MailStore {
       case 'contacts':
         void this.reloadContacts();
         break;
+      case 'calendar':
+        if (this.mode !== 'principale') break;
+        if (this.module === 'calendario') void this.cal.reload();
+        // L'invito aperto mostra se è già nel calendario.
+        if (this.detail?.invite && this.sel === this.detail.id) void this.refreshInvite(this.detail.id);
+        break;
       case 'newMail':
         if (this.mode === 'principale' && this.notifyDesktop) void this.alertNewMail(e.count, e.messages);
         break;
@@ -438,6 +451,55 @@ export class MailStore {
     this.module = m;
     this.backstage = false;
     if (m === 'contatti') void this.reloadContacts();
+    if (m === 'calendario') void this.cal.reload();
+  }
+
+  // ---------- Inviti ----------
+
+  private async refreshInvite(id: number) {
+    try {
+      const d = await this.backend.message(id, !!this.remoteOk[id]);
+      if (this.detail?.id === id) this.detail.invite = d.invite ?? null;
+    } catch {
+      /* resta lo stato di prima */
+    }
+  }
+
+  /** Risponde all'invito del messaggio aperto. Restituisce l'errore da mostrare, o null. */
+  async respondInvite(action: InviteAction, send: boolean): Promise<string | null> {
+    const d = this.detail;
+    if (!d?.invite) return null;
+    try {
+      await this.backend.respondInvite(d.id, action, send);
+      await this.refreshInvite(d.id);
+      if (send && (action === 'accepted' || action === 'tentative' || action === 'declined')) {
+        const s = this.list.find((m) => m.id === d.id);
+        if (s) s.answered = true;
+        d.answered = true;
+      }
+      const org = d.invite.event.organizer;
+      const text: Record<InviteAction, string> = {
+        accepted: 'Invito accettato e aggiunto al calendario',
+        tentative: 'Risposta provvisoria: l’evento è nel calendario',
+        declined: 'Invito rifiutato',
+        add: 'Aggiunto al calendario',
+        remove: 'Tolto dal calendario',
+      };
+      const sent = send && org && action !== 'add' && action !== 'remove' ? `. Risposta inviata a ${org.name || org.email}.` : '.';
+      this.flash({ kind: 'info', text: text[action] + sent }, 5000);
+      return null;
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  /** "Rispondi con una riunione": riunione con mittente e destinatari del messaggio. */
+  meetingFrom(m: MessageDetail | null = this.detail) {
+    if (!m) return;
+    const people = [m.from, ...m.to, ...m.cc];
+    const seen = new Set<string>();
+    const list = people.filter((p) => p.email && !seen.has(p.email.toLowerCase()) && seen.add(p.email.toLowerCase()));
+    this.cal.newEvent({ meeting: true, title: cleanSubject(m.subject), attendees: list });
   }
 
   async reloadContacts() {
@@ -1087,14 +1149,22 @@ export class MailStore {
   // ---------- Conferme ----------
 
   /** Chiede conferma con una finestra; vero se l'utente conferma. */
-  ask(c: Omit<Confirm, 'resolve'>): Promise<boolean> {
+  ask(c: Omit<Confirm, 'resolve' | 'alt'>): Promise<boolean> {
     this.confirm?.resolve(false);
     return new Promise((resolve) => {
-      this.confirm = { ...c, resolve };
+      this.confirm = { ...c, resolve: (a) => resolve(a === true) };
     });
   }
 
-  answer(yes: boolean) {
+  /** Domanda con due scelte più Annulla: 'ok', 'alt' oppure null. */
+  choose(c: Omit<Confirm, 'resolve'> & { alt: string }): Promise<'ok' | 'alt' | null> {
+    this.confirm?.resolve(false);
+    return new Promise((resolve) => {
+      this.confirm = { ...c, resolve: (a) => resolve(a === true ? 'ok' : a === 'alt' ? 'alt' : null) };
+    });
+  }
+
+  answer(yes: boolean | 'alt') {
     const c = this.confirm;
     this.confirm = null;
     c?.resolve(yes);
@@ -1206,7 +1276,7 @@ export class MailStore {
 
   // ---------- Scrittura ----------
 
-  private composeAccount(prefer?: string): Account | null {
+  composeAccount(prefer?: string): Account | null {
     const p = this.accounts.find((a) => a.id === prefer);
     if (this.canSend(p)) return p!;
     const cur = this.currentAccount;
@@ -1277,7 +1347,7 @@ export class MailStore {
     if (this.c && !this.cWin && this.mode === 'principale') await this.stashDraft();
   }
 
-  private flash(t: Omit<Toast, 'id'>, ms = 6000) {
+  flash(t: Omit<Toast, 'id'>, ms = 6000) {
     clearTimeout(this.toastTimer);
     const id = ++toastSeq;
     this.toast = { ...t, id };
@@ -2090,8 +2160,23 @@ ${m.text}`.slice(0, 20_000);
       this.setModule('contatti');
       await this.reloadContacts();
       this.contactSel = this.book[0]?.id ?? null;
-    } else if (v === 'calendario') {
+    } else if (v === 'calendario' || v === 'calendario-mese' || v === 'calendario-giorno') {
+      this.cal.view = v === 'calendario-mese' ? 'mese' : v === 'calendario-giorno' ? 'giorno' : 'settimana-lavorativa';
       this.setModule('calendario');
+      await this.cal.reload();
+    } else if (v === 'appuntamento' || v === 'riunione') {
+      this.setModule('calendario');
+      await this.cal.reload();
+      const o = this.cal.occs.find((x) => x.ev.id === 'ev3');
+      if (v === 'riunione' && o) this.cal.edit = { ev: JSON.parse(JSON.stringify(o.ev)), meeting: true, series: false, original: o.ev, occ: o };
+      else this.cal.newEvent({ start: this.cal.range.days[1] + 11 * 3_600_000 });
+    } else if (v === 'invito') {
+      if (this.list.some((m) => m.id === 14)) await this.pickMsg(14);
+    } else if (v === 'promemoria') {
+      this.setModule('calendario');
+      await this.cal.reload();
+      const o = this.cal.occs.find((x) => x.ev.id === 'ev5');
+      if (o) this.cal.reminders = [{ key: o.key, occ: o }];
     } else if (v === 'aggiungi') {
       this.openWizard(false);
     } else if (v === 'newsletter') {

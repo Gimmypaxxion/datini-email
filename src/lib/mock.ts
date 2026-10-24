@@ -3,7 +3,8 @@
 // test. Nell'app installata i dati arrivano dal motore di posta in Rust.
 // Le date sono relative a oggi, così i gruppi dell'elenco restano sensati.
 
-import type { Account, AttachmentInfo, Folder, MessageDetail, Person, Role } from './types';
+import type { Account, AttachmentInfo, CalEvent, Folder, MessageDetail, Person, Role } from './types';
+import { addDays, emptyEvent, startOfWeek } from './calendar';
 
 export const ME: Person = { name: 'Chiara Valli', email: 'chiara.valli@valliarredi.it' };
 export const ORDINI: Person = { name: 'Ordini Valli Arredi', email: 'ordini@valliarredi.it' };
@@ -92,6 +93,7 @@ const SEED: Seed[] = [
   { id: 11, folder: 'inbox', tab: 'altre', from: 'Arredo & Contract', email: 'newsletter@arredoecontract.example', date: 'ven 16/10/2026 06:30', subject: 'Uffici 2027: materiali, colori e acustica', body: ['Questa settimana:', 'cosa chiedono le aziende per i nuovi uffici, raccontato da tre studi di progettazione. Materiali, colori e soluzioni acustiche per gli spazi condivisi.'], unread: true, html: NEWSLETTER },
   { id: 12, folder: 'inbox', tab: 'altre', from: 'Cartoleria Bertelli', email: 'ordini@cartoleriabertelli.it', date: 'gio 15/10/2026 09:12', subject: 'Il tuo ordine è stato spedito', body: ['Gentile cliente,', 'il tuo ordine (toner e risme di carta) è stato spedito e arriverà entro sabato.', 'Cartoleria Bertelli'] },
   { id: 13, folder: 'inbox', tab: 'altre', from: 'Rete Progettisti Emilia', email: 'eventi@reteprogettisti.it', date: 'mer 14/10/2026 18:00', subject: 'Promemoria: webinar sull’illuminazione degli uffici', body: ['Ciao,', 'il webinar sull’illuminazione degli uffici inizia giovedì 22 ottobre alle 17:00. Riceverai il link di accesso un’ora prima.', 'Rete Progettisti Emilia'], unread: true },
+  { id: 14, folder: 'inbox', from: 'Marco Ventura', date: 'gio 15/10/2026 15:05', subject: 'Riunione commerciale', body: ['Riunione commerciale con Giorgio, dopo il sopralluogo.', 'Ordine del giorno: preventivo Bassano, listino 2027 e fiera di gennaio.'], to: 'Chiara Valli; Giorgio Valli', unread: true },
   { id: 21, folder: 'sent', thread: 21, from: 'Chiara Valli', date: 'gio 15/10/2026 18:05', subject: 'Re: Preventivo uffici Bassano, revisione 2', body: ['Ciao Davide,', 'il cliente chiede scrivanie più strette nelle postazioni operative: puoi rivedere il preventivo con quelle da 160?', 'Grazie,\nChiara'], to: 'Davide Orlandi', cc: 'Marco Ventura' },
   { id: 22, folder: 'sent', thread: 7, from: 'Chiara Valli', date: 'mer 14/10/2026 16:44', subject: 'Re: Consegna programmata per martedì 20 ottobre', body: ['Buongiorno,', 'martedì mattina va benissimo, in magazzino ci sarà Sara.', 'Cordiali saluti,\nChiara Valli'], to: 'Trasporti Ferri' },
   { id: 23, folder: 'sent', thread: 23, from: 'Chiara Valli', date: 'mer 14/10/2026 10:20', subject: 'Campionario tessuti per lo showroom', body: ['Ciao Lucia,', 'per lo showroom ci servirebbero i campioni del bouclé e del velluto a coste in sei tinte. Riesci a mandarli entro fine mese?', 'Grazie mille,\nChiara'], to: 'Lucia Marchetti' },
@@ -143,6 +145,51 @@ export const FOLDER_IDS: Record<string, number> = {
   amministrazione: 9,
   'ordini-inbox': 11,
 };
+
+/** Orario della settimana di oggi: settimana 0 è quella corrente, giorno 1 il lunedì. */
+function weekAt(now: Date, week: number, weekday: number, hh = 0, mm = 0): number {
+  const d = new Date(addDays(startOfWeek(now.getTime()), week * 7 + ((weekday + 6) % 7)));
+  d.setHours(hh, mm, 0, 0);
+  return d.getTime();
+}
+
+const me = (status: 'accepted' | 'tentative' | 'needs-action' = 'accepted') => ({ name: ME.name, email: ME.email, status, optional: false });
+const att = (name: string, status: 'accepted' | 'tentative' | 'needs-action' | 'declined' = 'needs-action', optional = false) => ({ name, email: PEOPLE[name] ?? '', status, optional });
+
+/** Invito arrivato con il messaggio 14: riunione di lunedì prossimo. */
+export function mockInvite(now = new Date()): CalEvent {
+  return {
+    ...emptyEvent(weekAt(now, 1, 1, 10, 30), weekAt(now, 1, 1, 12)),
+    id: '',
+    uid: 'riunione-commerciale@valliarredi.example',
+    title: 'Riunione commerciale',
+    location: 'Sala riunioni',
+    notes: 'Ordine del giorno: preventivo Bassano, listino 2027 e fiera di gennaio.',
+    organizer: person('Marco Ventura'),
+    attendees: [me('needs-action'), att('Giorgio Valli', 'accepted')],
+    reminder: 15,
+    sequence: 1,
+  };
+}
+
+/** Appuntamenti di esempio intorno alla settimana di oggi. */
+export function mockEvents(now = new Date()): CalEvent[] {
+  const e = (id: string, start: number, end: number, over: Partial<CalEvent>): CalEvent => ({ ...emptyEvent(start, end), id, uid: `${id}@valliarredi.example`, ...over });
+  const day = (week: number, weekday: number) => weekAt(now, week, weekday);
+  return [
+    e('ev1', weekAt(now, -8, 1, 9), weekAt(now, -8, 1, 9, 30), { title: 'Punto della settimana', location: 'Sala riunioni', reminder: 10, repeat: { freq: 'weekly', interval: 1, days: [1], week: null, until: null, count: null } }),
+    e('ev2', weekAt(now, 0, 2, 8), weekAt(now, 0, 2, 12), { title: 'Consegna Trasporti Ferri', location: 'Magazzino, via Emilia 214', reminder: 30, notes: 'Spedizione TF-208114. In magazzino c’è Sara.' }),
+    e('ev3', weekAt(now, 0, 3, 14, 30), weekAt(now, 0, 3, 16, 30), { title: 'Sopralluogo uffici Bassano', location: 'Bassano del Grappa', categories: ['c1'], organizer: ME, attendees: [att('Davide Orlandi', 'accepted'), att('Marco Ventura', 'tentative')], accountId: 'valli' }),
+    e('ev4', weekAt(now, 0, 3, 15), weekAt(now, 0, 3, 15, 30), { title: 'Telefonata con la tipografia', reminder: 5 }),
+    e('ev5', weekAt(now, 0, 4, 9), weekAt(now, 0, 4, 10), { title: 'Campioni del rovere', location: 'Studio Orlandi, Vicenza', organizer: person('Davide Orlandi'), attendees: [me('accepted'), att('Davide Orlandi', 'accepted')], response: 'accepted', accountId: 'valli' }),
+    e('ev6', weekAt(now, 0, 4, 17), weekAt(now, 0, 4, 18), { title: 'Webinar illuminazione degli uffici', location: 'Online', organizer: { name: 'Rete Progettisti Emilia', email: 'eventi@reteprogettisti.it' }, attendees: [me('tentative')], response: 'tentative', accountId: 'valli' }),
+    e('ev7', day(0, 5), day(0, 6), { title: 'Chiusura del trimestre', allDay: true, categories: ['c3'], reminder: 1080 }),
+    e('ev8', weekAt(now, 0, 5, 13), weekAt(now, 0, 5, 14, 30), { title: 'Pranzo con Lucia Marchetti', location: 'Trattoria da Bruno', categories: ['c2'] }),
+    e('ev9', day(1, 3), day(1, 6), { title: 'Ferie di Sara', allDay: true, reminder: null }),
+    e('ev10', new Date(1985, 2, 9).getTime(), new Date(1985, 2, 10).getTime(), { title: 'Compleanno di Lucia Marchetti', allDay: true, reminder: 1440, repeat: { freq: 'yearly', interval: 1, days: [], week: null, until: null, count: null } }),
+    e('ev11', weekAt(now, 1, 2, 11), weekAt(now, 1, 2, 12), { title: 'Bozza del catalogo: approvazione', location: 'Tipografia Gualtieri', reminder: 60 }),
+  ];
+}
 
 export function mockData(now = new Date()): MockData {
   const accounts = [account('valli', ME, 'imap'), account('ordini', ORDINI, 'pop3')];
@@ -205,5 +252,7 @@ export function mockData(now = new Date()): MockData {
       sig: s.sig ?? '',
     };
   });
+  const inv = messages.find((m) => m.id === 14);
+  if (inv) inv.invite = { method: 'request', event: mockInvite(now), local: null, outdated: false, replier: null, forMe: true };
   return { accounts, folders, messages };
 }

@@ -15,7 +15,7 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   const ctrl = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   const typing = isTyping(e.target);
-  const overlay = store.settings || store.backstage || store.wizard.open || !!store.confirm;
+  const overlay = store.settings || store.backstage || store.wizard.open || !!store.confirm || !!store.cal.edit;
 
   // La webview ricarica la pagina con Ctrl+R e F5, e apre la ricerca con Ctrl+F:
   // in un programma di posta questi tasti hanno altri significati.
@@ -37,6 +37,38 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   if (ctrl && e.shiftKey && key === 'c') {
     e.preventDefault();
     store.newContact();
+    return;
+  }
+  // Nuovo appuntamento e nuova riunione, da qualsiasi parte del programma.
+  if (ctrl && e.shiftKey && (key === 'a' || key === 'q')) {
+    e.preventDefault();
+    store.cal.newEvent({ meeting: key === 'q' });
+    return;
+  }
+  if (store.module === 'calendario') {
+    const cal = store.cal;
+    const views = ['giorno', 'settimana-lavorativa', 'settimana', 'mese'] as const;
+    if (ctrl && e.altKey && /^[1-4]$/.test(e.key)) {
+      e.preventDefault();
+      cal.setView(views[Number(e.key) - 1]);
+    } else if (ctrl && !e.shiftKey && key === 'n') {
+      e.preventDefault();
+      cal.newEvent();
+    } else if (ctrl && key === 'e') {
+      e.preventDefault();
+      ui.focusSearch();
+    } else if (!typing && !ctrl && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !(e.target instanceof HTMLButtonElement && e.target.closest('.mini-g'))) {
+      e.preventDefault();
+      cal.move(e.key === 'ArrowLeft' ? -1 : 1);
+    } else if (!typing && !ctrl && e.key === 'Delete' && cal.selected) {
+      e.preventDefault();
+      void cal.remove(cal.selected);
+    } else if (!typing && !ctrl && e.key === 'Enter' && cal.selected && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      void cal.open(cal.selected);
+    } else if (ctrl && e.key === 'p') {
+      e.preventDefault();
+    }
     return;
   }
   if (store.module === 'contatti') {

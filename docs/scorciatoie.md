@@ -43,11 +43,44 @@ Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegna
 | Togli l'ultimo destinatario | Backspace nel campo vuoto |
 | Chiudi la finestra (il messaggio resta in Bozze) | Esc |
 
-## In arrivo
+## Moduli
 
-Queste scorciatoie di Outlook arriveranno con le funzioni a cui servono:
+| Azione | Scorciatoia |
+|---|---|
+| Posta | Ctrl+1 |
+| Calendario | Ctrl+2 |
+| Contatti | Ctrl+3 |
+| Nuovo appuntamento (da qualsiasi modulo) | Ctrl+Maiusc+A |
+| Nuova riunione (da qualsiasi modulo) | Ctrl+Maiusc+Q |
+| Nuovo contatto (da qualsiasi modulo) | Ctrl+Maiusc+C |
+
+## Altre azioni sulla posta
 
 | Azione | Scorciatoia |
 |---|---|
 | Sposta in una cartella | Ctrl+Maiusc+V |
-| Posta, Calendario, Contatti, Attività | Ctrl+1 … Ctrl+4 |
+| Nuova cartella (dentro quella aperta) | Ctrl+Maiusc+E |
+| Stampa il messaggio | Ctrl+P |
+| Leggi ad alta voce o interrompi | Ctrl+Alt+Spazio |
+
+## Calendario
+
+| Azione | Scorciatoia |
+|---|---|
+| Nuovo appuntamento | Ctrl+N, oppure doppio clic su un orario libero |
+| Vista Giorno, Settimana lavorativa, Settimana, Mese | Ctrl+Alt+1 … Ctrl+Alt+4 |
+| Periodo precedente o successivo | Freccia sinistra / Freccia destra |
+| Apri l'appuntamento selezionato | Invio, oppure doppio clic |
+| Elimina l'appuntamento selezionato | Canc |
+| Cerca negli appuntamenti | Ctrl+E |
+| Nel modulo dell'appuntamento: salva | Ctrl+S |
+| Nel modulo della riunione: invia | Ctrl+Invio |
+| Chiudi il modulo | Esc |
+
+## Contatti
+
+| Azione | Scorciatoia |
+|---|---|
+| Nuovo contatto | Ctrl+N |
+| Cerca nei contatti | Ctrl+E |
+| Elimina il contatto selezionato | Canc |

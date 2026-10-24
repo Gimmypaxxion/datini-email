@@ -22,11 +22,11 @@ describe('elenco e cartelle', () => {
     const s = await fresh();
     expect(s.currentFolder?.role).toBe('inbox');
     expect(s.listTitle).toBe('Posta in arrivo');
-    expect(ids(s)).toEqual([1, 2, 3, 4, 5, 6, 8, 7, 9, 10]);
+    expect(ids(s)).toEqual([1, 2, 3, 4, 14, 5, 6, 8, 7, 9, 10]);
     expect(s.sel).toBe(1);
     expect(s.selected?.unread).toBe(false);
     expect(s.detail?.subject).toBe('Preventivo uffici Bassano, revisione 3');
-    expect(s.count(1, true)).toBe(5);
+    expect(s.count(1, true)).toBe(6);
   });
 
   it('aprire un messaggio lo segna come letto, anche nel motore', async () => {
@@ -34,7 +34,7 @@ describe('elenco e cartelle', () => {
     await s.pickMsg(2);
     expect(s.selected?.id).toBe(2);
     expect(s.selected?.unread).toBe(false);
-    expect(s.count(1, true)).toBe(4);
+    expect(s.count(1, true)).toBe(5);
     const inBackend = (await s.backend.messages(1, 'prio')).find((m) => m.id === 2);
     expect(inBackend?.unread).toBe(false);
   });
@@ -64,7 +64,7 @@ describe('elenco e cartelle', () => {
     await s.search('boucle');
     expect(ids(s)).toEqual([3, 23]);
     await s.clearSearch();
-    expect(s.list.length).toBe(10);
+    expect(s.list.length).toBe(11);
   });
 
   it('eliminare il messaggio selezionato lo sposta e seleziona il successivo', async () => {

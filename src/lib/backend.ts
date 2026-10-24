@@ -16,7 +16,10 @@ import type {
   Person,
   Role,
   AutoReply,
+  CalEvent,
+  CalImport,
   Contact,
+  InviteAction,
   ContactImport,
   FolderUsage,
   Rule,
@@ -88,6 +91,20 @@ export interface Backend {
   importContacts(): Promise<ContactImport | null>;
   /** Chiede dove salvare e scrive un file vCard. Null se l'utente annulla. */
   exportContacts(ids: string[] | null): Promise<number | null>;
+  /** Eventi che possono cadere nell'intervallo (le serie vanno espanse). */
+  events(from: number, to: number): Promise<CalEvent[]>;
+  /** Salva; per una riunione mia con `send` manda l'invito o l'aggiornamento. */
+  saveEvent(ev: CalEvent, send: boolean): Promise<CalEvent>;
+  /** Elimina l'evento o solo un'occorrenza; con `send` avvisa partecipanti o organizzatore. */
+  deleteEvent(id: string, occurrence: number | null, send: boolean): Promise<void>;
+  /** Risponde all'invito del messaggio. Restituisce l'evento nel calendario, se resta. */
+  respondInvite(messageId: number, action: InviteAction, send: boolean): Promise<CalEvent | null>;
+  /** Cambia dal calendario la risposta a un invito già aggiunto. */
+  respondEvent(id: string, action: InviteAction, send: boolean): Promise<CalEvent | null>;
+  /** Chiede il file .ics e importa. Null se l'utente annulla. */
+  importCalendar(): Promise<CalImport | null>;
+  /** Chiede dove salvare e scrive il calendario in .ics. Null se l'utente annulla. */
+  exportCalendar(): Promise<number | null>;
   /** Avviso sul desktop. Falso se il sistema non lo permette. */
   notify(title: string, body: string): Promise<boolean>;
   cancelSend(outboxId: number): Promise<Draft | null>;
@@ -278,6 +295,41 @@ export class TauriBackend implements Backend {
     const path = await save({ title: 'Esporta contatti', defaultPath: 'Contatti.vcf', filters: [{ name: 'vCard', extensions: ['vcf'] }] });
     if (!path) return null;
     return this.call<number>('export_contacts', { path, ids });
+  }
+  events(from: number, to: number) {
+    return this.call<CalEvent[]>('events', { from, to });
+  }
+  saveEvent(event: CalEvent, send: boolean) {
+    return this.call<CalEvent>('save_event', { event, send });
+  }
+  deleteEvent(id: string, occurrence: number | null, send: boolean) {
+    return this.call<void>('delete_event', { id, occurrence, send });
+  }
+  respondInvite(messageId: number, action: InviteAction, send: boolean) {
+    return this.call<CalEvent | null>('respond_invite', { id: messageId, action, send });
+  }
+  respondEvent(id: string, action: InviteAction, send: boolean) {
+    return this.call<CalEvent | null>('respond_event', { id, action, send });
+  }
+  async importCalendar() {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const path = await open({
+      multiple: false,
+      directory: false,
+      title: 'Importa calendario',
+      filters: [
+        { name: 'Calendario (iCalendar)', extensions: ['ics', 'ical', 'ifb', 'vcs'] },
+        { name: 'Tutti i file', extensions: ['*'] },
+      ],
+    });
+    if (!path || Array.isArray(path)) return null;
+    return this.call<CalImport>('import_calendar', { path });
+  }
+  async exportCalendar() {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const path = await save({ title: 'Esporta calendario', defaultPath: 'Calendario.ics', filters: [{ name: 'iCalendar', extensions: ['ics'] }] });
+    if (!path) return null;
+    return this.call<number>('export_calendar', { path });
   }
   largeMessages(accountId: string, minSize: number) {
     return this.call<MessageSummary[]>('large_messages', { accountId, minSize });

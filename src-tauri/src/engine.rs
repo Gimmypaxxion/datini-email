@@ -24,6 +24,9 @@ use crate::secrets::Secrets;
 use crate::smtp;
 use crate::utf7;
 
+mod agenda;
+pub use agenda::InviteAction;
+
 pub type Notifier = Arc<dyn Fn(Event) + Send + Sync>;
 
 /// Secondi in cui un messaggio inviato si può ancora annullare.
@@ -860,6 +863,7 @@ impl Engine {
             attachments: parsed.attachments(),
             remote_images: remote,
             remote_allowed: allow_remote,
+            invite: self.invite_info(&parsed),
         })
     }
 

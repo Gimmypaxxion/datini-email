@@ -377,6 +377,8 @@ pub struct MessageDetail {
     /// Immagini esterne bloccate per proteggere la privacy.
     pub remote_images: u32,
     pub remote_allowed: bool,
+    /// Invito a una riunione, da accettare o rifiutare.
+    pub invite: Option<Invite>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -532,6 +534,124 @@ pub struct ContactImport {
     pub unchanged: u32,
 }
 
+// ---------------- Calendario ----------------
+
+/// Risposta di un partecipante a un invito.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum PartStat {
+    #[default]
+    NeedsAction,
+    Accepted,
+    Tentative,
+    Declined,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Freq {
+    Daily,
+    Weekly,
+    Monthly,
+    Yearly,
+}
+
+fn one() -> u32 {
+    1
+}
+
+/// Ricorrenza di un appuntamento, nelle forme che propone Outlook.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Repeat {
+    pub freq: Freq,
+    #[serde(default = "one")]
+    pub interval: u32,
+    /// Giorni della settimana (0 domenica … 6 sabato): per la ricorrenza
+    /// settimanale, oppure il giorno di "il secondo martedì del mese".
+    #[serde(default)]
+    pub days: Vec<u8>,
+    /// Mensile o annuale per giorno della settimana: 1-4, oppure -1 per l'ultimo.
+    #[serde(default)]
+    pub week: Option<i8>,
+    /// Ultimo giorno della serie (ms, compreso).
+    #[serde(default)]
+    pub until: Option<i64>,
+    /// Numero di occorrenze.
+    #[serde(default)]
+    pub count: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Attendee {
+    #[serde(default)]
+    pub name: String,
+    pub email: String,
+    #[serde(default)]
+    pub status: PartStat,
+    #[serde(default)]
+    pub optional: bool,
+}
+
+/// Appuntamento, riunione o evento di tutto il giorno. Orari in millisecondi;
+/// per tutto il giorno, mezzanotte locale del primo giorno e del giorno dopo l'ultimo.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CalEvent {
+    pub id: String,
+    /// Identificativo iCalendar, uguale per tutti i calendari dei partecipanti.
+    pub uid: String,
+    pub title: String,
+    pub location: String,
+    pub start: i64,
+    pub end: i64,
+    pub all_day: bool,
+    pub repeat: Option<Repeat>,
+    /// Inizi delle occorrenze tolte dalla serie.
+    pub exceptions: Vec<i64>,
+    /// Occorrenza di una serie modificata a parte: il suo inizio originale.
+    pub recurrence_id: Option<i64>,
+    /// Promemoria: minuti prima dell'inizio.
+    pub reminder: Option<i32>,
+    pub notes: String,
+    pub categories: Vec<String>,
+    pub organizer: Option<Person>,
+    pub attendees: Vec<Attendee>,
+    /// La mia risposta a un invito ricevuto (None se non ho risposto o se l'evento è mio).
+    pub response: Option<PartStat>,
+    /// Account da cui partono gli inviti, o che ha ricevuto l'invito.
+    pub account_id: Option<String>,
+    pub sequence: i32,
+    /// Annullato dall'organizzatore.
+    pub cancelled: bool,
+}
+
+/// Invito contenuto in un messaggio (parte text/calendar o allegato .ics).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Invite {
+    /// request, cancel, reply, publish, counter…
+    pub method: String,
+    pub event: CalEvent,
+    /// Lo stesso evento, se è già nel calendario.
+    pub local: Option<CalEvent>,
+    /// Nel calendario c'è una versione più recente.
+    pub outdated: bool,
+    /// Per una risposta: chi ha risposto e come.
+    pub replier: Option<Attendee>,
+    /// Sono tra i partecipanti.
+    pub for_me: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CalImport {
+    pub added: u32,
+    pub updated: u32,
+    pub unchanged: u32,
+}
+
 /// Spazio occupato da una cartella (Pulizia cassetta postale).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -568,6 +688,8 @@ pub enum Event {
     Rules,
     /// La rubrica è cambiata.
     Contacts,
+    /// Il calendario è cambiato.
+    Calendar,
 }
 
 pub fn now_secs() -> i64 {

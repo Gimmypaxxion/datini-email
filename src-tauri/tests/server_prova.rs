@@ -489,11 +489,119 @@ async fn regole_e_risposta_automatica() {
     tokio::time::sleep(Duration::from_secs(3)).await;
     eng.sync_now(Some(&altro));
     tokio::time::sleep(Duration::from_secs(3)).await;
-    let replies = eng.messages(altro_inbox.id, None, 0, 1000).unwrap().into_iter().filter(|m| m.subject.starts_with("Risposta automatica:")).count();
+    // Solo le risposte di questa prova: la casella di "altro" non si svuota tra una prova e l'altra.
+    let replies = eng.messages(altro_inbox.id, None, 0, 1000).unwrap().into_iter().filter(|m| m.subject.starts_with(&format!("Risposta automatica: Regola-{tag}"))).count();
     assert_eq!(replies, 1);
     // Il messaggio spostato dalla regola non fa scattare l'avviso.
     assert!(!events.lock().unwrap().iter().any(|e| matches!(e, Event::NewMail { messages, .. } if messages.iter().any(|m| m.subject.starts_with("Regola-")))));
 
     eng.remove_account(&altro).unwrap();
     eng.remove_account(&prova).unwrap();
+}
+
+/// Riunione vera tra due computer: invito da Chiara (IMAP) ad "altro" (POP),
+/// risposta Accetto che torna all'organizzatore, poi annullamento.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn invito_risposta_e_annullamento() {
+    if !enabled() {
+        return;
+    }
+    reseed();
+    let (org, _) = engine();
+    let (ospite, _) = engine();
+    let prova = org
+        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@better-look.test".into(), password: "prova-123".into(), kind: None, incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    let altro = ospite
+        .add_account(NewAccount { name: "Altro".into(), email: "altro@better-look.test".into(), password: "altro-456".into(), kind: Some(AccountKind::Pop3), incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    wait_for("prima sincronizzazione", 60, || {
+        let org = org.clone();
+        let prova = prova.clone();
+        async move { org.status(&prova).state == "pronto" }
+    })
+    .await;
+
+    let tag = better_look_lib::mime::random_id()[..8].to_string();
+    let title = format!("Riunione {tag}");
+    let start = (chrono::Utc::now() + chrono::Duration::days(3)).timestamp_millis() / 60_000 * 60_000;
+    let ev = org
+        .save_event(
+            CalEvent {
+                title: title.clone(),
+                location: "Sala riunioni".into(),
+                start,
+                end: start + 3_600_000,
+                attendees: vec![Attendee { name: "Altro".into(), email: "altro@better-look.test".into(), ..Default::default() }],
+                ..Default::default()
+            },
+            true,
+        )
+        .unwrap();
+    assert_eq!(ev.organizer.as_ref().map(|o| o.email.as_str()), Some("prova@better-look.test"));
+
+    // L'invito arriva all'ospite, che lo accetta.
+    let ospite_inbox = folder(&ospite, &altro, "inbox");
+    wait_for("invito arrivato", 90, || {
+        let ospite = ospite.clone();
+        let altro = altro.clone();
+        let title = title.clone();
+        async move {
+            ospite.sync_now(Some(&altro));
+            find(&ospite, ospite_inbox.id, &title).is_some()
+        }
+    })
+    .await;
+    let msg = find(&ospite, ospite_inbox.id, &title).unwrap();
+    let inv = ospite.detail(msg.id, false).await.unwrap().invite.expect("invito nel messaggio");
+    assert_eq!(inv.method, "request");
+    assert!(inv.for_me && inv.local.is_none());
+    assert_eq!((inv.event.start, inv.event.end, inv.event.uid.clone()), (ev.start, ev.end, ev.uid.clone()));
+    let accepted = ospite.respond_invite(msg.id, better_look_lib::engine::InviteAction::Accepted, true).await.unwrap().unwrap();
+    assert_eq!(accepted.response, Some(PartStat::Accepted));
+
+    // La risposta torna all'organizzatore e aggiorna i partecipanti.
+    let org_inbox = folder(&org, &prova, "inbox");
+    let reply_subject = format!("Accettato: {title}");
+    wait_for("risposta arrivata", 90, || {
+        let org = org.clone();
+        let prova = prova.clone();
+        let reply_subject = reply_subject.clone();
+        async move {
+            org.sync_now(Some(&prova));
+            find(&org, org_inbox.id, &reply_subject).is_some()
+        }
+    })
+    .await;
+    let reply = find(&org, org_inbox.id, &reply_subject).unwrap();
+    let inv = org.detail(reply.id, false).await.unwrap().invite.unwrap();
+    assert_eq!(inv.method, "reply");
+    assert_eq!(inv.replier.unwrap().status, PartStat::Accepted);
+    assert_eq!(org.db.event(&ev.id).unwrap().unwrap().attendees[0].status, PartStat::Accepted);
+
+    // L'organizzatore annulla: l'ospite toglie l'evento dal calendario.
+    org.delete_event(&ev.id, None, true).unwrap();
+    let cancel_subject = format!("Annullato: {title}");
+    wait_for("annullamento arrivato", 90, || {
+        let ospite = ospite.clone();
+        let altro = altro.clone();
+        let cancel_subject = cancel_subject.clone();
+        async move {
+            ospite.sync_now(Some(&altro));
+            find(&ospite, ospite_inbox.id, &cancel_subject).is_some()
+        }
+    })
+    .await;
+    let c = find(&ospite, ospite_inbox.id, &cancel_subject).unwrap();
+    let inv = ospite.detail(c.id, false).await.unwrap().invite.unwrap();
+    assert_eq!(inv.method, "cancel");
+    assert!(inv.local.is_some());
+    ospite.respond_invite(c.id, better_look_lib::engine::InviteAction::Remove, false).await.unwrap();
+    assert!(ospite.db.events_by_uid(&ev.uid).unwrap().is_empty());
 }

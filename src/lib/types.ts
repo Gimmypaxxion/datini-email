@@ -230,6 +230,8 @@ export interface MessageDetail extends MessageSummary {
   attachments: AttachmentInfo[];
   remoteImages: number;
   remoteAllowed: boolean;
+  /** Invito a una riunione contenuto nel messaggio. */
+  invite?: Invite | null;
 }
 
 export interface AttachmentRef {
@@ -298,7 +300,8 @@ export type EngineEvent =
   | { type: 'categories' }
   | { type: 'newMail'; accountId: string; count: number; messages: MessageSummary[] }
   | { type: 'rules' }
-  | { type: 'contacts' };
+  | { type: 'contacts' }
+  | { type: 'calendar' };
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {
@@ -314,4 +317,78 @@ export function errorMessage(e: unknown): string {
 export function errorKind(e: unknown): string {
   if (e && typeof e === 'object' && 'kind' in e) return String((e as EngineError).kind);
   return '';
+}
+
+// ---------- Calendario ----------
+
+/** Risposta di un partecipante a un invito. */
+export type PartStat = 'needs-action' | 'accepted' | 'tentative' | 'declined';
+
+export type RepeatFreq = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface Repeat {
+  freq: RepeatFreq;
+  interval: number;
+  /** Giorni della settimana (0 domenica … 6 sabato). */
+  days: number[];
+  /** Mensile o annuale "il secondo martedì": 1-4, oppure -1 per l'ultimo. */
+  week: number | null;
+  /** Ultimo giorno della serie (ms, compreso). */
+  until: number | null;
+  count: number | null;
+}
+
+export interface Attendee {
+  name: string;
+  email: string;
+  status: PartStat;
+  optional: boolean;
+}
+
+/** Appuntamento o riunione. Per tutto il giorno: mezzanotte del primo giorno e del giorno dopo l'ultimo. */
+export interface CalEvent {
+  id: string;
+  uid: string;
+  title: string;
+  location: string;
+  start: number;
+  end: number;
+  allDay: boolean;
+  repeat: Repeat | null;
+  /** Inizi delle occorrenze tolte dalla serie. */
+  exceptions: number[];
+  /** Occorrenza di una serie modificata a parte: il suo inizio originale. */
+  recurrenceId: number | null;
+  /** Promemoria: minuti prima dell'inizio. */
+  reminder: number | null;
+  notes: string;
+  categories: string[];
+  organizer: Person | null;
+  attendees: Attendee[];
+  /** La mia risposta a un invito ricevuto. */
+  response: PartStat | null;
+  accountId: string | null;
+  sequence: number;
+  cancelled: boolean;
+}
+
+export interface Invite {
+  method: 'request' | 'cancel' | 'reply' | 'publish' | 'counter' | string;
+  event: CalEvent;
+  /** Lo stesso evento già nel calendario. */
+  local: CalEvent | null;
+  /** Nel calendario c'è una versione più recente. */
+  outdated: boolean;
+  /** Per le risposte: chi ha risposto e come. */
+  replier: Attendee | null;
+  /** Sono tra i partecipanti. */
+  forMe: boolean;
+}
+
+export type InviteAction = 'accepted' | 'tentative' | 'declined' | 'add' | 'remove';
+
+export interface CalImport {
+  added: number;
+  updated: number;
+  unchanged: number;
 }

@@ -1151,6 +1151,61 @@ impl Db {
         Ok(out)
     }
 
+    // ---------------- Calendario ----------------
+
+    fn read_events(&self, sql: &str, args: impl rusqlite::Params) -> Result<Vec<CalEvent>> {
+        let c = self.conn();
+        let mut st = c.prepare(sql)?;
+        let rows = st.query_map(args, |r| r.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for json in rows {
+            if let Ok(ev) = serde_json::from_str::<CalEvent>(&json?) {
+                out.push(ev);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Eventi che possono cadere nell'intervallo (ms): quelli singoli che lo
+    /// toccano e le serie iniziate prima della fine e non ancora concluse.
+    pub fn events_between(&self, from: i64, to: i64) -> Result<Vec<CalEvent>> {
+        self.read_events("SELECT data FROM events WHERE start < ?2 AND (until IS NULL OR until > ?1) ORDER BY start", params![from, to])
+    }
+
+    pub fn all_events(&self) -> Result<Vec<CalEvent>> {
+        self.read_events("SELECT data FROM events ORDER BY start", [])
+    }
+
+    pub fn event(&self, id: &str) -> Result<Option<CalEvent>> {
+        Ok(self.read_events("SELECT data FROM events WHERE id = ?1", [id])?.into_iter().next())
+    }
+
+    /// La serie e le sue occorrenze modificate.
+    pub fn events_by_uid(&self, uid: &str) -> Result<Vec<CalEvent>> {
+        self.read_events("SELECT data FROM events WHERE uid = ?1 ORDER BY start", [uid])
+    }
+
+    pub fn save_event(&self, ev: &CalEvent) -> Result<()> {
+        let dur = (ev.end - ev.start).max(0);
+        // Fine della serie, per trovare gli eventi di un intervallo; senza fine (o con
+        // un numero di ripetizioni) si legge sempre.
+        let until = match &ev.repeat {
+            None => Some(ev.end.max(ev.start + 1)),
+            Some(r) if r.count.is_none() => r.until.map(|u| u + dur),
+            Some(_) => None,
+        };
+        self.conn().execute(
+            "INSERT OR REPLACE INTO events(id, uid, start, end, all_day, recurring, until, data, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![ev.id, ev.uid, ev.start, ev.end, ev.all_day, ev.repeat.is_some(), until, serde_json::to_string(ev)?, now_secs()],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_event(&self, id: &str) -> Result<()> {
+        self.conn().execute("DELETE FROM events WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
     // ---------------- Operazioni in attesa ----------------
 
     pub fn push_op(&self, account_id: &str, op: &Op) -> Result<i64> {

@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::engine::{Engine, NewAccount, SavedDraft};
+use crate::engine::{Engine, InviteAction, NewAccount, SavedDraft};
 use crate::error::{Error, Result};
 use crate::model::*;
 
@@ -224,6 +224,42 @@ pub async fn import_contacts(e: E<'_>, path: PathBuf) -> Result<ContactImport> {
 #[tauri::command]
 pub async fn export_contacts(e: E<'_>, path: PathBuf, ids: Option<Vec<String>>) -> Result<usize> {
     e.export_contacts(&path, ids.as_deref())
+}
+
+#[tauri::command]
+pub async fn events(e: E<'_>, from: i64, to: i64) -> Result<Vec<CalEvent>> {
+    e.events(from, to)
+}
+
+#[tauri::command]
+pub async fn save_event(e: E<'_>, event: CalEvent, send: bool) -> Result<CalEvent> {
+    e.save_event(event, send)
+}
+
+#[tauri::command]
+pub async fn delete_event(e: E<'_>, id: String, occurrence: Option<i64>, send: bool) -> Result<()> {
+    e.delete_event(&id, occurrence, send)
+}
+
+#[tauri::command]
+pub async fn respond_invite(e: E<'_>, id: i64, action: InviteAction, send: bool) -> Result<Option<CalEvent>> {
+    e.respond_invite(id, action, send).await
+}
+
+#[tauri::command]
+pub async fn respond_event(e: E<'_>, id: String, action: InviteAction, send: bool) -> Result<Option<CalEvent>> {
+    e.respond_event(&id, action, send)
+}
+
+#[tauri::command]
+pub async fn import_calendar(e: E<'_>, path: PathBuf) -> Result<CalImport> {
+    let eng = e.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || eng.import_calendar(&path)).await.map_err(|err| Error::user(err.to_string()))?
+}
+
+#[tauri::command]
+pub async fn export_calendar(e: E<'_>, path: PathBuf) -> Result<usize> {
+    e.export_calendar(&path)
 }
 
 #[tauri::command]

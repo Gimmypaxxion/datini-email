@@ -12,6 +12,9 @@
   import AccountWizard from './components/AccountWizard.svelte';
   import StatusBar from './components/StatusBar.svelte';
   import ContactsView from './components/ContactsView.svelte';
+  import CalendarView from './components/CalendarView.svelte';
+  import EventEditor from './components/EventEditor.svelte';
+  import Reminders from './components/Reminders.svelte';
   import Icon from './lib/Icon.svelte';
   import { store } from './lib/store.svelte';
   import { setWindowTitle } from './lib/platform';
@@ -64,6 +67,8 @@
     </nav>
     {#if store.module === 'contatti'}
       <ContactsView />
+    {:else if store.module === 'calendario'}
+      <CalendarView />
     {:else}
       {#if store.showFolders}<FolderPane />{/if}
       <MessageList />
@@ -76,6 +81,8 @@
   <Settings />
   <AccountWizard />
   <Onboarding />
+  <EventEditor />
+  <Reminders />
   <ConfirmDialog />
 </div>
 

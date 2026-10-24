@@ -24,6 +24,20 @@
   const rib = $derived(store.activeRibbon);
   const sel = $derived(store.sel);
 
+  let newAnchor = $state<HTMLElement | null>(null);
+  const newItems = [
+    { label: 'Messaggio', icon: 'mail-plus' as const, keys: 'Ctrl+N', onclick: () => store.openCompose('new') },
+    { label: 'Appuntamento', icon: 'calendar-plus' as const, keys: 'Ctrl+Maiusc+A', onclick: () => store.cal.newEvent() },
+    { label: 'Riunione', icon: 'users-group' as const, keys: 'Ctrl+Maiusc+Q', onclick: () => store.cal.newEvent({ meeting: true }) },
+    { label: 'Contatto', icon: 'user-plus' as const, keys: 'Ctrl+Maiusc+C', onclick: () => store.newContact() },
+  ];
+  const VIEWS = [
+    ['giorno', 'calendar-due', 'Giorno', 'Ctrl+Alt+1'],
+    ['settimana-lavorativa', 'briefcase', 'Settimana lavorativa', 'Ctrl+Alt+2'],
+    ['settimana', 'calendar-week', 'Settimana', 'Ctrl+Alt+3'],
+    ['mese', 'calendar-month', 'Mese', 'Ctrl+Alt+4'],
+  ] as const;
+
   let moveAnchor = $state<HTMLElement | null>(null);
   let catAnchor = $state<HTMLElement | null>(null);
   let rulesAnchor = $state<HTMLElement | null>(null);
@@ -69,11 +83,34 @@
         <RB big icon="file-import" tone="c-brand" label="Importa" title="Importa contatti da vCard, CSV o LDIF" onclick={() => store.importContacts()} />
         <RB big icon="file-export" label="Esporta" title="Esporta la rubrica in vCard" disabled={!store.book.length} onclick={() => store.exportContacts()} />
       </div><span class="rgl">Gestisci</span></div>
+    {:else if store.module === 'calendario' && rib === 'home'}
+      {@const cal = store.cal}
+      {@const occ = cal.selected}
+      <div class="rg"><div class="rgb">
+        <RB big alwaysLabel cls="pri" icon="calendar-plus" label="Nuovo appuntamento" title="Nuovo appuntamento (Ctrl+N)" onclick={() => cal.newEvent()} />
+        <RB big icon="users-group" tone="c-brand" label="Nuova riunione" title="Nuova riunione (Ctrl+Maiusc+Q)" onclick={() => cal.newEvent({ meeting: true })} />
+      </div><span class="rgl">Nuovo</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="calendar-event" tone="c-brand" label="Oggi" title="Vai a oggi" onclick={() => cal.today()} />
+      </div><span class="rgl">Vai a</span></div>
+      <div class="rg"><div class="rgb">
+        {#each VIEWS as [v, icon, label, keys] (v)}
+          <RB big icon={icon} tone="c-brand" label={label} title="{label} ({keys})" pressed={cal.view === v} onclick={() => cal.setView(v)} />
+        {/each}
+      </div><span class="rgl">Disponi</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="pencil" tone="c-brand" label="Apri" title="Apri l'appuntamento (Invio)" disabled={!occ} onclick={() => occ && cal.open(occ)} />
+        <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={!occ} onclick={() => occ && cal.remove(occ)} />
+      </div><span class="rgl">Appuntamento</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="file-import" tone="c-brand" label="Importa" title="Importa un calendario (.ics) da Outlook, Google o Apple" onclick={() => cal.importIcs()} />
+        <RB big icon="file-export" label="Esporta" title="Salva il calendario in un file .ics" onclick={() => cal.exportIcs()} />
+      </div><span class="rgl">Gestisci calendari</span></div>
     {:else if rib === 'home'}
       <div class="rg"><div class="rgb">
         <RB big alwaysLabel cls="pri split" icon="mail-plus" label="Nuovo messaggio" title="Nuovo messaggio (Ctrl+N)" onclick={() => store.openCompose('new')} />
-        <button class="rb pri pri-x only-c" aria-label="Altri elementi nuovi" title="Nuovo evento, contatto o attività"><Icon name="chevron-down" size={16} class="chev" /></button>
-        <RB big menu cls="only-e" icon="layout-grid-add" tone="c-brand" label="Nuovi elementi" title="Nuovo evento, contatto o attività" onclick={() => store.soon('Calendario, contatti e attività')} />
+        <button class="rb pri pri-x only-c" aria-label="Altri elementi nuovi" aria-haspopup="menu" aria-expanded={!!newAnchor} title="Nuovo appuntamento, riunione o contatto" onclick={(e) => (newAnchor = newAnchor ? null : e.currentTarget)}><Icon name="chevron-down" size={16} class="chev" /></button>
+        <RB big menu cls="only-e" icon="layout-grid-add" tone="c-brand" label="Nuovi elementi" title="Nuovo appuntamento, riunione o contatto" pressed={!!newAnchor} onclick={(e) => (newAnchor = newAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Nuovo</span></div>
 
       <div class="rg only-e"><div class="rgb">
@@ -98,7 +135,7 @@
           <RB icon="arrow-forward-up" tone="c-brand" label="Inoltra" title="Inoltra (Ctrl+F)" disabled={noSel} onclick={() => store.openCompose('forward')} />
         </div>
         <div class="rs only-e">
-          <RB showLabel={false} icon="calendar-plus" tone="c-brand" label="Rispondi con una riunione" disabled={noSel} onclick={() => store.soon('Rispondi con una riunione')} />
+          <RB showLabel={false} icon="calendar-plus" tone="c-brand" label="Rispondi con una riunione" disabled={noSel || !store.detail} onclick={() => store.meetingFrom()} />
           <RB showLabel={false} menu icon="message-dots" label="Altre risposte" disabled={noSel} onclick={() => store.soon('Altre risposte')} />
         </div>
       </div><span class="rgl">Rispondi</span></div>
@@ -161,6 +198,9 @@
     {/if}
     </div>
 
+    {#if newAnchor}
+      <Menu anchor={newAnchor} items={newItems} label="Nuovi elementi" onclose={() => (newAnchor = null)} />
+    {/if}
     {#if moveAnchor && store.selected}
       <Menu anchor={moveAnchor} items={moveItems(store.selected)} label="Sposta in" onclose={() => (moveAnchor = null)} />
     {/if}

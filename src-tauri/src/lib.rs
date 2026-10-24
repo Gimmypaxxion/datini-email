@@ -5,6 +5,7 @@
 //! riceve le notifiche sull'evento "better-look://evento".
 
 pub mod autoconfig;
+pub mod calendar;
 pub mod commands;
 pub mod contacts;
 pub mod db;
@@ -118,6 +119,13 @@ pub fn run() {
             commands::delete_contacts,
             commands::import_contacts,
             commands::export_contacts,
+            commands::events,
+            commands::save_event,
+            commands::delete_event,
+            commands::respond_invite,
+            commands::respond_event,
+            commands::import_calendar,
+            commands::export_calendar,
             commands::mailbox_usage,
             commands::large_messages,
             commands::older_messages,
