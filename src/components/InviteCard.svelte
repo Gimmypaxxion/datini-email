@@ -18,6 +18,8 @@
   const method = $derived(invite.method);
   const isRequest = $derived(method === 'request');
   const answered = $derived(local?.response && local.response !== 'needs-action' ? local.response : null);
+  /** Invito mandato da me (per esempio aperto da Posta inviata): niente risposta. */
+  const sentByMe = $derived(!!ev.organizer && cal.isMine(ev));
   const day = $derived(new Date(ev.start));
 
   let sendReply = $state(true);
@@ -70,6 +72,10 @@
       return { icon: 'calendar-event', color: 'var(--brand-ink)', text: `${name} ha risposto.` };
     }
     if (invite.outdated) return { icon: 'calendar-time', color: 'var(--ink-3)', text: "Questo invito è superato: nel calendario c'è già una versione più recente." };
+    if (isRequest && sentByMe) {
+      const n = ev.attendees.length;
+      return { icon: 'send', color: 'var(--brand-ink)', text: `Hai invitato ${n === 1 ? '1 partecipante' : `${n} partecipanti`}.` };
+    }
     if (isRequest) {
       if (answered) return { icon: answered === 'declined' ? 'calendar-x' : answered === 'tentative' ? 'calendar-question' : 'calendar-check', color: 'var(--brand-ink)', text: `Hai risposto: ${partStatText(answered).toLowerCase()}.` };
       return { icon: 'calendar-event', color: 'var(--brand-ink)', text: invite.forMe ? 'Non hai ancora risposto.' : 'Invito inoltrato: non sei tra i partecipanti.' };
@@ -99,10 +105,10 @@
     {/if}
 
     <p class="status"><Icon name={head.icon} size={16} style="color:{head.color}" />{head.text}</p>
-    {#if method === 'reply' && local && local.attendees.length}
+    {#if (method === 'reply' || (isRequest && sentByMe)) && local && local.attendees.length}
       <p class="meta tally">Risposte finora: {responsesText(local.attendees)}.</p>
     {/if}
-    {#if isRequest && !invite.outdated && !ev.allDay && method !== 'cancel'}
+    {#if isRequest && !sentByMe && !invite.outdated && !ev.allDay}
       <p class="meta clash" class:busy={clash.length > 0}>
         {#if clash.length}
           <Icon name="alert-triangle" size={15} />In conflitto con {clash.slice(0, 2).map((o) => `“${o.ev.title || 'Senza titolo'}” (${timeText(o.start)}-${timeText(o.end)})`).join(' e ')}{clash.length > 2 ? ` e altri ${clash.length - 2}` : ''}.
@@ -112,7 +118,7 @@
       </p>
     {/if}
 
-    {#if isRequest && !invite.outdated}
+    {#if isRequest && !sentByMe && !invite.outdated}
       <div class="acts" role="group" aria-label="Rispondi all'invito">
         {#each RESP as [a, label, icon] (a)}
           <button class="sec-btn rbtn" aria-pressed={answered === a} disabled={busy} onclick={() => act(a)}><Icon name={icon} size={16} />{label}</button>
