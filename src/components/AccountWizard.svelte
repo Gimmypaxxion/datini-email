@@ -143,7 +143,7 @@
       {:else}
         <header>
           <h2 id="wiz-title">{store.wizard.first ? 'Aggiungi il tuo account di posta' : 'Aggiungi un account'}</h2>
-          <button class="ibtn btn" onclick={close} disabled={step === 'cerco'} aria-label="Chiudi" title="Chiudi (Esc)"><Icon name="x" /></button>
+          <button class="dlg-x" onclick={close} disabled={step === 'cerco'} aria-label="Chiudi" title="Chiudi (Esc)"><Icon name="x" size={18} /></button>
         </header>
         <form class="scroll body" onsubmit={submit} novalidate>
           <p class="intro">Scrivi indirizzo e password: Better-Look trova da solo le impostazioni dei provider più diffusi, come Aruba, Libero, Register.it e Gmail.</p>

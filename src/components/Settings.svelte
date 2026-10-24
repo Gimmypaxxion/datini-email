@@ -6,6 +6,8 @@
   import RulesPage from './RulesPage.svelte';
   import AutoReplyPage from './AutoReplyPage.svelte';
   import CleanupPage from './CleanupPage.svelte';
+  import QuickStepsPage from './QuickStepsPage.svelte';
+  import TemplatesPage from './TemplatesPage.svelte';
   import RichEditor from './RichEditor.svelte';
   import LinkDialog from './LinkDialog.svelte';
   import Popover from './Popover.svelte';
@@ -52,6 +54,16 @@
       pref('compose', 'finestra', 'In una finestra separata', 'Puoi continuare a leggere la posta mentre scrivi.'),
       pref('compose', 'pannello', 'Nel riquadro di lettura', 'Scrivi accanto all’elenco dei messaggi, nella stessa finestra.'),
     ] },
+    { id: 'set-read', legend: 'Riquadro di lettura', opts: [
+      { on: store.readingPane === 'destra', title: 'A destra', text: 'Elenco a sinistra e messaggio a destra, come nella vista predefinita.', pick: () => store.setReadingPane('destra') },
+      { on: store.readingPane === 'basso', title: 'In basso', text: 'Elenco sopra e messaggio sotto: utile sugli schermi stretti.', pick: () => store.setReadingPane('basso') },
+      { on: store.readingPane === 'nascosto', title: 'Nascosto', text: 'Solo l’elenco; il messaggio si apre con doppio clic o Invio.', pick: () => store.setReadingPane('nascosto') },
+    ] },
+    { id: 'set-dens', legend: 'Densità dell’elenco', opts: [
+      { on: store.density === 'ampia', title: 'Ampia', text: 'Più spazio fra i messaggi.', pick: () => store.setDensity('ampia') },
+      { on: store.density === 'media', title: 'Media', text: 'Foto, oggetto e anteprima del testo.', pick: () => store.setDensity('media') },
+      { on: store.density === 'compatta', title: 'Compatta', text: 'Senza foto né anteprima: più messaggi sullo schermo.', pick: () => store.setDensity('compatta') },
+    ] },
     { id: 'set-theme', legend: 'Tema', opts: [
       themeOpt('sistema', 'Come il sistema', 'Chiaro o scuro, seguendo l’impostazione del computer.'),
       themeOpt('chiaro', 'Chiaro', 'Fondo chiaro, adatto alla luce del giorno.'),
@@ -76,12 +88,27 @@
     if (normalizeHex(v)) store.setAccent(v);
   }
 
+  let dlgEl: HTMLDivElement | undefined = $state();
+  let contentEl: HTMLDivElement | undefined = $state();
+
+  // All'apertura il fuoco va alla finestra (non alla X): Esc chiude, Tab entra nei comandi.
+  $effect(() => {
+    if (store.settings && dlgEl && !dlgEl.contains(document.activeElement)) dlgEl.focus();
+  });
+  // Cambiando pagina si riparte dall'alto.
+  $effect(() => {
+    void store.setPage;
+    if (contentEl) contentEl.scrollTop = 0;
+  });
+
   const nav = [
     ['aspetto', 'Aspetto'],
     ['account', 'Account e sincronizzazione'],
     ['composizione', 'Composizione e risposta'],
+    ['modelli', 'Modelli di messaggio'],
     ['categorie', 'Categorie'],
     ['regole', 'Regole e avvisi'],
+    ['azioni', 'Azioni rapide'],
     ['risposte', 'Risposte automatiche'],
     ['pulizia', 'Pulizia cassetta postale'],
     ['info', 'Informazioni su Better-Look'],
@@ -255,6 +282,7 @@
   <div class="scrim fade-in">
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
+      bind:this={dlgEl}
       class="dlg rise"
       role="dialog"
       aria-modal="true"
@@ -274,8 +302,9 @@
           <button class="btn fold navit" data-sel={on ? 'si' : 'no'} aria-current={on ? 'page' : undefined} style:font-weight={on ? 600 : 400} onclick={() => (store.setPage = id)}>{label}</button>
         {/each}
       </nav>
-      <div class="scroll content">
-        <button class="ibtn btn close" onclick={() => (store.settings = false)} aria-label="Chiudi impostazioni" title="Chiudi (Esc)"><Icon name="x" /></button>
+      <div class="pane">
+        <button class="dlg-x close" onclick={() => (store.settings = false)} aria-label="Chiudi impostazioni" title="Chiudi (Esc)"><Icon name="x" size={18} /></button>
+        <div class="scroll content" bind:this={contentEl}>
 
         {#if store.setPage === 'aspetto'}
           <h3>Aspetto</h3>
@@ -590,8 +619,12 @@
               </div>
             </Popover>
           {/if}
+        {:else if store.setPage === 'modelli'}
+          <TemplatesPage />
         {:else if store.setPage === 'regole'}
           <RulesPage />
+        {:else if store.setPage === 'azioni'}
+          <QuickStepsPage />
         {:else if store.setPage === 'risposte'}
           <AutoReplyPage />
         {:else if store.setPage === 'pulizia'}
@@ -600,18 +633,23 @@
           <h3>Informazioni su Better-Look</h3>
           <div style="margin-top:30px"><About /></div>
         {/if}
+        </div>
       </div>
     </div>
   </div>
 {/if}
 
 <style>
-  .dlg { width: min(1000px, 100%); height: min(720px, 100%); display: flex; border-radius: 8px; background: var(--sheet); box-shadow: var(--win-shadow); overflow: hidden; outline: none; }
-  .nav { width: 240px; flex: none; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box; padding: 22px 12px; background: var(--rail); }
-  .nav h2 { margin: 0 0 14px 12px; font-size: 20px; font-weight: 600; }
-  .navit { height: 36px; padding: 0 12px; }
-  .content { position: relative; flex: 1; min-width: 0; overflow: auto; padding: 28px 40px 40px; }
-  .close { position: absolute; top: 16px; right: 16px; }
+  .dlg { width: min(1040px, 100%); height: min(720px, 100%); display: flex; border-radius: 8px; background: var(--sheet); box-shadow: var(--win-shadow); overflow: hidden; outline: none; }
+  .nav { width: 264px; flex: none; display: flex; flex-direction: column; gap: 2px; box-sizing: border-box; padding: 24px 12px; background: var(--rail); overflow-y: auto; }
+  .nav h2 { margin: 0 0 14px 12px; font-size: 20px; font-weight: 600; line-height: 1.3; }
+  .navit { height: 36px; flex: none; padding: 0 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pane { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .content { flex: 1; min-height: 0; overflow: auto; padding: 28px 72px 40px 40px; }
+  /* Ferma in alto a destra, allineata al titolo della pagina, anche quando il contenuto scorre. */
+  .close { position: absolute; top: 26px; right: 20px; z-index: 2; background: var(--sheet); }
+  .close:hover { background: color-mix(in srgb, var(--ink) 6%, var(--sheet)); }
+  .two:has(> :nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 840px; }
   h3 { margin: 0; font-size: 22px; font-weight: 600; }
   h4 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
   h4.tight { margin-bottom: 4px; }

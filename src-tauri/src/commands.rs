@@ -15,6 +15,12 @@ use crate::model::*;
 
 type E<'a> = State<'a, Arc<Engine>>;
 
+/// Esce dal programma (Cmd+Q sul Mac, anche quando il tasto arriva alla pagina).
+#[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 #[tauri::command]
 pub async fn accounts(e: E<'_>) -> Result<Vec<AccountInfo>> {
     e.accounts()
@@ -224,6 +230,82 @@ pub async fn import_contacts(e: E<'_>, path: PathBuf) -> Result<ContactImport> {
 #[tauri::command]
 pub async fn export_contacts(e: E<'_>, path: PathBuf, ids: Option<Vec<String>>) -> Result<usize> {
     e.export_contacts(&path, ids.as_deref())
+}
+
+#[tauri::command]
+pub async fn ignore_thread(e: E<'_>, id: i64, on: bool) -> Result<usize> {
+    e.ignore_thread(id, on).await
+}
+
+#[tauri::command]
+pub async fn thread_ignored(e: E<'_>, id: i64) -> Result<bool> {
+    e.thread_ignored(id)
+}
+
+#[tauri::command]
+pub async fn clean_up(e: E<'_>, id: Option<i64>, folder_id: Option<i64>, subfolders: bool) -> Result<usize> {
+    e.clean_up(id, folder_id, subfolders).await
+}
+
+#[tauri::command]
+pub async fn quick_steps(e: E<'_>) -> Result<Vec<QuickStep>> {
+    e.quick_steps()
+}
+
+#[tauri::command]
+pub async fn save_quick_steps(e: E<'_>, list: Vec<QuickStep>) -> Result<Vec<QuickStep>> {
+    e.save_quick_steps(list)
+}
+
+#[tauri::command]
+pub async fn templates(e: E<'_>) -> Result<Vec<MessageTemplate>> {
+    e.templates()
+}
+
+#[tauri::command]
+pub async fn save_template(e: E<'_>, template: MessageTemplate) -> Result<MessageTemplate> {
+    e.save_template(template)
+}
+
+#[tauri::command]
+pub async fn delete_template(e: E<'_>, id: String) -> Result<()> {
+    e.delete_template(&id)
+}
+
+#[tauri::command]
+pub async fn task_lists(e: E<'_>) -> Result<Vec<TaskList>> {
+    e.task_lists()
+}
+
+#[tauri::command]
+pub async fn save_task_list(e: E<'_>, list: TaskList) -> Result<TaskList> {
+    e.save_task_list(list)
+}
+
+#[tauri::command]
+pub async fn delete_task_list(e: E<'_>, id: String) -> Result<usize> {
+    e.delete_task_list(&id)
+}
+
+#[tauri::command]
+pub async fn tasks(e: E<'_>) -> Result<Vec<Task>> {
+    e.tasks()
+}
+
+/// Restituisce l'attività salvata e quella nuova di una ripetizione.
+#[tauri::command]
+pub async fn save_task(e: E<'_>, task: Task) -> Result<(Task, Option<Task>)> {
+    e.save_task(task)
+}
+
+#[tauri::command]
+pub async fn delete_task(e: E<'_>, id: String) -> Result<()> {
+    e.delete_task(&id)
+}
+
+#[tauri::command]
+pub async fn flagged_messages(e: E<'_>) -> Result<Vec<MessageSummary>> {
+    e.flagged_messages()
 }
 
 #[tauri::command]

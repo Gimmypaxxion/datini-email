@@ -129,3 +129,165 @@ describe('conversazioni', () => {
     expect(s.threadOpen[m.thread!]).toBeUndefined();
   });
 });
+
+describe('scorciatoie sul Mac', () => {
+  it('scrive le scorciatoie con i simboli del Mac', async () => {
+    const { keysText } = await import('../src/lib/platform');
+    expect(keysText('Rispondi a tutti (Ctrl+Maiusc+R)', true)).toBe('Rispondi a tutti (⇧⌘R)');
+    expect(keysText('Leggi ad alta voce (Ctrl+Alt+Spazio)', true)).toBe('Leggi ad alta voce (⌥⌘Spazio)');
+    expect(keysText('Ctrl+1 … Ctrl+4', true)).toBe('⌘1 … ⌘4');
+    expect(keysText('Elimina (Canc)', true)).toBe('Elimina (Canc)');
+    expect(keysText('Rispondi (Ctrl+R)', false)).toBe('Rispondi (Ctrl+R)');
+  });
+});
+
+describe('conversazioni: ignora, pulisci, inoltra come allegato', () => {
+  const until = async (ok: () => unknown) => {
+    for (let i = 0; i < 50 && !ok(); i++) await new Promise((r) => setTimeout(r, 0));
+  };
+
+  it('ignora una conversazione e poi smette', async () => {
+    const s = await fresh();
+    const trash = s.roleFolder('valli', 'deleted')!;
+    const p = s.ignoreConversation(1);
+    await until(() => s.confirm);
+    expect(s.confirm?.title).toBe('Ignora conversazione');
+    s.answer(true);
+    await p;
+    expect(s.threadIgnored).toBe(true);
+    expect(s.toast?.text).toMatch(/2 messaggi spostati in Posta eliminata/);
+    const inTrash = await s.backend.messages(trash.id, null);
+    expect(inTrash.map((m) => m.id).sort()).toEqual([1, 21]);
+    expect(await s.backend.threadIgnored(1)).toBe(true);
+
+    const back = s.ignoreConversation(1);
+    await until(() => s.confirm);
+    expect(s.confirm?.title).toBe('Smetti di ignorare');
+    s.answer(true);
+    await back;
+    expect(s.threadIgnored).toBe(false);
+    expect((await s.backend.messages(trash.id, null)).some((m) => m.id === 1)).toBe(false);
+  });
+
+  it('pulisce i messaggi già riportati in una risposta', async () => {
+    const s = await fresh();
+    const b = s.backend as unknown as { find(id: number): { text: string } };
+    // Il messaggio 1 riporta per intero il 21, al quale risponde.
+    b.find(1).text += `\n\nIl giovedì Chiara Valli ha scritto:\n${b.find(21).text}`;
+    s.sel = 1;
+    const p = s.cleanUp('conversazione');
+    await until(() => s.confirm);
+    expect(s.confirm?.ok).toBe('Pulisci');
+    s.answer(true);
+    await p;
+    expect(s.toast?.text).toMatch(/1 messaggio superfluo/);
+    const trash = s.roleFolder('valli', 'deleted')!;
+    const inTrash = (await s.backend.messages(trash.id, null)).map((m) => m.id);
+    // Il 21 è superfluo; l'1 resta (ha allegati ed è da leggere).
+    expect(inTrash).toContain(21);
+    expect(inTrash).not.toContain(1);
+
+    // Una cartella dove ogni messaggio dice qualcosa di nuovo: nulla da pulire.
+    const again = s.cleanUp('cartella');
+    await until(() => s.confirm);
+    s.answer(true);
+    await again;
+    expect(s.toast?.text).toMatch(/Nessun messaggio da pulire/);
+  });
+
+  it('inoltra un messaggio intero come allegato .eml', async () => {
+    const s = await fresh();
+    await s.forwardAsAttachment(3);
+    expect(s.c?.subject).toBe('I: Campionario tessuti per lo showroom');
+    expect(s.c?.attachments).toHaveLength(1);
+    expect(s.c?.attachments[0]).toMatchObject({ name: 'Campionario tessuti per lo showroom.eml', mime: 'message/rfc822', message: 3 });
+  });
+});
+
+describe('azioni rapide', () => {
+  it('Fatto segna come letto e archivia; Rispondi ed elimina apre la risposta', async () => {
+    const s = await fresh();
+    expect(s.quickSteps.map((q) => q.name)).toEqual(['Fatto', 'Rispondi ed elimina']);
+    const archive = s.roleFolder('valli', 'archive')!;
+    const trash = s.roleFolder('valli', 'deleted')!;
+
+    await s.pickMsg(1);
+    s.runQuickShortcut(1);
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const inArchive = await s.backend.messages(archive.id, null);
+    expect(inArchive.find((m) => m.id === 1)?.unread).toBe(false);
+    expect(s.list.some((m) => m.id === 1)).toBe(false);
+    expect(s.toast?.text).toMatch(/Fatto/);
+
+    await s.pickMsg(3);
+    await s.runQuickStep(s.quickSteps[1]);
+    expect(s.c?.subject).toBe('Re: Campionario tessuti per lo showroom');
+    expect(s.c?.to[0]?.email).toBe('lucia@marchettitessuti.it');
+    expect((await s.backend.messages(trash.id, null)).some((m) => m.id === 3)).toBe(true);
+  });
+
+  it('azione personalizzata: categoria, contrassegno, sposta e inoltro con testo', async () => {
+    const s = await fresh();
+    const clienti = s.folders.find((f) => f.path === 'Clienti')!;
+    const err = await s.saveQuickSteps([
+      ...s.quickSteps,
+      {
+        id: '',
+        name: 'Al commercialista',
+        icon: 'briefcase',
+        shortcut: 3,
+        actions: [
+          { kind: 'categoria', category: 'c3' },
+          { kind: 'contrassegna' },
+          { kind: 'sposta', folder: clienti.id },
+          { kind: 'inoltra', to: [{ name: '', email: 'studio@commercialista.example' }], text: 'Da registrare, grazie.' },
+        ],
+      },
+    ]);
+    expect(err).toBe('');
+    const q = s.quickSteps.find((x) => x.name === 'Al commercialista')!;
+    expect(q.id).not.toBe('');
+    await s.pickMsg(4);
+    await s.runQuickStep(q);
+    const moved = (await s.backend.messages(clienti.id, null)).find((m) => m.id === 4)!;
+    expect(moved.flagged).toBe(true);
+    expect(moved.categories).toContain('c3');
+    expect(s.c?.subject).toMatch(/^I: /);
+    expect(s.c?.to.map((p) => p.email)).toEqual(['studio@commercialista.example']);
+    expect(s.c?.html).toMatch(/^<div>Da registrare, grazie\.<\/div>/);
+
+    // Due spostamenti, o una scorciatoia già presa: errore in parole.
+    expect(await s.saveQuickSteps([{ ...q, actions: [{ kind: 'archivia' }, { kind: 'elimina' }] }])).toMatch(/un solo posto/);
+    expect(await s.saveQuickSteps([...s.quickSteps, { ...q, id: '', name: 'Copia', shortcut: 1 }])).toMatch(/Ctrl\+Maiusc\+1/);
+  });
+});
+
+describe('modelli di messaggio', () => {
+  it('inserisce un modello e salva il messaggio come modello', async () => {
+    const s = await fresh();
+    expect(s.templates.length).toBe(2);
+    await s.openCompose('new');
+    const t = s.templates.find((x) => x.name === 'Richiesta campioni')!;
+    s.insertTemplate(t);
+    expect(s.c?.subject).toBe('Richiesta campioni');
+    expect(s.c?.html).toContain('ci servirebbero i campioni');
+    // L'oggetto già scritto non cambia.
+    s.c!.subject = 'Campioni per Bassano';
+    s.insertTemplate(s.templates[0]);
+    expect(s.c?.subject).toBe('Campioni per Bassano');
+
+    // Salvato come modello: senza firma.
+    expect(await s.saveDraftAsTemplate('Campioni Bassano')).toBe('');
+    const saved = s.templates.find((x) => x.name === 'Campioni Bassano')!;
+    expect(saved.subject).toBe('Campioni per Bassano');
+    expect(saved.html).toContain('ci servirebbero i campioni');
+    expect(saved.html).not.toContain('Ufficio acquisti');
+
+    // Stesso nome: sostituisce.
+    expect(await s.saveDraftAsTemplate('campioni bassano')).toBe('');
+    expect(s.templates.filter((x) => x.name.toLowerCase() === 'campioni bassano').length).toBe(1);
+    await s.deleteTemplate(saved.id);
+    expect(s.templates.some((x) => x.id === saved.id)).toBe(false);
+  });
+});

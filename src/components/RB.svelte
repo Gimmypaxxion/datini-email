@@ -3,6 +3,7 @@
   // estesa e compatta: è il CSS di .rib[data-mode] a cambiarne la forma.
   import Icon from '../lib/Icon.svelte';
   import type { IconName } from '../lib/icons';
+  import { keysText } from '../lib/platform';
 
   let {
     icon,
@@ -41,7 +42,7 @@
 <button
   class="rb {big ? 'big' : ''} {iconOnly ? 'ico' : ''} {cls}"
   {disabled}
-  title={title ?? label}
+  title={keysText(title ?? label)}
   aria-label={label}
   aria-pressed={pressed}
   {onclick}

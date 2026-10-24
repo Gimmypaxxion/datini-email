@@ -7,6 +7,7 @@
   // o dopo aver scelto una voce; le frecce spostano il fuoco tra le voci.
   import Icon from '../lib/Icon.svelte';
   import type { MenuItem } from '../lib/menus';
+  import { keysText } from '../lib/platform';
 
   let {
     anchor,
@@ -41,7 +42,8 @@
     const gap = at ? 0 : 4;
     pos = {
       left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)),
-      top: r.bottom + gap + h > window.innerHeight - 8 ? Math.max(8, r.top - h - gap) : r.bottom + gap,
+      // Sotto se c'è posto, altrimenti sopra; se non basta nessuno dei due, il più in basso possibile.
+      top: r.bottom + gap + h <= window.innerHeight - 8 ? r.bottom + gap : r.top - h - gap >= 8 ? r.top - h - gap : Math.max(8, window.innerHeight - h - 8),
     };
     el?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
     const away = (e: MouseEvent) => {
@@ -94,7 +96,7 @@
       >
         {#if it.swatch}<span class="menu-sw" style:background={it.swatch} aria-hidden="true"></span>{:else if it.icon}<Icon name={it.icon} size={17} />{/if}
         <span class="lab">{it.label}</span>
-        {#if it.keys}<span class="menu-k">{it.keys}</span>{/if}
+        {#if it.keys}<span class="menu-k">{keysText(it.keys)}</span>{/if}
         {#if it.checked}<Icon name="check" size={16} class="menu-ck" />{/if}
       </button>
     {/if}

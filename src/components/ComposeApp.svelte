@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fitGroups } from '../lib/fit';
   // Finestra del sistema per scrivere un messaggio, come in Outlook classico.
   // Riceve la bozza dalla finestra principale; chiudendola la bozza va in
   // Bozze, inviando parte (con qualche secondo per annullare dalla finestra
@@ -76,7 +77,7 @@
         {/each}
       </nav>
       <div class="rib" data-mode={store.prefs.ribbon} role="toolbar" aria-label="Comandi del messaggio">
-        <RibbonCompose tab={store.winTab} />
+        <div class="rib-groups" use:fitGroups><RibbonCompose tab={store.winTab} /></div>
       </div>
     </div>
     <div class="content">

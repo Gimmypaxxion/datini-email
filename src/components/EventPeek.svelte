@@ -31,7 +31,7 @@
   <div class="pk-h">
     <span class="sw" aria-hidden="true"></span>
     <h3>{ev.title || 'Senza titolo'}</h3>
-    <button class="ibtn btn" onclick={onclose} aria-label="Chiudi"><Icon name="x" size={16} /></button>
+    <button class="dlg-x" onclick={onclose} aria-label="Chiudi" title="Chiudi (Esc)"><Icon name="x" size={16} /></button>
   </div>
   {#if ev.cancelled}<p class="cancel">L'organizzatore ha annullato questo evento.</p>{/if}
   <ul class="facts">
@@ -71,7 +71,7 @@
   .pk-h { display: flex; align-items: flex-start; gap: 10px; }
   .sw { width: 12px; height: 12px; flex: none; margin-top: 6px; border-radius: 3px; background: var(--ev-line); }
   h3 { flex: 1; min-width: 0; margin: 0; padding-top: 1px; font-size: 16px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
-  .pk-h .ibtn { width: 28px; height: 28px; margin: -2px -6px 0 0; }
+  .pk-h .dlg-x { width: 28px; height: 28px; margin: -2px -6px 0 0; }
   .cancel { margin: 8px 0 0; font-size: 13.5px; color: var(--danger); }
   .facts { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--ink); }
   .facts li { display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; }

@@ -7,8 +7,11 @@
   import Icon from '../lib/Icon.svelte';
   import Menu from './Menu.svelte';
   import { store, type RibbonTab } from '../lib/store.svelte';
-  import { categoryItems, moveItems } from '../lib/menus';
+  import { categoryItems, moveItems, quickItems } from '../lib/menus';
+  import { iconOr } from '../lib/icons';
+  import { dayKey, dueChoices } from '../lib/tasks';
   import { REPO_URL } from '../lib/platform';
+  import { fitGroups } from '../lib/fit';
 
   const TAB_NAMES: Record<RibbonTab, string> = {
     home: 'Home',
@@ -30,6 +33,7 @@
     { label: 'Appuntamento', icon: 'calendar-plus' as const, keys: 'Ctrl+Maiusc+A', onclick: () => store.cal.newEvent() },
     { label: 'Riunione', icon: 'users-group' as const, keys: 'Ctrl+Maiusc+Q', onclick: () => store.cal.newEvent({ meeting: true }) },
     { label: 'Contatto', icon: 'user-plus' as const, keys: 'Ctrl+Maiusc+C', onclick: () => store.newContact() },
+    { label: 'Attività', icon: 'playlist-add' as const, keys: 'Ctrl+Maiusc+K', onclick: () => store.tasks.newTask() },
   ];
   const VIEWS = [
     ['giorno', 'calendar-due', 'Giorno', 'Ctrl+Alt+1'],
@@ -37,6 +41,34 @@
     ['settimana', 'calendar-week', 'Settimana', 'Ctrl+Alt+3'],
     ['mese', 'calendar-month', 'Mese', 'Ctrl+Alt+4'],
   ] as const;
+
+  let paneAnchor = $state<HTMLElement | null>(null);
+  let densAnchor = $state<HTMLElement | null>(null);
+  const paneItems = $derived([
+    { label: 'A destra', icon: 'layout-sidebar-right' as const, checked: store.readingPane === 'destra', onclick: () => store.setReadingPane('destra') },
+    { label: 'In basso', icon: 'layout-rows' as const, checked: store.readingPane === 'basso', onclick: () => store.setReadingPane('basso') },
+    { label: 'Nascosto', icon: 'layout-list' as const, checked: store.readingPane === 'nascosto', onclick: () => store.setReadingPane('nascosto') },
+  ]);
+  const densItems = $derived([
+    { label: 'Ampia', checked: store.density === 'ampia', onclick: () => store.setDensity('ampia') },
+    { label: 'Media', checked: store.density === 'media', onclick: () => store.setDensity('media') },
+    { label: 'Compatta', checked: store.density === 'compatta', onclick: () => store.setDensity('compatta') },
+  ]);
+
+  let cleanAnchor = $state<HTMLElement | null>(null);
+  const cleanItems = $derived([
+    { label: 'Pulisci conversazione', icon: 'messages' as const, disabled: noSel, onclick: () => store.cleanUp('conversazione') },
+    { label: 'Pulisci cartella', icon: 'folder' as const, onclick: () => store.cleanUp('cartella') },
+    { label: 'Pulisci cartella e sottocartelle', icon: 'folders' as const, onclick: () => store.cleanUp('sottocartelle') },
+  ]);
+  let moreAnchor = $state<HTMLElement | null>(null);
+  const moreItems = $derived([
+    { label: 'Inoltra come allegato', icon: 'paperclip' as const, keys: 'Ctrl+Alt+F', onclick: () => store.forwardAsAttachment() },
+    { label: 'Rispondi con una riunione', icon: 'calendar-plus' as const, disabled: !store.detail, onclick: () => store.meetingFrom() },
+  ]);
+
+  let quickAnchor = $state<HTMLElement | null>(null);
+  const quickMenu = $derived(quickItems(noSel));
 
   let moveAnchor = $state<HTMLElement | null>(null);
   let catAnchor = $state<HTMLElement | null>(null);
@@ -66,7 +98,7 @@
   </nav>
 
   <div class="rib" data-mode={store.prefs.ribbon} role="toolbar" aria-label="Comandi">
-    <div class="rib-groups">
+    <div class="rib-groups" use:fitGroups>
     {#if store.module === 'contatti' && rib === 'home'}
       {@const ct = store.selectedContact}
       <div class="rg"><div class="rgb">
@@ -90,7 +122,7 @@
         <RB big alwaysLabel cls="pri" icon="calendar-plus" label="Nuovo appuntamento" title="Nuovo appuntamento (Ctrl+N)" onclick={() => cal.newEvent()} />
         <RB big icon="users-group" tone="c-brand" label="Nuova riunione" title="Nuova riunione (Ctrl+Maiusc+Q)" onclick={() => cal.newEvent({ meeting: true })} />
       </div><span class="rgl">Nuovo</span></div>
-      <div class="rg"><div class="rgb">
+      <div class="rg" data-drop="2"><div class="rgb">
         <RB big icon="calendar-event" tone="c-brand" label="Oggi" title="Vai a oggi" onclick={() => cal.today()} />
       </div><span class="rgl">Vai a</span></div>
       <div class="rg"><div class="rgb">
@@ -98,7 +130,7 @@
           <RB big icon={icon} tone="c-brand" label={label} title="{label} ({keys})" pressed={cal.view === v} onclick={() => cal.setView(v)} />
         {/each}
       </div><span class="rgl">Disponi</span></div>
-      <div class="rg"><div class="rgb">
+      <div class="rg" data-drop="1"><div class="rgb">
         <RB big icon="pencil" tone="c-brand" label="Apri" title="Apri l'appuntamento (Invio)" disabled={!occ} onclick={() => occ && cal.open(occ)} />
         <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={!occ} onclick={() => occ && cal.remove(occ)} />
       </div><span class="rgl">Appuntamento</span></div>
@@ -106,21 +138,43 @@
         <RB big icon="file-import" tone="c-brand" label="Importa" title="Importa un calendario (.ics) da Outlook, Google o Apple" onclick={() => cal.importIcs()} />
         <RB big icon="file-export" label="Esporta" title="Salva il calendario in un file .ics" onclick={() => cal.exportIcs()} />
       </div><span class="rgl">Gestisci calendari</span></div>
+    {:else if store.module === 'attivita' && rib === 'home'}
+      {@const tk = store.tasks}
+      {@const t = tk.selected}
+      {@const myDay = !!t && t.myDay === dayKey(tk.now)}
+      <div class="rg"><div class="rgb">
+        <RB big alwaysLabel cls="pri" icon="playlist-add" label="Nuova attività" title="Nuova attività (Ctrl+N)" onclick={() => tk.newTask()} />
+        <RB big icon="list" tone="c-brand" label="Nuovo elenco" title="Nuovo elenco di attività" onclick={() => tk.startNewList()} />
+      </div><span class="rgl">Nuovo</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="circle-check" tone="c-green" label={t?.done ? 'Da fare' : 'Completata'} title={t?.done ? 'Segna come da fare' : 'Segna come completata'} disabled={!t} onclick={() => t && tk.toggleDone(t)} />
+        <RB big icon={t?.important ? 'star-filled' : 'star'} tone="c-brand" label="Importante" title="Importante (Ins)" disabled={!t} pressed={!!t?.important} onclick={() => t && tk.toggleImportant(t)} />
+        <RB big icon="sun" tone="c-amber" label="La mia giornata" title={myDay ? 'Togli da La mia giornata' : 'Aggiungi a La mia giornata'} disabled={!t} pressed={myDay} onclick={() => t && tk.toggleMyDay(t)} />
+        <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={!t} onclick={() => t && tk.remove(t)} />
+      </div><span class="rgl">Gestisci</span></div>
+      <div class="rg" data-drop="1"><div class="rgb"><div class="rs">
+        {#each dueChoices(tk.now) as c (c.label)}
+          <RB icon="calendar-due" tone="c-brand" label={c.label} title="Scade {c.label.toLowerCase()} ({c.hint})" disabled={!t} onclick={() => t && tk.setDue(t, c.at)} />
+        {/each}
+      </div></div><span class="rgl">Scadenza</span></div>
+      <div class="rg" data-drop="2"><div class="rgb">
+        <RB big icon="checklist" tone="c-brand" label="Completate" title={tk.doneOpen ? 'Nascondi le attività completate' : 'Mostra le attività completate'} pressed={tk.doneOpen} onclick={() => (tk.doneOpen = !tk.doneOpen)} />
+      </div><span class="rgl">Visualizza</span></div>
     {:else if rib === 'home'}
       <div class="rg"><div class="rgb">
         <RB big alwaysLabel cls="pri split" icon="mail-plus" label="Nuovo messaggio" title="Nuovo messaggio (Ctrl+N)" onclick={() => store.openCompose('new')} />
-        <button class="rb pri pri-x only-c" aria-label="Altri elementi nuovi" aria-haspopup="menu" aria-expanded={!!newAnchor} title="Nuovo appuntamento, riunione o contatto" onclick={(e) => (newAnchor = newAnchor ? null : e.currentTarget)}><Icon name="chevron-down" size={16} class="chev" /></button>
-        <RB big menu cls="only-e" icon="layout-grid-add" tone="c-brand" label="Nuovi elementi" title="Nuovo appuntamento, riunione o contatto" pressed={!!newAnchor} onclick={(e) => (newAnchor = newAnchor ? null : (e.currentTarget as HTMLElement))} />
+        <button class="rb pri pri-x only-c" aria-label="Altri elementi nuovi" aria-haspopup="menu" aria-expanded={!!newAnchor} title="Nuovo appuntamento, riunione, contatto o attività" onclick={(e) => (newAnchor = newAnchor ? null : e.currentTarget)}><Icon name="chevron-down" size={16} class="chev" /></button>
+        <RB big menu cls="only-e" icon="layout-grid-add" tone="c-brand" label="Nuovi elementi" title="Nuovo appuntamento, riunione, contatto o attività" pressed={!!newAnchor} onclick={(e) => (newAnchor = newAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Nuovo</span></div>
 
-      <div class="rg only-e"><div class="rgb">
+      <div class="rg only-e" data-drop="6"><div class="rgb">
         <RB big icon="refresh" tone="c-brand" label="Invia e ricevi" title="Invia/Ricevi tutte le cartelle (F9)" onclick={() => store.syncNow()} />
       </div><span class="rgl">Aggiorna</span></div>
 
       <div class="rg"><div class="rgb">
         <div class="rs only-e">
-          <RB showLabel={false} icon="mail-off" label="Ignora conversazione" disabled={noSel} onclick={() => store.soon('Ignora conversazione')} />
-          <RB showLabel={false} menu icon="eraser" tone="c-amber" label="Pulisci conversazione" disabled={noSel} onclick={() => store.soon('Pulisci conversazione')} />
+          <RB showLabel={false} icon="mail-off" label="Ignora conversazione" title={store.threadIgnored ? 'Smetti di ignorare questa conversazione' : 'Ignora conversazione: questa e le risposte future vanno in Posta eliminata'} disabled={noSel} pressed={store.threadIgnored} onclick={() => store.ignoreConversation()} />
+          <RB showLabel={false} menu icon="eraser" tone="c-amber" label="Pulisci" title="Pulisci: togli i messaggi già riportati nelle risposte" disabled={!store.currentFolder} pressed={!!cleanAnchor} onclick={(e) => (cleanAnchor = cleanAnchor ? null : (e.currentTarget as HTMLElement))} />
           <RB showLabel={false} menu icon="ban" tone="c-red" label="Posta indesiderata" title="Segnala come posta indesiderata" disabled={noSel} onclick={() => store.moveMsg(sel, 'junk')} />
         </div>
         <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={noSel} onclick={() => store.deleteMsg(sel)} />
@@ -136,12 +190,19 @@
         </div>
         <div class="rs only-e">
           <RB showLabel={false} icon="calendar-plus" tone="c-brand" label="Rispondi con una riunione" disabled={noSel || !store.detail} onclick={() => store.meetingFrom()} />
-          <RB showLabel={false} menu icon="message-dots" label="Altre risposte" disabled={noSel} onclick={() => store.soon('Altre risposte')} />
+          <RB showLabel={false} menu icon="message-dots" label="Altro" title="Altre risposte" disabled={noSel} pressed={!!moreAnchor} onclick={(e) => (moreAnchor = moreAnchor ? null : (e.currentTarget as HTMLElement))} />
         </div>
       </div><span class="rgl">Rispondi</span></div>
 
-      <div class="rg only-e"><div class="rgb">
-        <RB big menu icon="bolt" tone="c-amber" label="Azioni rapide" title="Azioni rapide: più passaggi con un clic" onclick={() => store.soon('Azioni rapide')} />
+      <div class="rg" data-drop="5"><div class="rgb">
+        {#if store.quickSteps.length}
+          <div class="rs only-e qs-gal">
+            {#each store.quickSteps.slice(0, 3) as q (q.id)}
+              <RB icon={iconOr(q.icon, 'bolt')} tone="c-brand" label={q.name} title={q.shortcut ? `${q.name} (Ctrl+Maiusc+${q.shortcut})` : q.name} disabled={noSel} onclick={() => store.runQuickStep(q)} />
+            {/each}
+          </div>
+        {/if}
+        <RB big menu icon="bolt" tone="c-amber" label="Azioni rapide" title="Azioni rapide: più passaggi con un clic" pressed={!!quickAnchor} onclick={(e) => (quickAnchor = quickAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Azioni rapide</span></div>
 
       <div class="rg"><div class="rgb">
@@ -155,28 +216,28 @@
         <RB icon="flag" tone="c-red" label="Contrassegna" title="Contrassegna (Ins)" disabled={noSel} onclick={() => store.toggleFlag(sel)} />
       </div></div><span class="rgl">Tag</span></div>
 
-      <div class="rg only-e p2"><div class="rgb">
+      <div class="rg only-e" data-drop="4"><div class="rgb">
         <RB big menu icon="search" label="Trova" title="Cerca persone, rubrica e filtri della posta" onclick={() => document.querySelector<HTMLInputElement>('.search input')?.focus()} />
       </div><span class="rgl">Trova</span></div>
 
-      <div class="rg only-e p1"><div class="rgb">
+      <div class="rg only-e" data-drop="3"><div class="rgb">
         <RB big icon={store.speech === 'off' ? 'volume' : 'player-stop'} tone="c-brand" label={store.speech === 'off' ? 'Leggi ad alta voce' : 'Interrompi la lettura'} title="Leggi ad alta voce il messaggio (Ctrl+Alt+Spazio)" disabled={noSel && store.speech === 'off'} pressed={store.speech !== 'off'} onclick={() => store.toggleSpeech()} />
       </div><span class="rgl">Comandi vocali</span></div>
 
-      <div class="rg only-e p1"><div class="rgb">
+      <div class="rg only-e" data-drop="2"><div class="rgb">
         <RB big icon="language" tone="c-brand" label="Traduci" title="Traduci il messaggio" onclick={() => store.soon('Traduci')} />
       </div><span class="rgl">Lingua</span></div>
 
-      <div class="rg only-e p2"><div class="rgb">
+      <div class="rg only-e" data-drop="1"><div class="rgb">
         <RB big icon="puzzle" tone="c-brand" label="Tutte le estensioni" title="Estensioni installate" onclick={() => store.soon('Estensioni')} />
       </div><span class="rgl">Estensioni</span></div>
     {:else if rib === 'visualizza'}
       <div class="rg"><div class="rgb">
         <RB big icon="layout-sidebar" tone="c-brand" label="Riquadro cartelle" pressed={store.showFolders} onclick={() => store.toggleFolders()} />
-        <RB big menu icon="layout-sidebar-right" tone="c-brand" label="Riquadro di lettura" onclick={() => store.soon('Posizione del riquadro di lettura')} />
+        <RB big menu icon="layout-sidebar-right" tone="c-brand" label="Riquadro di lettura" title="Riquadro di lettura: a destra, in basso o nascosto" pressed={!!paneAnchor} onclick={(e) => (paneAnchor = paneAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Layout</span></div>
       <div class="rg"><div class="rgb">
-        <RB big menu icon="layout-rows" label="Densità" onclick={() => store.soon('Densità')} />
+        <RB big menu icon="layout-rows" label="Densità" title="Spazio fra le righe dell'elenco" pressed={!!densAnchor} onclick={(e) => (densAnchor = densAnchor ? null : (e.currentTarget as HTMLElement))} />
         <RB big icon="messages" label="Conversazioni" title="Mostra i messaggi raggruppati per conversazione" pressed={store.conversations} onclick={() => store.toggleConversations()} />
       </div><span class="rgl">Elenco messaggi</span></div>
       <div class="rg"><div class="rgb">
@@ -198,11 +259,26 @@
     {/if}
     </div>
 
+    {#if paneAnchor}
+      <Menu anchor={paneAnchor} items={paneItems} label="Riquadro di lettura" onclose={() => (paneAnchor = null)} />
+    {/if}
+    {#if densAnchor}
+      <Menu anchor={densAnchor} items={densItems} label="Densità" onclose={() => (densAnchor = null)} />
+    {/if}
     {#if newAnchor}
       <Menu anchor={newAnchor} items={newItems} label="Nuovi elementi" onclose={() => (newAnchor = null)} />
     {/if}
     {#if moveAnchor && store.selected}
       <Menu anchor={moveAnchor} items={moveItems(store.selected)} label="Sposta in" onclose={() => (moveAnchor = null)} />
+    {/if}
+    {#if quickAnchor}
+      <Menu anchor={quickAnchor} items={quickMenu} label="Azioni rapide" onclose={() => (quickAnchor = null)} />
+    {/if}
+    {#if cleanAnchor}
+      <Menu anchor={cleanAnchor} items={cleanItems} label="Pulisci" onclose={() => (cleanAnchor = null)} />
+    {/if}
+    {#if moreAnchor && store.selected}
+      <Menu anchor={moreAnchor} items={moreItems} label="Altre risposte" onclose={() => (moreAnchor = null)} />
     {/if}
     {#if rulesAnchor}
       <Menu anchor={rulesAnchor} items={rulesItems} label="Regole" onclose={() => (rulesAnchor = null)} />
@@ -219,4 +295,7 @@
 <style>
   .ribbon-wrap { flex: none; background: var(--ground); padding: 0 10px 8px; }
   .file-tab { padding: 0 14px; color: var(--brand-ink); font-weight: 600; }
+  /* Le prime azioni rapide, come la raccolta di Outlook: nomi lunghi accorciati. */
+  .qs-gal :global(.rb) { max-width: 168px; }
+  .qs-gal :global(.rb .lbl) { overflow: hidden; text-overflow: ellipsis; }
 </style>

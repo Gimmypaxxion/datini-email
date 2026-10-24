@@ -2,7 +2,9 @@
 // comandi, stessi eventi) ma senza rete: serve nel browser e nei test.
 
 import type { Backend, Tab } from './backend';
-import { mockData, mockEvents, type MockMessage } from './mock';
+import { mockData, mockEvents, mockTasks, mockTemplates, type MockMessage } from './mock';
+import { checkQuickSteps, defaultQuickSteps } from './quicksteps';
+import { nextTaskDate } from './tasks';
 import { addDays, isMine } from './calendar';
 import { textToHtml } from './compose-html';
 import { hasActions, ruleMatches } from './rules';
@@ -31,6 +33,10 @@ import type {
   Role,
   SavedDraft,
   Signature,
+  QuickStep,
+  MessageTemplate,
+  Task,
+  TaskList,
 } from './types';
 
 export const UNDO_MS = 7000;
@@ -112,6 +118,10 @@ export class MockBackend implements Backend {
   private ruleList: Rule[] = [];
   private book: Contact[] = SAMPLE_CONTACTS.map((c) => ({ ...c, emails: [...c.emails], phones: c.phones.map((p) => ({ ...p })) }));
   private cal: CalEvent[];
+  private quick: QuickStep[] = defaultQuickSteps();
+  private tpls: MessageTemplate[] = mockTemplates();
+  private taskLists_: TaskList[];
+  private taskItems: Task[];
   /** Messaggi di calendario messi in uscita (inviti, risposte, annullamenti), per i test. */
   itip: { method: string; to: string[]; subject: string; event: CalEvent }[] = [];
   /** Avvisi sul desktop mandati (per i test). */
@@ -125,6 +135,9 @@ export class MockBackend implements Backend {
     this.folderList = d.folders;
     this.msgs = d.messages;
     this.cal = mockEvents(now);
+    const t = mockTasks(now);
+    this.taskLists_ = t.lists;
+    this.taskItems = t.tasks;
   }
 
   private emit(e: EngineEvent) {
@@ -659,6 +672,166 @@ export class MockBackend implements Backend {
 
   async exportContacts(ids: string[] | null) {
     return ids ? ids.length : this.book.length;
+  }
+
+  // ---------- Conversazioni ----------
+
+  private ignored = new Set<string>();
+
+  private threadKey(m: MockMessage) {
+    return `${m.accountId}|${m.thread ?? `#${m.id}`}`;
+  }
+
+  private sameThread(m: MockMessage, x: MockMessage) {
+    return x.accountId === m.accountId && (m.thread ? x.thread === m.thread : x.id === m.id);
+  }
+
+  async ignoreThread(messageId: number, on: boolean) {
+    const m = this.find(messageId);
+    const trash = this.roleFolder(m.accountId, 'deleted').id;
+    if (on) {
+      this.ignored.add(this.threadKey(m));
+      const ids = this.msgs.filter((x) => this.sameThread(m, x) && x.folderId !== trash && !x.draft && x.folderId !== -1).map((x) => x.id);
+      if (ids.length) await this.moveToRole(ids, 'deleted');
+      return ids.length;
+    }
+    this.ignored.delete(this.threadKey(m));
+    const ids = this.msgs.filter((x) => this.sameThread(m, x) && x.folderId === trash).map((x) => x.id);
+    if (ids.length) await this.moveToRole(ids, 'inbox');
+    return ids.length;
+  }
+
+  async threadIgnored(messageId: number) {
+    return this.ignored.has(this.threadKey(this.find(messageId)));
+  }
+
+  async cleanUp(messageId: number | null, folderId: number | null, subfolders: boolean) {
+    // Come il motore: un messaggio letto, senza contrassegno né allegati, il cui testo
+    // compare per intero in un messaggio più recente della stessa conversazione.
+    const inside = (f: number): boolean => {
+      if (f === folderId) return true;
+      if (!subfolders || folderId === null) return false;
+      const parent = this.folderList.find((x) => x.id === folderId);
+      const child = this.folderList.find((x) => x.id === f);
+      return !!parent && !!child && child.accountId === parent.accountId && child.path.startsWith(`${parent.path}/`);
+    };
+    const pool = messageId !== null ? this.threadOf(this.find(messageId)) : this.msgs.filter((m) => inside(m.folderId));
+    const own = (m: MockMessage) => m.text.replace(/\s+/g, ' ').trim();
+    const done = pool.filter((m) => {
+      const t = own(m);
+      if (m.unread || m.flagged || m.hasAttachments || m.draft || t.length < 20) return false;
+      return this.msgs.some((x) => x.id !== m.id && this.sameThread(m, x) && x.date > m.date && own(x).includes(t));
+    });
+    if (done.length) await this.moveToRole(done.map((m) => m.id), 'deleted');
+    return done.length;
+  }
+
+  // ---------- Azioni rapide e modelli ----------
+
+  async quickSteps() {
+    return clone(this.quick);
+  }
+
+  async saveQuickSteps(list: QuickStep[]) {
+    const bad = checkQuickSteps(list);
+    if (bad) throw err('utente', bad);
+    const out = clone(list).map((q) => ({ ...q, name: q.name.trim(), id: q.id || `q${this.nextId++}`, icon: q.icon || 'bolt' }));
+    this.quick = out;
+    this.emit({ type: 'quickSteps' });
+    return clone(out);
+  }
+
+  async templates() {
+    return clone(this.tpls);
+  }
+
+  async saveTemplate(t: MessageTemplate) {
+    const name = t.name.trim();
+    if (!name) throw err('utente', 'Dai un nome al modello.');
+    const saved = { ...clone(t), name, id: t.id || `m${this.nextId++}` };
+    const i = this.tpls.findIndex((x) => x.id === saved.id);
+    if (i >= 0) this.tpls[i] = saved;
+    else this.tpls.push(saved);
+    this.tpls.sort((a, b) => a.name.localeCompare(b.name, 'it'));
+    this.emit({ type: 'templates' });
+    return clone(saved);
+  }
+
+  async deleteTemplate(id: string) {
+    this.tpls = this.tpls.filter((t) => t.id !== id);
+    this.emit({ type: 'templates' });
+  }
+
+  // ---------- Attività ----------
+
+  async taskLists() {
+    return clone(this.taskLists_);
+  }
+
+  async saveTaskList(l: TaskList) {
+    const name = l.name.trim();
+    if (!name) throw err('utente', "Dai un nome all'elenco.");
+    const found = this.taskLists_.find((x) => l.id && x.id === l.id);
+    let out: TaskList;
+    if (found) {
+      found.name = name;
+      out = found;
+    } else {
+      out = { id: `l${this.nextId++}`, name };
+      this.taskLists_.push(out);
+    }
+    this.emit({ type: 'tasks' });
+    return clone(out);
+  }
+
+  async deleteTaskList(id: string) {
+    if (!id) throw err('utente', "L'elenco Attività non si può eliminare.");
+    this.taskLists_ = this.taskLists_.filter((l) => l.id !== id);
+    const before = this.taskItems.length;
+    this.taskItems = this.taskItems.filter((t) => t.list !== id);
+    this.emit({ type: 'tasks' });
+    return before - this.taskItems.length;
+  }
+
+  async tasks() {
+    return clone(this.taskItems);
+  }
+
+  async saveTask(input: Task): Promise<[Task, Task | null]> {
+    const t = clone(input);
+    t.title = t.title.trim();
+    if (!t.title) throw err('utente', "Scrivi che cosa c'è da fare.");
+    if (t.list && !this.taskLists_.some((l) => l.id === t.list)) t.list = '';
+    t.steps = t.steps.filter((s) => s.title.trim()).map((s) => ({ ...s, title: s.title.trim(), id: s.id || `s${this.nextId++}` }));
+    const old = t.id ? this.taskItems.find((x) => x.id === t.id) : undefined;
+    if (!t.id) t.id = `t${this.nextId++}`;
+    if (!t.created) t.created = old?.created || Date.now();
+    t.doneAt = t.done ? (t.doneAt ?? Date.now()) : null;
+    let next: Task | null = null;
+    if (t.done && !old?.done && t.repeat && t.due !== null) {
+      const nd = nextTaskDate(t.due, t.repeat);
+      next = { ...clone(t), id: `t${this.nextId++}`, due: nd, reminder: t.reminder === null ? null : t.reminder + (nd - t.due), done: false, doneAt: null, myDay: null, created: Date.now(), steps: t.steps.map((s) => ({ ...s, done: false })) };
+      t.repeat = null;
+      this.taskItems.push(next);
+    }
+    const i = this.taskItems.findIndex((x) => x.id === t.id);
+    if (i >= 0) this.taskItems[i] = t;
+    else this.taskItems.push(t);
+    this.emit({ type: 'tasks' });
+    return [clone(t), next ? clone(next) : null];
+  }
+
+  async deleteTask(id: string) {
+    this.taskItems = this.taskItems.filter((t) => t.id !== id);
+    this.emit({ type: 'tasks' });
+  }
+
+  async flaggedMessages() {
+    const skip = new Set(this.folderList.filter((f) => f.role === 'deleted' || f.role === 'junk').map((f) => f.id));
+    return this.msgs
+      .filter((m) => m.flagged && !m.draft && !skip.has(m.folderId) && m.folderId !== -1)
+      .sort((a, b) => b.date - a.date)
+      .map((m) => ({ ...summary(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
   }
 
   // ---------- Calendario ----------

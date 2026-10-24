@@ -7,7 +7,7 @@
   import Menu from './Menu.svelte';
   import Toast from './Toast.svelte';
   import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
-  import { categoryItems, messageItems, moveItems, type MenuItem } from '../lib/menus';
+  import { categoryItems, messageItems, moveItems, quickItems, type MenuItem } from '../lib/menus';
   import { GROUP_ORDER, groupLabel, initials, listTime, peopleText, personLabel, tint, whenText } from '../lib/format';
   import type { MessageSummary, Role } from '../lib/types';
 
@@ -98,10 +98,15 @@
     e.preventDefault();
     const el = e.currentTarget as HTMLElement;
     const at = { x: e.clientX, y: e.clientY };
-    const sub = (kind: 'categorie' | 'sposta') => {
+    const sub = (kind: 'categorie' | 'sposta' | 'azioni') => {
       // Il secondo menu si apre nello stesso punto, appena chiuso il primo.
       setTimeout(() => {
-        ctx = kind === 'categorie' ? { el, ...at, items: categoryItems(m), label: 'Categorizza' } : { el, ...at, items: moveItems(m), label: 'Sposta in' };
+        ctx =
+          kind === 'categorie'
+            ? { el, ...at, items: categoryItems(m), label: 'Categorizza' }
+            : kind === 'azioni'
+              ? { el, ...at, items: quickItems(false, m.id), label: 'Azioni rapide' }
+              : { el, ...at, items: moveItems(m), label: 'Sposta in' };
       }, 0);
     };
     ctx = { el, ...at, items: messageItems(m, sub), label: 'Azioni sul messaggio' };
@@ -152,11 +157,12 @@
       oncontextmenu={(e) => openMenu(e, m)}
       onkeydown={(e) => menuKey(e, m)}
       onclick={() => store.pickMsg(m.id)}
+      ondblclick={() => store.readingPane === 'nascosto' && store.openFull(m.id)}
       aria-current={on ? 'true' : undefined}
       aria-label={`${unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${many ? `Conversazione di ${conv!.count} messaggi. ` : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
     >
       <span class="bar" aria-hidden="true" style:background={unread ? 'var(--brand)' : 'transparent'}></span>
-      <span class="avatar" aria-hidden="true" style="width:36px;height:36px;font-size:13px;background:{t.bg};color:{t.fg}">{initials(name)}</span>
+      <span class="avatar pic" aria-hidden="true" style="background:{t.bg};color:{t.fg}">{initials(name)}</span>
       <span class="txt">
         <span class="l1">
           <span class="from" style:font-weight={unread ? 600 : 400}>{name}</span>
@@ -204,6 +210,7 @@
       oncontextmenu={(e) => openMenu(e, k)}
       onkeydown={(e) => menuKey(e, k)}
       onclick={() => store.pickMsg(k.id)}
+      ondblclick={() => store.readingPane === 'nascosto' && store.openFull(k.id)}
       aria-current={on ? 'true' : undefined}
       aria-label={`${k.unread ? 'Non letto. ' : ''}${personLabel(k.from)}, ${listTime(k.date, now)}${elsewhere ? `, in ${folderOf(k)}` : ''}`}
     >
@@ -223,7 +230,7 @@
   </div>
 {/snippet}
 
-<section class="pane-list" aria-label="Elenco messaggi" aria-busy={store.listLoading}>
+<section class="pane-list" data-density={store.density} aria-label="Elenco messaggi" aria-busy={store.listLoading}>
   {#if store.offline}
     <div role="status" class="note-bar warn">
       <Icon name="wifi-off" style="color:var(--warn)" />
@@ -278,7 +285,7 @@
       {#each outbox as o (o.id)}
         <div class="row" data-sel="no">
           <div class="row-main out">
-            <span class="avatar" aria-hidden="true" style="width:36px;height:36px;background:var(--brand-soft);color:var(--brand-ink)"><Icon name={o.state === 'errore' ? 'mail-exclamation' : 'mail-up'} size={18} /></span>
+            <span class="avatar pic" aria-hidden="true" style="background:var(--brand-soft);color:var(--brand-ink)"><Icon name={o.state === 'errore' ? 'mail-exclamation' : 'mail-up'} size={18} /></span>
             <span class="txt">
               <span class="l1"><span class="from">{o.to.length ? peopleText(o.to) : 'Nessun destinatario'}</span></span>
               <span class="l2"><span class="subj">{o.subject || '(nessun oggetto)'}</span></span>
@@ -338,7 +345,7 @@
 </section>
 
 <style>
-  .pane-list { position: relative; width: 420px; flex: none; min-height: 0; display: flex; flex-direction: column; margin: 0 0 10px; border-radius: 8px; background: var(--sheet); box-shadow: var(--sheet-shadow); overflow: hidden; }
+  .pane-list { container: lista / inline-size; position: relative; width: var(--list-w, 420px); flex: none; min-height: 0; display: flex; flex-direction: column; margin: 0 0 10px; border-radius: 8px; background: var(--sheet); box-shadow: var(--sheet-shadow); overflow: hidden; }
   .head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 0 16px; }
   h1 { margin: 0; flex: 1; min-width: 0; font-size: 18px; font-weight: 600; line-height: 34px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .tabs { display: flex; gap: 18px; padding: 2px 16px 0; box-shadow: inset 0 -1px 0 var(--rule); }
@@ -374,5 +381,37 @@
   .ghost { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 12px 18px 12px 20px; }
   .lines { display: flex; flex-direction: column; gap: 7px; padding-top: 2px; }
   .more { padding: 14px 20px; }
+  /* Densità (Visualizza › Densità): ampia con più aria, compatta senza foto e anteprima. */
+  .pane-list[data-density="ampia"] :global(.row-main) { padding-top: 14px; padding-bottom: 15px; column-gap: 14px; }
+  .pane-list[data-density="ampia"] .txt { gap: 3px; }
+  .pane-list[data-density="compatta"] :global(.row-main) { grid-template-columns: minmax(0, 1fr); padding-top: 6px; padding-bottom: 7px; }
+  .pane-list[data-density="compatta"] .avatar, .pane-list[data-density="compatta"] .prev { display: none; }
+  .pane-list[data-density="compatta"] .l3:not(:has(.cat)) { display: none; }
+  .pane-list[data-density="compatta"] .bar { top: 6px; bottom: 6px; }
+  .pane-list[data-density="compatta"] .row.kid :global(.row-main) { padding-left: 34px; }
+  .pane-list[data-density="compatta"] .row.kid .bar { left: 22px; }
+  .pane-list[data-density="compatta"] .group { margin-top: 8px; }
+  .pane-list[data-density="compatta"] .tog { top: 9px; }
+  .pic { width: 36px; height: 36px; font-size: 13px; }
+  /* Elenco largo (riquadro in basso o nascosto): una riga per messaggio, come in Outlook. */
+  @container lista (min-width: 780px) {
+    .row:not(.kid) :global(.row-main) { grid-template-columns: 28px minmax(0, 1fr); align-items: center; padding-top: 7px; padding-bottom: 7px; }
+    .pic { width: 28px; height: 28px; font-size: 11px; }
+    .txt { flex-direction: row; align-items: center; gap: 14px; }
+    .l1 { display: contents; }
+    .from { flex: 0 0 clamp(150px, 22%, 240px); }
+    .time { order: 9; flex: 0 0 84px; text-align: right; }
+    .l2 { flex: 0 1 auto; max-width: 40%; min-width: 0; }
+    .l3 { flex: 1 1 0; }
+    .bar { top: 8px; bottom: 8px; }
+    .tog { top: 9px; }
+    .row-acts { top: 3px; }
+    .row.kid :global(.row-main) { padding-left: 54px; }
+    .row.kid .bar { left: 42px; }
+    .pane-list[data-density="ampia"] :global(.row-main) { padding-top: 10px; padding-bottom: 10px; }
+    .pane-list[data-density="compatta"] :global(.row-main) { padding-top: 4px; padding-bottom: 4px; }
+    .pane-list[data-density="compatta"] .row:not(.kid) :global(.row-main) { grid-template-columns: minmax(0, 1fr); }
+    .pane-list[data-density="compatta"] .l3 { display: flex; }
+  }
   @media (max-width: 760px) { .pane-list { width: auto; flex: 1 1 auto; margin-right: 10px; } }
 </style>

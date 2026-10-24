@@ -258,6 +258,36 @@ pub fn add_days_local(ms: i64, n: i64) -> i64 {
     local_ms(dt + Duration::days(n))
 }
 
+/// Stesso giorno `n` mesi dopo; se quel mese è più corto, l'ultimo giorno.
+fn plus_months(d: NaiveDate, n: i32) -> Option<NaiveDate> {
+    let total = d.year() * 12 + d.month0() as i32 + n;
+    let (y, m) = (total.div_euclid(12), total.rem_euclid(12) as u32 + 1);
+    let last = NaiveDate::from_ymd_opt(if m == 12 { y + 1 } else { y }, if m == 12 { 1 } else { m + 1 }, 1)?.pred_opt()?.day();
+    NaiveDate::from_ymd_opt(y, m, d.day().min(last))
+}
+
+/// Prossima data di un'attività ripetuta (daily, weekdays, weekly, monthly,
+/// yearly), alla stessa ora locale.
+pub fn next_task_date(ms: i64, repeat: &str) -> Option<i64> {
+    let dt = local_dt(ms);
+    let d = dt.date();
+    let next = match repeat {
+        "daily" => d.succ_opt()?,
+        "weekdays" => {
+            let mut n = d.succ_opt()?;
+            while matches!(n.weekday(), Weekday::Sat | Weekday::Sun) {
+                n = n.succ_opt()?;
+            }
+            n
+        }
+        "weekly" => d + Duration::days(7),
+        "monthly" => plus_months(d, 1)?,
+        "yearly" => plus_months(d, 12)?,
+        _ => return None,
+    };
+    Some(local_ms(next.and_time(dt.time())))
+}
+
 /// Durata ISO 8601 ("-PT15M", "P1D", "PT1H30M") in millisecondi.
 fn parse_duration(v: &str) -> Option<i64> {
     let v = v.trim();

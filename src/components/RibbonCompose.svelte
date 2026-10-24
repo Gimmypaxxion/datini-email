@@ -10,13 +10,14 @@
   import Menu, { type MenuItem } from './Menu.svelte';
   import Popover from './Popover.svelte';
   import SchedulePicker from './SchedulePicker.svelte';
+  import TemplatePicker from './TemplatePicker.svelte';
   import type { IconName } from '../lib/icons';
   import { store } from '../lib/store.svelte';
   import { FONTS, HIGHLIGHTS, SIZES, STANDARD_COLORS, THEME_COLORS, composeEditor as ed, fontStack } from '../lib/editor.svelte';
 
   let { tab }: { tab: 'messaggio' | 'inserisci' | 'formato' } = $props();
 
-  type PopKind = 'font' | 'size' | 'color' | 'hl' | 'table' | 'sig' | 'case' | 'spacing';
+  type PopKind = 'font' | 'size' | 'color' | 'hl' | 'table' | 'sig' | 'tpl' | 'case' | 'spacing';
   let pop = $state<{ kind: PopKind; anchor: HTMLElement } | null>(null);
   let schedOpen = $state(false);
   let schedEl = $state<HTMLElement | null>(null);
@@ -31,6 +32,7 @@
     const a = e.currentTarget as HTMLElement;
     pop = pop?.kind === kind ? null : { kind, anchor: a };
     if (kind === 'sig') void store.reloadSignatures();
+    if (kind === 'tpl') void store.reloadTemplates();
   }
   const close = () => (pop = null);
   const keep = (e: MouseEvent) => e.preventDefault();
@@ -157,9 +159,10 @@
     <RB big icon="paperclip" tone="c-brand" label="Allega file" title="Allega file" onclick={() => store.addFiles()} />
     <RB big icon="link" tone="c-brand" label="Collegamento" title="Inserisci collegamento (Ctrl+K)" onclick={(e) => store.openLinkDialog(e.currentTarget as HTMLElement)} disabled={!ed.ready} />
     <RB big menu icon="signature" tone="c-brand" label="Firma" title="Inserisci una firma" pressed={pop?.kind === 'sig'} onclick={(e) => open('sig', e)} />
+    <RB big menu icon="template" tone="c-brand" label="Modelli" title="I miei modelli: testi da riusare" disabled={!store.c} pressed={pop?.kind === 'tpl'} onclick={(e) => open('tpl', e)} />
   </div><span class="rgl">Includi</span></div>
 
-  <div class="rg only-e"><div class="rgb">
+  <div class="rg only-e" data-drop="1"><div class="rgb">
     <RB big menu icon="clock" tone="c-brand" label="Invio programmato" title="Ritarda il recapito: scegli quando inviare" disabled={!store.c} pressed={schedOpen} onclick={(e) => { schedEl = e.currentTarget as HTMLElement; schedOpen = !schedOpen; }} />
   </div><span class="rgl">Invio</span></div>
 {:else if tab === 'formato'}
@@ -209,17 +212,18 @@
   <div class="rg"><div class="rgb">
     <RB big icon="paperclip" tone="c-brand" label="Allega file" title="Allega file" onclick={() => store.addFiles()} />
     <RB big menu icon="signature" tone="c-brand" label="Firma" title="Inserisci una firma" pressed={pop?.kind === 'sig'} onclick={(e) => open('sig', e)} />
+    <RB big menu icon="template" tone="c-brand" label="Modelli" title="I miei modelli: testi da riusare" disabled={!store.c} pressed={pop?.kind === 'tpl'} onclick={(e) => open('tpl', e)} />
   </div><span class="rgl">Includi</span></div>
-  <div class="rg"><div class="rgb">
+  <div class="rg" data-drop="4"><div class="rgb">
     <RB big menu icon="table" tone="c-brand" label="Tabella" title="Inserisci tabella" pressed={pop?.kind === 'table'} onclick={(e) => open('table', e)} disabled={!ed.ready} />
   </div><span class="rgl">Tabelle</span></div>
-  <div class="rg"><div class="rgb">
+  <div class="rg" data-drop="3"><div class="rgb">
     <RB big icon="photo" tone="c-green" label="Immagini" title="Inserisci un'immagine dal computer" onclick={() => imgInput?.click()} disabled={!ed.ready} />
   </div><span class="rgl">Illustrazioni</span></div>
-  <div class="rg"><div class="rgb">
+  <div class="rg" data-drop="2"><div class="rgb">
     <RB big icon="link" tone="c-brand" label="Collegamento" title="Inserisci collegamento (Ctrl+K)" onclick={(e) => store.openLinkDialog(e.currentTarget as HTMLElement)} disabled={!ed.ready} />
   </div><span class="rgl">Collegamenti</span></div>
-  <div class="rg"><div class="rgb">
+  <div class="rg" data-drop="1"><div class="rgb">
     <RB big icon="separator-horizontal" label="Linea orizzontale" title="Inserisci una linea orizzontale" onclick={() => ed.insertLine()} disabled={!ed.ready} />
   </div><span class="rgl">Simboli</span></div>
 {/if}
@@ -229,6 +233,10 @@
 
 {#if pop?.kind === 'sig'}
   <Menu anchor={pop.anchor} items={sigItems} label="Firme" onclose={close} />
+{:else if pop?.kind === 'tpl'}
+  <Popover anchor={pop.anchor} onclose={close} label="I miei modelli">
+    <TemplatePicker onclose={close} />
+  </Popover>
 {:else if pop?.kind === 'case'}
   <Menu anchor={pop.anchor} items={caseItems} label="Maiuscole/minuscole" onclose={close} />
 {:else if pop?.kind === 'spacing'}

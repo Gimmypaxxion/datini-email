@@ -15,6 +15,13 @@
       Contatti: {store.contactQuery.trim() ? `${store.filteredContacts.length} di ${store.book.length}` : store.book.length}
     {:else if store.module === 'calendario'}
       {store.cal.query.trim() ? `Risultati: ${store.cal.found.length}` : `Elementi: ${store.cal.occs.length}`}
+    {:else if store.module === 'attivita'}
+      {@const tk = store.tasks}
+      {#if tk.view === 'contrassegnati'}
+        Messaggi contrassegnati: {tk.shownFlagged.length}
+      {:else}
+        {tk.query.trim() ? 'Risultati' : 'Da fare'}: {tk.shown.open.length}{#if tk.shown.done.length}<span class="gap"></span>Completate: {tk.shown.done.length}{/if}
+      {/if}
     {:else if store.q.trim()}
       Risultati: {store.list.length}
     {:else if store.view === 'uscita'}

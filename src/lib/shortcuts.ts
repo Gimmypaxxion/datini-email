@@ -3,6 +3,7 @@
 // in un campo di testo, per non interferire con la digitazione.
 
 import { store } from './store.svelte';
+import { isMac, quitApp } from './platform';
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -11,9 +12,15 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }): void {
+  const key = e.key.toLowerCase();
+  // Sul Mac Cmd+Q, Cmd+W, Cmd+H e Cmd+M sono del sistema (esci, chiudi,
+  // nascondi, riduci): non vanno mai intercettati, altrimenti non arrivano al menu.
+  if (isMac && e.metaKey && !e.ctrlKey && (key === 'q' || key === 'w' || key === 'h' || key === 'm')) {
+    if (key === 'q' && !e.shiftKey && !e.altKey) void quitApp();
+    return;
+  }
   if (store.onboarding) return;
   const ctrl = e.ctrlKey || e.metaKey;
-  const key = e.key.toLowerCase();
   const typing = isTyping(e.target);
   const overlay = store.settings || store.backstage || store.wizard.open || !!store.confirm || !!store.cal.edit;
 
@@ -24,19 +31,33 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   if (e.key === 'Escape') {
     if (store.settings) store.settings = false;
     else if (store.backstage) store.backstage = false;
+    else if (store.fullRead && !typing && !store.confirm) store.closeFull();
+    else if (store.module === 'attivita' && store.tasks.sel && !typing && !store.confirm) store.tasks.sel = null;
     return;
   }
   if (overlay) return;
 
-  // Posta, Calendario, Contatti, come in Outlook.
-  if (ctrl && !e.shiftKey && !e.altKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
+  // Cmd+, apre le impostazioni, come in ogni programma per Mac.
+  if (isMac && e.metaKey && e.key === ',') {
     e.preventDefault();
-    store.setModule(e.key === '1' ? 'posta' : e.key === '2' ? 'calendario' : 'contatti');
+    store.openSettings();
+    return;
+  }
+
+  // Posta, Calendario, Contatti, come in Outlook.
+  if (ctrl && !e.shiftKey && !e.altKey && /^Digit[1-4]$/.test(e.code)) {
+    e.preventDefault();
+    store.setModule((['posta', 'calendario', 'contatti', 'attivita'] as const)[Number(e.code.slice(5)) - 1]);
     return;
   }
   if (ctrl && e.shiftKey && key === 'c') {
     e.preventDefault();
     store.newContact();
+    return;
+  }
+  if (ctrl && e.shiftKey && key === 'k') {
+    e.preventDefault();
+    store.tasks.newTask();
     return;
   }
   // Nuovo appuntamento e nuova riunione, da qualsiasi parte del programma.
@@ -48,9 +69,10 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   if (store.module === 'calendario') {
     const cal = store.cal;
     const views = ['giorno', 'settimana-lavorativa', 'settimana', 'mese'] as const;
-    if (ctrl && e.altKey && /^[1-4]$/.test(e.key)) {
+    if (ctrl && e.altKey && /^Digit[1-4]$/.test(e.code)) {
+      // Con il codice del tasto: sul Mac Opzione+1 scrive un simbolo.
       e.preventDefault();
-      cal.setView(views[Number(e.key) - 1]);
+      cal.setView(views[Number(e.code.slice(5)) - 1]);
     } else if (ctrl && !e.shiftKey && key === 'n') {
       e.preventDefault();
       cal.newEvent();
@@ -68,6 +90,23 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
       void cal.open(cal.selected);
     } else if (ctrl && e.key === 'p') {
       e.preventDefault();
+    }
+    return;
+  }
+  if (store.module === 'attivita') {
+    const tk = store.tasks;
+    if (ctrl && !e.shiftKey && key === 'n') {
+      e.preventDefault();
+      tk.newTask();
+    } else if (ctrl && key === 'e') {
+      e.preventDefault();
+      ui.focusSearch();
+    } else if (!typing && !ctrl && e.key === 'Delete' && tk.selected && !(e.target instanceof HTMLButtonElement && e.target.closest('.trow'))) {
+      e.preventDefault();
+      void tk.remove(tk.selected);
+    } else if (!typing && !ctrl && e.key === 'Insert' && tk.selected) {
+      e.preventDefault();
+      void tk.toggleImportant(tk.selected);
     }
     return;
   }
@@ -118,8 +157,21 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   }
   if (typing) return;
 
+  // Riquadro di lettura nascosto: Invio apre il messaggio al posto dell'elenco.
+  if (!ctrl && e.key === 'Enter' && store.readingPane === 'nascosto' && store.sel !== null && !store.fullRead) {
+    store.openFull();
+    return;
+  }
+
   if (ctrl && key === 'r') {
     void store.openCompose(e.shiftKey ? 'replyAll' : 'reply');
+  } else if (ctrl && e.shiftKey && !e.altKey && /^Digit[1-9]$/.test(e.code)) {
+    // Azioni rapide, come in Outlook.
+    e.preventDefault();
+    if (store.module === 'posta' && store.sel !== null) store.runQuickShortcut(Number(e.code.slice(5)));
+  } else if (ctrl && e.altKey && e.code === 'KeyF') {
+    e.preventDefault();
+    void store.forwardAsAttachment();
   } else if (ctrl && key === 'f') {
     void store.openCompose('forward');
   } else if (ctrl && e.shiftKey && key === 'v') {

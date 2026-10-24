@@ -402,6 +402,9 @@ pub struct DraftAttachment {
     /// Allegato di un messaggio già in archivio (inoltro, bozze riaperte).
     #[serde(default)]
     pub source: Option<AttachmentRef>,
+    /// Un intero messaggio dell'archivio, allegato come .eml (Inoltra come allegato).
+    #[serde(default)]
+    pub message: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -652,6 +655,88 @@ pub struct CalImport {
     pub unchanged: u32,
 }
 
+/// Un passaggio di un'azione rapida. `kind` è uno di: sposta, archivia,
+/// elimina, letto, da-leggere, contrassegna, togli-contrassegno, categoria,
+/// togli-categorie, rispondi, rispondi-tutti, inoltra, inoltra-allegato,
+/// ignora. Le azioni le esegue l'interfaccia con i comandi di sempre.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct QuickAction {
+    pub kind: String,
+    /// Cartella di destinazione (sposta).
+    pub folder: Option<i64>,
+    /// Categoria da assegnare (categoria).
+    pub category: Option<String>,
+    /// Destinatari già scritti (inoltra, inoltra-allegato).
+    pub to: Vec<Person>,
+    /// Testo da aggiungere all'inizio della risposta o dell'inoltro.
+    pub text: Option<String>,
+}
+
+/// Azione rapida: più passaggi con un clic, come in Outlook.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct QuickStep {
+    pub id: String,
+    pub name: String,
+    /// Nome dell'icona (Tabler) mostrata nella barra.
+    pub icon: String,
+    /// Ctrl+Maiusc+1..9.
+    pub shortcut: Option<u8>,
+    pub actions: Vec<QuickAction>,
+}
+
+/// Modello di messaggio (I miei modelli): oggetto e testo da inserire.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MessageTemplate {
+    pub id: String,
+    pub name: String,
+    pub subject: String,
+    pub html: String,
+}
+
+/// Elenco di attività creato dall'utente (gli elenchi intelligenti non si salvano).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TaskList {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TaskStep {
+    pub id: String,
+    pub title: String,
+    pub done: bool,
+}
+
+/// Attività (modulo Attività). Le date sono millisecondi in ora locale:
+/// `due` è l'inizio del giorno di scadenza, `reminder` l'istante del promemoria.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Task {
+    pub id: String,
+    /// Elenco dell'utente; vuoto per l'elenco Attività.
+    pub list: String,
+    pub title: String,
+    pub notes: String,
+    pub important: bool,
+    /// Giorno (AAAA-MM-GG) in cui è stata aggiunta a La mia giornata.
+    pub my_day: Option<String>,
+    pub due: Option<i64>,
+    pub reminder: Option<i64>,
+    /// Ripetizione semplice: daily, weekdays, weekly, monthly, yearly.
+    pub repeat: Option<String>,
+    pub steps: Vec<TaskStep>,
+    pub done: bool,
+    pub done_at: Option<i64>,
+    pub created: i64,
+    /// Messaggio da cui è nata l'attività, se c'è.
+    pub message: Option<i64>,
+}
+
 /// Spazio occupato da una cartella (Pulizia cassetta postale).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -690,6 +775,11 @@ pub enum Event {
     Contacts,
     /// Il calendario è cambiato.
     Calendar,
+    /// Azioni rapide o modelli di messaggio cambiati.
+    QuickSteps,
+    Templates,
+    /// Le attività sono cambiate.
+    Tasks,
 }
 
 pub fn now_secs() -> i64 {

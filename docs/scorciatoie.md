@@ -1,6 +1,8 @@
 # Scorciatoie da tastiera
 
-Better-Look usa le stesse scorciatoie di Outlook in italiano. Su macOS, al posto di **Ctrl** si può usare anche **Cmd**.
+Better-Look usa le stesse scorciatoie di Outlook in italiano. Su macOS, al posto di **Ctrl** si può usare anche **Cmd**: nei suggerimenti dei pulsanti le scorciatoie compaiono già con i simboli del Mac (⌘, ⇧, ⌥).
+
+Sul Mac valgono anche le scorciatoie del sistema: **Cmd+Q** chiude Better-Look, **Cmd+H** lo nasconde, **Cmd+M** riduce la finestra a icona e **Cmd+,** apre le impostazioni.
 
 Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegnare...) funzionano quando non stai scrivendo in un campo di testo, così non disturbano la digitazione.
 
@@ -12,6 +14,7 @@ Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegna
 | Rispondi | Ctrl+R |
 | Rispondi a tutti | Ctrl+Maiusc+R |
 | Inoltra | Ctrl+F |
+| Inoltra come allegato | Ctrl+Alt+F |
 | Elimina | Canc |
 | Archivia | Backspace |
 | Contrassegna o togli il contrassegno | Ins |
@@ -20,6 +23,9 @@ Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegna
 | Messaggio successivo o precedente | Freccia giù / Freccia su |
 | Invia e ricevi | F9 |
 | Cerca | Ctrl+E |
+| Azioni rapide | Ctrl+Maiusc+1 … Ctrl+Maiusc+9 |
+| Apri il messaggio (riquadro di lettura nascosto) | Invio, oppure doppio clic |
+| Torna all'elenco (riquadro di lettura nascosto) | Esc |
 | Chiudi il menu File o le impostazioni | Esc |
 
 ## Mentre scrivi un messaggio
@@ -50,9 +56,11 @@ Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegna
 | Posta | Ctrl+1 |
 | Calendario | Ctrl+2 |
 | Contatti | Ctrl+3 |
+| Attività | Ctrl+4 |
 | Nuovo appuntamento (da qualsiasi modulo) | Ctrl+Maiusc+A |
 | Nuova riunione (da qualsiasi modulo) | Ctrl+Maiusc+Q |
 | Nuovo contatto (da qualsiasi modulo) | Ctrl+Maiusc+C |
+| Nuova attività (da qualsiasi modulo) | Ctrl+Maiusc+K |
 
 ## Altre azioni sulla posta
 
@@ -84,3 +92,14 @@ Le scorciatoie che agiscono su un messaggio (rispondere, eliminare, contrassegna
 | Nuovo contatto | Ctrl+N |
 | Cerca nei contatti | Ctrl+E |
 | Elimina il contatto selezionato | Canc |
+
+## Attività
+
+| Azione | Scorciatoia |
+|---|---|
+| Nuova attività | Ctrl+N (scrivi il titolo e premi Invio) |
+| Segna come importante o togli l'importanza | Ins |
+| Elimina l'attività aperta | Canc |
+| Chiudi i dettagli dell'attività | Esc |
+| Cerca nelle attività | Ctrl+E |
+| Rinomina l'elenco selezionato | F2 |

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fitGroups } from '../lib/fit';
   // Messaggio in una finestra interna all'app. Nell'app installata i messaggi
   // si aprono in una vera finestra del sistema (ComposeApp.svelte): questa
   // resta per l'anteprima nel browser.
@@ -37,7 +38,7 @@
         {/each}
       </nav>
       <div class="rib" data-mode={store.prefs.ribbon} role="toolbar" aria-label="Comandi del messaggio">
-        <RibbonCompose tab={store.winTab} />
+        <div class="rib-groups" use:fitGroups><RibbonCompose tab={store.winTab} /></div>
       </div>
     </div>
     <div class="content">

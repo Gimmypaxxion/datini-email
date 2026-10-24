@@ -3,8 +3,8 @@
 // test. Nell'app installata i dati arrivano dal motore di posta in Rust.
 // Le date sono relative a oggi, così i gruppi dell'elenco restano sensati.
 
-import type { Account, AttachmentInfo, CalEvent, Folder, MessageDetail, Person, Role } from './types';
-import { addDays, emptyEvent, startOfWeek } from './calendar';
+import type { Account, AttachmentInfo, CalEvent, Folder, MessageDetail, MessageTemplate, Person, Role, Task, TaskList } from './types';
+import { addDays, dateInput, emptyEvent, startOfWeek } from './calendar';
 
 export const ME: Person = { name: 'Chiara Valli', email: 'chiara.valli@valliarredi.it' };
 export const ORDINI: Person = { name: 'Ordini Valli Arredi', email: 'ordini@valliarredi.it' };
@@ -188,6 +188,38 @@ export function mockEvents(now = new Date()): CalEvent[] {
     e('ev9', day(1, 3), day(1, 6), { title: 'Ferie di Sara', allDay: true, reminder: null }),
     e('ev10', new Date(1985, 2, 9).getTime(), new Date(1985, 2, 10).getTime(), { title: 'Compleanno di Lucia Marchetti', allDay: true, reminder: 1440, repeat: { freq: 'yearly', interval: 1, days: [], week: null, until: null, count: null } }),
     e('ev11', weekAt(now, 1, 2, 11), weekAt(now, 1, 2, 12), { title: 'Bozza del catalogo: approvazione', location: 'Tipografia Gualtieri', reminder: 60 }),
+  ];
+}
+
+/** Attività di esempio: un elenco dell'utente e qualche cosa da fare. */
+export function mockTasks(now = new Date()): { lists: TaskList[]; tasks: Task[] } {
+  const day = (n: number, h = 0) => {
+    const d = new Date(now);
+    d.setHours(h, 0, 0, 0);
+    d.setDate(d.getDate() + n);
+    return d.getTime();
+  };
+  const today = dateInput(now.getTime());
+  const t = (id: string, over: Partial<Task>): Task => ({ id, list: '', title: '', notes: '', important: false, myDay: null, due: null, reminder: null, repeat: null, steps: [], done: false, doneAt: null, created: day(-3, 9), message: null, ...over });
+  return {
+    lists: [{ id: 'l-bassano', name: 'Uffici Bassano' }],
+    tasks: [
+      t('t1', { title: 'Confermare il preventivo rev. 3 al cliente', list: 'l-bassano', important: true, myDay: today, due: day(0), reminder: day(1, 9), created: day(-1, 8), steps: [{ id: 's1', title: 'Controllare le cassettiere', done: true }, { id: 's2', title: 'Chiedere i campioni del rovere', done: false }] }),
+      t('t2', { title: 'Ordinare i campioni 30x30', list: 'l-bassano', due: day(2), notes: 'Rovere naturale, spazzolato e termotrattato.', created: day(-2, 10) }),
+      t('t3', { title: 'Mandare le fatture passive allo studio', important: true, due: day(-1), created: day(-5, 11), repeat: 'monthly' }),
+      t('t4', { title: 'Richiamare la tipografia per il catalogo', myDay: today, created: day(0, 8) }),
+      t('t5', { title: 'Prenotare il furgone per la fiera', due: day(9), created: day(-4, 16) }),
+      t('t6', { title: 'Aggiornare il listino tessuti', done: true, doneAt: day(-1, 17), created: day(-6, 9) }),
+      t('t7', { title: 'Inviare le misure delle lampade', list: 'l-bassano', done: true, doneAt: day(-2, 12), created: day(-7, 9) }),
+    ],
+  };
+}
+
+/** Modelli di messaggio di esempio. */
+export function mockTemplates(): MessageTemplate[] {
+  return [
+    { id: 'm1', name: 'Conferma d’ordine', subject: 'Conferma d’ordine', html: '<div>Buongiorno,</div><div><br></div><div>confermiamo l’ordine ricevuto. La consegna è prevista entro 15 giorni lavorativi: vi scriveremo il giorno prima per concordare l’orario.</div><div><br></div><div>Cordiali saluti,</div>' },
+    { id: 'm2', name: 'Richiesta campioni', subject: 'Richiesta campioni', html: '<div>Buongiorno,</div><div><br></div><div>ci servirebbero i campioni indicati qui sotto, se possibile entro fine mese:</div><ul><li><br></li></ul><div>Grazie,</div>' },
   ];
 }
 

@@ -21,13 +21,17 @@ Cosa funziona:
   - schede Prioritaria e Altre: newsletter e notifiche automatiche vanno in Altre;
   - lettura, risposta, risposta a tutti, inoltro;
   - sposta, elimina, archivia, contrassegna, letto e da leggere;
-  - categorie colorate, vista per conversazione, stampa, lettura ad alta voce.
+  - categorie colorate, vista per conversazione, stampa, lettura ad alta voce;
+  - Ignora conversazione (anche le risposte future vanno in Posta eliminata) e Pulisci conversazione, cartella o cartella e sottocartelle (via i messaggi già riportati nelle risposte);
+  - Inoltra come allegato (Ctrl+Alt+F);
+  - riquadro di lettura a destra, in basso o nascosto, con il separatore da trascinare; densità dell'elenco ampia, media o compatta; con l'elenco largo i messaggi stanno su una riga.
 - **Organizzazione:**
   - regole e avvisi: per mittente, destinatari, oggetto, parole o allegati; spostano, eliminano, segnano come letti, contrassegnano, assegnano una categoria o mandano un avviso; si possono eseguire subito su una cartella;
   - avviso sul desktop quando arriva posta nuova;
   - risposte automatiche (fuori sede) con periodo facoltativo, una sola risposta per mittente;
   - invio programmato a un giorno e un'ora;
-  - pulizia della casella: spazio occupato per cartella, messaggi più grandi, archiviazione dei messaggi vecchi.
+  - pulizia della casella: spazio occupato per cartella, messaggi più grandi, archiviazione dei messaggi vecchi;
+  - azioni rapide come in Outlook: più passaggi con un clic (per esempio "segna come letto e archivia" o "inoltra al commercialista"), dalla barra, dal clic destro o con Ctrl+Maiusc+1…9.
 - **Contatti:**
   - rubrica con nome, azienda, indirizzi email, telefoni, indirizzo, compleanno e note;
   - importazione da Outlook, Gmail, Apple e Thunderbird (vCard, CSV, LDIF), senza doppioni; esportazione in vCard;
@@ -39,6 +43,11 @@ Cosa funziona:
   - inviti ricevuti da Outlook, Google e Apple: Accetta, Provvisorio o Rifiuta, con la risposta all'organizzatore e gli impegni in conflitto;
   - riunioni organizzate da te: invito ai partecipanti, aggiornamenti, annullamento; le risposte aggiornano l'elenco dei partecipanti;
   - importazione ed esportazione di file iCalendar (`.ics`).
+- **Attività** (Ctrl+4):
+  - La mia giornata, Importanti, Pianificate (in ritardo, oggi, domani, questa settimana, più avanti), Attività ed elenchi tuoi;
+  - passaggi, scadenza, promemoria con avviso, ripetizione (alla fine ne nasce subito un'altra), note;
+  - Posta contrassegnata: i messaggi contrassegnati di tutti gli account, da completare con un clic;
+  - "Aggiungi alle attività" dal clic destro su un messaggio.
 - **Offline e ricerca:**
   - archivio sul computer con ricerca nel testo;
   - uso offline: le modifiche partono quando torna la connessione.
@@ -47,6 +56,7 @@ Cosa funziona:
   - schede Messaggio, Inserisci e Formato testo con i comandi dove li mette Outlook; formato HTML o Testo normale;
   - incolla da Word, Excel e dai siti mantenendo la formattazione;
   - firme come in Outlook: più firme con un nome, una predefinita per i nuovi messaggi e una per le risposte di ogni account, pulsante Firma per cambiarla; la prima parte già scritta con nome e indirizzo;
+  - modelli di messaggio (I miei modelli): testi da riusare con un clic, salvati anche dal messaggio che stai scrivendo;
   - nuovo messaggio in una vera finestra del sistema o nel riquadro di lettura;
   - suggerimento dei contatti, Cc e Ccn, allegati;
   - bozze salvate da sole;
@@ -61,13 +71,14 @@ Cosa funziona:
   - primo avvio con la scelta tra Outlook classico e nuovo Outlook;
   - barra estesa o compatta, menu File o ingranaggio;
   - tema chiaro o scuro e colore di accento a scelta (il blu è quello predefinito): i colori si adattano da soli per restare leggibili;
-  - [scorciatoie da tastiera](docs/scorciatoie.md) di Outlook.
+  - [scorciatoie da tastiera](docs/scorciatoie.md) di Outlook; sul Mac anche Cmd+Q, Cmd+W, Cmd+H e Cmd+, come in ogni programma.
 
 Cosa manca ancora:
 - **Microsoft 365, Outlook.com e Gmail con accesso moderno (OAuth).** Su queste caselle l'accesso IMAP con la sola password è già disattivato o lo sarà presto. Gmail per ora si può usare solo con una "password per le app", se Google la consente sull'account.
-- Calendari online (Google Calendar, Microsoft 365, CalDAV) e calendari condivisi; Attività.
+- Calendari online (Google Calendar, Microsoft 365, CalDAV) e calendari condivisi; le attività restano sul computer.
+- Estensioni: il pulsante c'è, ma resta da decidere come farle (componenti aggiuntivi e macro di Outlook non si possono riusare).
 - Traduci: il pulsante c'è, la traduzione arriverà con i servizi di intelligenza artificiale, che saranno un prodotto separato.
-- Risposte automatiche, regole sui messaggi in arrivo, invio programmato e promemoria funzionano solo mentre Better-Look è aperto: lavorano sul computer, non sul server.
+- Risposte automatiche, regole sui messaggi in arrivo, Ignora conversazione, invio programmato e promemoria funzionano solo mentre Better-Look è aperto: lavorano sul computer, non sul server.
 - Dai file PST si importa solo la posta: i contatti vanno esportati da Outlook in CSV e il calendario in `.ics`.
 - File `.ost` (copie locali di Exchange): non si aprono, va esportato un `.pst`.
 - Firma del codice e aggiornamenti automatici.
@@ -83,19 +94,18 @@ Cosa manca ancora:
 
 ## Scaricare e provare
 
-A ogni modifica GitHub prepara gli installer da solo:
+Gli installer delle versioni pubblicate sono nella pagina **[Release](https://github.com/Gimmypaxxion/datini-email/releases/latest)**, senza bisogno di accedere a GitHub. Scegli il file del tuo sistema nella sezione *Assets*:
+- **Windows:** `Better-Look_…_x64-setup.exe` (oppure `.msi`);
+- **macOS:** `Better-Look_…_aarch64.dmg` per i Mac con chip Apple (M1 e successivi), `Better-Look_…_x64.dmg` per i Mac con Intel;
+- **Linux:** `.deb`, `.rpm` o `.AppImage`.
 
-1. Apri [Actions › Installer](https://github.com/Gimmypaxxion/datini-email/actions/workflows/installer.yml) e scegli l'esecuzione più recente con il segno verde.
-2. In fondo, nella sezione **Artifacts**, scarica il file del tuo sistema:
-   - `better-look-windows`: installer `.exe` e `.msi`;
-   - `better-look-macos-apple-silicon` o `better-look-macos-intel`: `.dmg`;
-   - `better-look-linux`: `.deb`, `.rpm`, `.AppImage`.
+Tra una versione e l'altra GitHub prepara comunque gli installer a ogni modifica: sono in [Actions › Installer](https://github.com/Gimmypaxxion/datini-email/actions/workflows/installer.yml), nella sezione **Artifacts** dell'esecuzione più recente (serve l'accesso a GitHub).
 
 Gli installer **non sono ancora firmati**, quindi al primo avvio compare un avviso:
 - **Windows:** nella finestra "Windows ha protetto il PC", clicca *Ulteriori informazioni* e poi *Esegui comunque*.
-- **macOS:** apri Better-Look dalla cartella Applicazioni con il tasto destro, poi scegli *Apri*.
+- **macOS:** apri Better-Look dalla cartella Applicazioni; se compare l'avviso, vai in *Impostazioni di Sistema › Privacy e sicurezza* e clicca *Apri comunque* (sulle versioni di macOS più vecchie basta il tasto destro sull'app e poi *Apri*).
 
-Per pubblicare una versione basta creare un tag, per esempio `v0.1.0`: GitHub prepara una release in bozza con tutti gli installer.
+Per pubblicare una versione basta creare un tag, per esempio `v0.2.0`: GitHub pubblica la release con tutti gli installer.
 
 ## Sviluppo
 
@@ -135,7 +145,7 @@ Per lavorare solo sull'interfaccia basta `npm run dev`, poi aprire http://localh
 
 Gli stati si aprono aggiungendo parametri all'indirizzo, per esempio `?stile=nuovo&view=composizione&tema=scuro&avvio=0`:
 - `stile`: `classico`, `nuovo`;
-- `view`: `composizione`, `inviato`, `file`, `impostazioni`, `account`, `informazioni`, `aggiungi`, `newsletter`, `uscita`, `contatti`, `calendario`, `calendario-giorno`, `calendario-mese`, `appuntamento`, `riunione`, `invito`, `promemoria`;
+- `view`: `composizione`, `inviato`, `file`, `impostazioni`, `impostazioni-<pagina>` (per esempio `impostazioni-regole`), `account`, `informazioni`, `aggiungi`, `newsletter`, `uscita`, `contatti`, `calendario`, `calendario-giorno`, `calendario-mese`, `appuntamento`, `riunione`, `invito`, `promemoria`, `attivita`, `attivita-dettaglio`, `attivita-pianificate`, `attivita-elenco`, `attivita-contrassegnati`, `promemoria-attivita`, `azioni-rapide`, `azione-nuova`, `modelli`, `lettura-basso`, `lettura-nascosto`, `lettura-piena`, `compatta`, `ampia`, `ignora`, `inoltra-allegato`;
 - `tema`: `chiaro`, `scuro`, `sistema`;
 - `accento`: un colore in esadecimale senza `#`, per esempio `038387`;
 - `avvio`: `1` per mostrare il primo avvio, `0` per saltarlo;
@@ -158,9 +168,16 @@ src/                     interfaccia (Svelte 5 + TypeScript)
   lib/calendar.ts        calendario: date, ripetizioni, disposizione nella griglia, testi
   lib/calendar.svelte.ts stato del calendario, modulo dell'appuntamento, promemoria
   lib/rules.ts, lib/contacts.ts   regole e rubrica lato interfaccia
+  lib/quicksteps.ts      azioni rapide: azioni possibili, controlli, ordine di esecuzione
+  lib/tasks.ts           attività: elenchi intelligenti, scadenze, ripetizioni
+  lib/tasks.svelte.ts    stato del modulo Attività e promemoria delle attività
+  lib/fit.ts             barra dei comandi che nasconde i gruppi quando manca spazio
 src-tauri/src/           motore (Rust)
   engine.rs              account, sincronizzazione, posta in uscita, bozze, regole, rubrica
   engine/agenda.rs       calendario, inviti e risposte all'organizzatore
+  engine/conversations.rs   Ignora e Pulisci conversazione
+  engine/quick.rs        azioni rapide e modelli di messaggio
+  engine/tasks.rs        attività ed elenchi, posta contrassegnata
   calendar.rs            file iCalendar (.ics) e inviti iTIP, con le zone orarie
   rules.rs, contacts.rs   regole sui messaggi; vCard, CSV e LDIF
   imap.rs, pop3.rs, smtp.rs   protocolli di posta
@@ -187,7 +204,8 @@ assets/                  logo e icona del programma
 5. **POP3 e più account.** *(fatto)*
 6. **Archivi:** apertura dei file PST, import MBOX, export MBOX ed EML. *(fatto)*
 7. **Organizzazione:** cartelle, categorie, conversazioni, regole e avvisi, risposte automatiche, invio programmato, pulizia, rubrica, calendario e inviti. *(fatto)*
-8. Accesso Microsoft 365 e Gmail (OAuth), firma del codice, aggiornamenti automatici, licenza.
+8. **Produttività:** attività, azioni rapide, modelli di messaggio, Ignora e Pulisci conversazione, posizione del riquadro di lettura e densità. *(fatto, versione 0.2.0)*
+9. Accesso Microsoft 365 e Gmail (OAuth), calendari online (CalDAV), firma del codice, aggiornamenti automatici, licenza.
 
 I dettagli e le decisioni prese sono in [`docs/progetto.md`](docs/progetto.md).
 

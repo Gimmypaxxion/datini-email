@@ -1,7 +1,7 @@
 {
   "name": "better-look",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Client di posta desktop libero e open source, con i comandi dove li mette Outlook.",
   "scripts": {

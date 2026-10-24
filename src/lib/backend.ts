@@ -25,6 +25,10 @@ import type {
   Rule,
   SavedDraft,
   Signature,
+  QuickStep,
+  MessageTemplate,
+  Task,
+  TaskList,
 } from './types';
 
 export type Tab = 'prio' | 'altre';
@@ -91,6 +95,26 @@ export interface Backend {
   importContacts(): Promise<ContactImport | null>;
   /** Chiede dove salvare e scrive un file vCard. Null se l'utente annulla. */
   exportContacts(ids: string[] | null): Promise<number | null>;
+  /** Ignora conversazione (o smetti): restituisce quanti messaggi ha spostato. */
+  ignoreThread(messageId: number, on: boolean): Promise<number>;
+  threadIgnored(messageId: number): Promise<boolean>;
+  /** Pulisci conversazione o cartella: messaggi già riportati nelle risposte in Posta eliminata. */
+  cleanUp(messageId: number | null, folderId: number | null, subfolders: boolean): Promise<number>;
+  quickSteps(): Promise<QuickStep[]>;
+  saveQuickSteps(list: QuickStep[]): Promise<QuickStep[]>;
+  templates(): Promise<MessageTemplate[]>;
+  saveTemplate(t: MessageTemplate): Promise<MessageTemplate>;
+  deleteTemplate(id: string): Promise<void>;
+  taskLists(): Promise<TaskList[]>;
+  saveTaskList(l: TaskList): Promise<TaskList>;
+  /** Elimina l'elenco e le sue attività; restituisce quante erano. */
+  deleteTaskList(id: string): Promise<number>;
+  tasks(): Promise<Task[]>;
+  /** Salva; completando un'attività che si ripete restituisce anche la successiva. */
+  saveTask(t: Task): Promise<[Task, Task | null]>;
+  deleteTask(id: string): Promise<void>;
+  /** Messaggi contrassegnati di tutti gli account. */
+  flaggedMessages(): Promise<MessageSummary[]>;
   /** Eventi che possono cadere nell'intervallo (le serie vanno espanse). */
   events(from: number, to: number): Promise<CalEvent[]>;
   /** Salva; per una riunione mia con `send` manda l'invito o l'aggiornamento. */
@@ -295,6 +319,51 @@ export class TauriBackend implements Backend {
     const path = await save({ title: 'Esporta contatti', defaultPath: 'Contatti.vcf', filters: [{ name: 'vCard', extensions: ['vcf'] }] });
     if (!path) return null;
     return this.call<number>('export_contacts', { path, ids });
+  }
+  ignoreThread(messageId: number, on: boolean) {
+    return this.call<number>('ignore_thread', { id: messageId, on });
+  }
+  threadIgnored(messageId: number) {
+    return this.call<boolean>('thread_ignored', { id: messageId });
+  }
+  cleanUp(messageId: number | null, folderId: number | null, subfolders: boolean) {
+    return this.call<number>('clean_up', { id: messageId, folderId, subfolders });
+  }
+  quickSteps() {
+    return this.call<QuickStep[]>('quick_steps');
+  }
+  saveQuickSteps(list: QuickStep[]) {
+    return this.call<QuickStep[]>('save_quick_steps', { list });
+  }
+  templates() {
+    return this.call<MessageTemplate[]>('templates');
+  }
+  saveTemplate(template: MessageTemplate) {
+    return this.call<MessageTemplate>('save_template', { template });
+  }
+  deleteTemplate(id: string) {
+    return this.call<void>('delete_template', { id });
+  }
+  taskLists() {
+    return this.call<TaskList[]>('task_lists');
+  }
+  saveTaskList(list: TaskList) {
+    return this.call<TaskList>('save_task_list', { list });
+  }
+  deleteTaskList(id: string) {
+    return this.call<number>('delete_task_list', { id });
+  }
+  tasks() {
+    return this.call<Task[]>('tasks');
+  }
+  saveTask(task: Task) {
+    return this.call<[Task, Task | null]>('save_task', { task });
+  }
+  deleteTask(id: string) {
+    return this.call<void>('delete_task', { id });
+  }
+  flaggedMessages() {
+    return this.call<MessageSummary[]>('flagged_messages');
   }
   events(from: number, to: number) {
     return this.call<CalEvent[]>('events', { from, to });

@@ -245,6 +245,8 @@ export interface DraftAttachment {
   mime?: string | null;
   path?: string | null;
   source?: AttachmentRef | null;
+  /** Un intero messaggio dell'archivio, allegato come .eml (Inoltra come allegato). */
+  message?: number | null;
 }
 
 export interface Draft {
@@ -301,7 +303,96 @@ export type EngineEvent =
   | { type: 'newMail'; accountId: string; count: number; messages: MessageSummary[] }
   | { type: 'rules' }
   | { type: 'contacts' }
-  | { type: 'calendar' };
+  | { type: 'calendar' }
+  | { type: 'quickSteps' }
+  | { type: 'templates' }
+  | { type: 'tasks' };
+
+// ---------- Azioni rapide e modelli ----------
+
+export type QuickActionKind =
+  | 'letto'
+  | 'da-leggere'
+  | 'contrassegna'
+  | 'togli-contrassegno'
+  | 'categoria'
+  | 'togli-categorie'
+  | 'rispondi'
+  | 'rispondi-tutti'
+  | 'inoltra'
+  | 'inoltra-allegato'
+  | 'sposta'
+  | 'archivia'
+  | 'elimina'
+  | 'ignora';
+
+export interface QuickAction {
+  kind: QuickActionKind;
+  /** Cartella di destinazione (sposta). */
+  folder?: number | null;
+  /** Categoria da assegnare (categoria). */
+  category?: string | null;
+  /** Destinatari già scritti (inoltra). */
+  to?: Person[];
+  /** Testo da aggiungere in cima alla risposta o all'inoltro. */
+  text?: string | null;
+}
+
+/** Azione rapida: più passaggi con un clic. */
+export interface QuickStep {
+  id: string;
+  name: string;
+  /** Icona Tabler registrata in icons.ts. */
+  icon: string;
+  /** Ctrl+Maiusc+1..9. */
+  shortcut: number | null;
+  actions: QuickAction[];
+}
+
+/** Modello di messaggio (I miei modelli). */
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  html: string;
+}
+
+// ---------- Attività ----------
+
+export interface TaskList {
+  id: string;
+  name: string;
+}
+
+export interface TaskStep {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+export type TaskRepeat = 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly';
+
+export interface Task {
+  id: string;
+  /** Elenco dell'utente; vuoto per l'elenco Attività. */
+  list: string;
+  title: string;
+  notes: string;
+  important: boolean;
+  /** Giorno (AAAA-MM-GG) in cui è stata aggiunta a La mia giornata. */
+  myDay: string | null;
+  /** Inizio del giorno di scadenza (ms, ora locale). */
+  due: number | null;
+  /** Istante del promemoria (ms). */
+  reminder: number | null;
+  repeat: TaskRepeat | null;
+  steps: TaskStep[];
+  done: boolean;
+  doneAt: number | null;
+  created: number;
+  /** Messaggio da cui è nata. */
+  message: number | null;
+}
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {

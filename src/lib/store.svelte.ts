@@ -8,7 +8,8 @@ import { TauriBackend } from './backend';
 import { MockBackend } from './mockBackend';
 import { inTauri } from './platform';
 import { DEFAULT_ACCENT, normalizeHex } from './accent';
-import { addPlainSignature, hasQuote, htmlToText, newMessageHtml, plainFromHtml, replaceSignature, replyHtml, textToHtml } from './compose-html';
+import { addPlainSignature, hasQuote, htmlToText, newMessageHtml, ownHtml, plainFromHtml, replaceSignature, replyHtml, textToHtml } from './compose-html';
+import { checkQuickSteps, emptyQuickStep, runOrder } from './quicksteps';
 import { DEFAULT_FONT, composeEditor } from './editor.svelte';
 import {
   clock,
@@ -23,6 +24,8 @@ import {
 import { emptyRule } from './rules';
 import { contactName } from './contacts';
 import { CalendarState } from './calendar.svelte';
+import { TasksState } from './tasks.svelte';
+import type { TaskView } from './tasks';
 import {
   errorKind,
   errorMessage,
@@ -43,6 +46,8 @@ import {
   type Role,
   type Signature,
   type SyncOptions,
+  type QuickStep,
+  type MessageTemplate,
 } from './types';
 
 export type RibbonMode = 'estesa' | 'compatta';
@@ -54,9 +59,9 @@ export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inseris
 export type WinTab = 'messaggio' | 'inserisci' | 'formato';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
-/** Parte del programma mostrata: posta, calendario, contatti (Ctrl+1, 2, 3). */
-export type AppModule = 'posta' | 'calendario' | 'contatti';
-export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'categorie' | 'regole' | 'risposte' | 'pulizia' | 'info';
+/** Parte del programma mostrata: posta, calendario, contatti, attività (Ctrl+1, 2, 3, 4). */
+export type AppModule = 'posta' | 'calendario' | 'contatti' | 'attivita';
+export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'modelli' | 'categorie' | 'regole' | 'azioni' | 'risposte' | 'pulizia' | 'info';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -150,7 +155,24 @@ interface Saved {
   conversations?: boolean;
   /** Avviso sul desktop all'arrivo di nuovi messaggi. */
   notify?: boolean;
+  /** Riquadro di lettura: a destra, in basso o nascosto. */
+  readingPane?: ReadingPanePos;
+  /** Spazio fra le righe dell'elenco. */
+  density?: Density;
+  /** Larghezza dell'elenco (riquadro a destra), in pixel. */
+  listW?: number;
+  /** Altezza dell'elenco (riquadro in basso), come frazione. */
+  listH?: number;
+  /** Elenco aperto nel modulo Attività. */
+  tasksView?: string;
 }
+
+/** Misure predefinite dell'elenco dei messaggi. */
+export const LIST_W = 420;
+export const LIST_H = 0.46;
+
+export type ReadingPanePos = 'destra' | 'basso' | 'nascosto';
+export type Density = 'ampia' | 'media' | 'compatta';
 
 const STORAGE_KEY = 'better-look.interfaccia.v1';
 
@@ -196,6 +218,7 @@ export class MailStore {
   module = $state<AppModule>('posta');
   /** Calendario: vista, appuntamenti, modulo e promemoria. */
   cal: CalendarState = new CalendarState(this);
+  tasks: TasksState = new TasksState(this);
   // Rubrica
   book = $state<Contact[]>([]);
   contactSel = $state<string | null>(null);
@@ -210,6 +233,15 @@ export class MailStore {
   notifyDesktop = $state(true);
   /** Vista per conversazioni (Visualizza › Conversazioni). */
   conversations = $state(false);
+  /** Visualizza › Riquadro di lettura. */
+  readingPane = $state<ReadingPanePos>('destra');
+  /** Visualizza › Densità. */
+  density = $state<Density>('media');
+  /** Misure dell'elenco, cambiate trascinando il separatore. */
+  listW = $state(LIST_W);
+  listH = $state(LIST_H);
+  /** Riquadro di lettura nascosto: messaggio aperto al posto dell'elenco. */
+  fullRead = $state(false);
   /** Conversazioni aperte nell'elenco: chiave → messaggi di tutte le cartelle, dal più recente. */
   threadOpen = $state<Record<string, MessageSummary[]>>({});
   /** Leggi ad alta voce: spento, in lettura o in pausa. */
@@ -261,6 +293,13 @@ export class MailStore {
   askNoSubject = $state(false);
   /** Passaggio a testo normale: la formattazione si perde, si chiede conferma. */
   askPlain = $state(false);
+  /** Azioni rapide (Home › Azioni rapide) e quella in modifica nelle impostazioni. */
+  quickSteps = $state<QuickStep[]>([]);
+  quickDraft = $state<QuickStep | null>(null);
+  /** Modelli di messaggio (I miei modelli). */
+  templates = $state<MessageTemplate[]>([]);
+  /** La conversazione del messaggio aperto è ignorata (pulsante Ignora premuto). */
+  threadIgnored = $state(false);
   toast = $state<Toast | null>(null);
   confirm = $state<Confirm | null>(null);
   folderEdit = $state<FolderEdit | null>(null);
@@ -291,6 +330,11 @@ export class MailStore {
         if (saved.font?.family && saved.font.size) this.font = { ...saved.font };
         this.conversations = !!saved.conversations;
         if (typeof saved.notify === 'boolean') this.notifyDesktop = saved.notify;
+        if (saved.readingPane === 'destra' || saved.readingPane === 'basso' || saved.readingPane === 'nascosto') this.readingPane = saved.readingPane;
+        if (saved.density === 'ampia' || saved.density === 'media' || saved.density === 'compatta') this.density = saved.density;
+        if (typeof saved.listW === 'number' && saved.listW >= 280 && saved.listW <= 1600) this.listW = Math.round(saved.listW);
+        if (typeof saved.listH === 'number' && saved.listH >= 0.2 && saved.listH <= 0.75) this.listH = saved.listH;
+        if (typeof saved.tasksView === 'string' && /^(giornata|importanti|pianificate|attivita|contrassegnati|elenco:[\w-]+)$/.test(saved.tasksView)) this.tasks.view = saved.tasksView as TaskView;
       }
     }
     if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
@@ -318,7 +362,7 @@ export class MailStore {
     }
   }
 
-  private save() {
+  save() {
     if (!this.persist) return;
     const data: Saved = {
       prefs: { ...this.prefs },
@@ -330,6 +374,11 @@ export class MailStore {
       font: { ...this.font },
       conversations: this.conversations,
       notify: this.notifyDesktop,
+      readingPane: this.readingPane,
+      density: this.density,
+      listW: this.listW,
+      listH: this.listH,
+      tasksView: this.tasks.view,
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -343,9 +392,12 @@ export class MailStore {
   async init() {
     this.unsubscribe?.();
     this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
-    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules()]);
+    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules(), this.reloadQuickSteps(), this.reloadTemplates()]);
     if (this.mode === 'principale') {
-      if (this.persist) this.cal.startReminders();
+      if (this.persist) {
+        this.cal.startReminders();
+        this.tasks.startReminders();
+      }
       const inbox = this.defaultInbox();
       if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
       if (!this.onboarding && this.backend.real && !this.accounts.length) this.openWizard(true);
@@ -372,6 +424,7 @@ export class MailStore {
     switch (e.type) {
       case 'changed':
         this.scheduleRefresh();
+        if (this.module === 'attivita' && this.mode === 'principale') void this.tasks.reloadFlagged();
         break;
       case 'status': {
         const a = this.accounts.find((x) => x.id === e.accountId);
@@ -395,8 +448,17 @@ export class MailStore {
       case 'rules':
         void this.reloadRules();
         break;
+      case 'quickSteps':
+        void this.reloadQuickSteps();
+        break;
+      case 'templates':
+        void this.reloadTemplates();
+        break;
       case 'contacts':
         void this.reloadContacts();
+        break;
+      case 'tasks':
+        if (this.mode === 'principale' && this.module === 'attivita') void this.tasks.reload();
         break;
       case 'calendar':
         if (this.mode !== 'principale') break;
@@ -452,6 +514,14 @@ export class MailStore {
     this.backstage = false;
     if (m === 'contatti') void this.reloadContacts();
     if (m === 'calendario') void this.cal.reload();
+    if (m === 'attivita') void this.tasks.reload();
+  }
+
+  /** Da un altro modulo al messaggio, nella sua cartella. */
+  async revealMessage(m: MessageSummary) {
+    this.setModule('posta');
+    if (this.folderId !== m.folderId || this.q.trim()) await this.pickFolder(m.folderId, `acc-${m.folderId}`);
+    if (this.findMsg(m.id)) await this.pickMsg(m.id);
   }
 
   // ---------- Inviti ----------
@@ -611,6 +681,194 @@ export class MailStore {
     const name = p.name.trim() && p.name.trim() !== p.email ? p.name.trim() : '';
     const sp = name.lastIndexOf(' ');
     this.newContact({ firstName: sp > 0 ? name.slice(0, sp) : name, lastName: sp > 0 ? name.slice(sp + 1) : '', emails: [p.email] });
+  }
+
+  // ---------- Azioni rapide ----------
+
+  async reloadQuickSteps() {
+    if (this.mode !== 'principale') return;
+    try {
+      this.quickSteps = await this.backend.quickSteps();
+    } catch {
+      /* senza azioni rapide si lavora lo stesso */
+    }
+  }
+
+  /** Salva l'elenco delle azioni rapide. Restituisce l'errore da mostrare, o ''. */
+  async saveQuickSteps(list: QuickStep[]): Promise<string> {
+    const bad = checkQuickSteps(list);
+    if (bad) return bad;
+    try {
+      this.quickSteps = await this.backend.saveQuickSteps(list);
+      return '';
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  /** Nuova azione rapida, nelle impostazioni. */
+  newQuickStep() {
+    this.quickDraft = emptyQuickStep();
+    this.openSettings('azioni');
+  }
+
+  manageQuickSteps() {
+    this.quickDraft = null;
+    this.openSettings('azioni');
+  }
+
+  /** Bozza di risposta o inoltro per un'azione rapida (dal messaggio, anche se non è aperto). */
+  private async quickDraftFor(kind: 'rispondi' | 'rispondi-tutti' | 'inoltra' | 'inoltra-allegato', id: number): Promise<Draft | null> {
+    const s = this.findMsg(id);
+    const acct = this.composeAccount(s?.accountId);
+    if (!acct) {
+      this.openWizard(false);
+      return null;
+    }
+    if (kind === 'inoltra-allegato') return s ? this.attachmentDraft(s, acct) : null;
+    const m = this.detail && this.detail.id === id ? this.detail : await this.backend.message(id, false);
+    const quote = await this.backend.quoteHtml(id).catch(() => undefined);
+    return this.draftFrom(kind === 'rispondi' ? 'reply' : kind === 'rispondi-tutti' ? 'replyAll' : 'forward', m, acct, quote);
+  }
+
+  /**
+   * Esegue un'azione rapida sul messaggio: prima cambia lo stato (letto,
+   * contrassegno, categorie), poi prepara la risposta o l'inoltro, infine
+   * sposta il messaggio. La risposta si apre alla fine.
+   */
+  async runQuickStep(q: QuickStep, id: number | null = this.sel) {
+    if (id === null || !this.findMsg(id)) return;
+    let compose: Draft | null = null;
+    let moved = false;
+    try {
+      for (const a of runOrder(q.actions)) {
+        const m = this.findMsg(id);
+        switch (a.kind) {
+          case 'letto':
+          case 'da-leggere':
+            await this.setRead(id, a.kind === 'letto');
+            break;
+          case 'contrassegna':
+          case 'togli-contrassegno':
+            if (m && m.flagged !== (a.kind === 'contrassegna')) await this.toggleFlag(id);
+            break;
+          case 'categoria':
+            if (m && a.category && !m.categories.includes(a.category)) await this.toggleCategory(id, a.category);
+            break;
+          case 'togli-categorie':
+            await this.clearMsgCategories(id);
+            break;
+          case 'rispondi':
+          case 'rispondi-tutti':
+          case 'inoltra':
+          case 'inoltra-allegato': {
+            compose = await this.quickDraftFor(a.kind, id);
+            if (!compose) return;
+            if (a.to?.length && (a.kind === 'inoltra' || a.kind === 'inoltra-allegato')) compose.to = a.to.map((p) => ({ ...p }));
+            if (a.text?.trim()) {
+              const extra = textToHtml(a.text.trim());
+              if (compose.html !== null && compose.html !== undefined) compose.html = extra + compose.html;
+              compose.body = `${a.text.trim()}\n${compose.body}`;
+            }
+            break;
+          }
+          case 'sposta':
+            if (a.folder !== null && a.folder !== undefined) {
+              await this.dropOnFolder([id], a.folder);
+              moved = true;
+            }
+            break;
+          case 'archivia':
+            await this.moveMsg(id, 'archive');
+            moved = true;
+            break;
+          case 'elimina':
+            await this.deleteMsg(id);
+            moved = true;
+            break;
+          case 'ignora':
+            await this.backend.ignoreThread(id, true);
+            this.scheduleRefresh();
+            moved = true;
+            break;
+        }
+      }
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+      return;
+    }
+    if (compose) {
+      await this.stashDraft();
+      await this.present(compose, this.prefs.compose === 'finestra' && this.prefs.replyWin);
+    } else {
+      this.flash({ kind: 'info', text: moved ? `Azione rapida «${q.name}» eseguita: il messaggio è stato spostato.` : `Azione rapida «${q.name}» eseguita.` }, 3500);
+    }
+  }
+
+  /** Ctrl+Maiusc+1..9. */
+  runQuickShortcut(n: number) {
+    const q = this.quickSteps.find((x) => x.shortcut === n);
+    if (q) void this.runQuickStep(q);
+    else this.flash({ kind: 'info', text: `Nessuna azione rapida usa Ctrl+Maiusc+${n}. Puoi assegnarla in Azioni rapide.` }, 4000);
+  }
+
+  // ---------- Modelli di messaggio ----------
+
+  async reloadTemplates() {
+    try {
+      this.templates = await this.backend.templates();
+    } catch {
+      /* senza modelli si scrive lo stesso */
+    }
+  }
+
+  /** Salva un modello. Restituisce l'errore da mostrare, o ''. */
+  async saveTemplate(t: MessageTemplate): Promise<string> {
+    try {
+      const saved = await this.backend.saveTemplate(t);
+      await this.reloadTemplates();
+      if (!this.templates.some((x) => x.id === saved.id)) this.templates = [...this.templates, saved];
+      return '';
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  async deleteTemplate(id: string) {
+    try {
+      await this.backend.deleteTemplate(id);
+      this.templates = this.templates.filter((t) => t.id !== id);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Inserisce il modello nel messaggio che si sta scrivendo (l'oggetto solo se manca). */
+  insertTemplate(t: MessageTemplate) {
+    const c = this.c;
+    if (!c) return;
+    if (t.subject.trim() && !c.subject.trim()) c.subject = t.subject.trim();
+    if (c.plain) {
+      const text = htmlToText(t.html);
+      c.body = c.body.trim() ? `${text}\n${c.body}` : text;
+    } else if (composeEditor.attached) {
+      composeEditor.insertHtml(t.html);
+    } else {
+      c.html = t.html + (c.html ?? textToHtml(c.body));
+      c.body = htmlToText(c.html);
+    }
+    this.touch();
+  }
+
+  /** Il messaggio che si sta scrivendo diventa un modello (senza firma né messaggio citato). */
+  async saveDraftAsTemplate(name: string): Promise<string> {
+    const c = this.c;
+    if (!c) return '';
+    const html = c.plain ? textToHtml(c.body) : ownHtml(c.html ?? textToHtml(c.body));
+    if (!htmlToText(html).trim() && !/<img/i.test(html)) return 'Il messaggio è vuoto: scrivi il testo da riusare, poi salvalo come modello.';
+    const same = this.templates.find((t) => t.name.trim().toLowerCase() === name.trim().toLowerCase());
+    const subject = cleanSubject(c.subject);
+    return this.saveTemplate({ id: same?.id ?? '', name, subject, html });
   }
 
   // ---------- Regole, risposte automatiche e avvisi ----------
@@ -780,6 +1038,11 @@ export class MailStore {
     return null;
   }
 
+  /** Contrassegno cambiato altrove (per esempio da Attività): lo aggiorna nell'elenco. */
+  markFlag(id: number, flagged: boolean) {
+    this.eachCopy(id, (x) => (x.flagged = flagged));
+  }
+
   /** Applica una modifica a tutte le copie del messaggio (elenco, conversazioni, lettura). */
   private eachCopy(id: number, fn: (m: MessageSummary) => void) {
     const l = this.list.find((m) => m.id === id);
@@ -856,6 +1119,7 @@ export class MailStore {
 
   async pickFolder(folderId: number, selId: string) {
     await this.stashPaneDraft();
+    this.fullRead = false;
     this.view = 'cartella';
     this.folderId = folderId;
     this.folderSel = selId;
@@ -871,6 +1135,7 @@ export class MailStore {
 
   async pickOutbox(selId: string) {
     await this.stashPaneDraft();
+    this.fullRead = false;
     this.view = 'uscita';
     this.folderSel = selId;
     this.q = '';
@@ -882,6 +1147,7 @@ export class MailStore {
 
   async pickTab(tab: Tab) {
     await this.stashPaneDraft();
+    this.fullRead = false;
     this.tab = tab;
     this.err = '';
     this.sel = null;
@@ -994,6 +1260,7 @@ export class MailStore {
       if (token !== this.detailToken) return;
       const s = this.findMsg(id);
       this.detail = s ? { ...d, unread: s.unread, flagged: s.flagged } : d;
+      this.threadIgnored = await this.backend.threadIgnored(id).catch(() => false);
     } catch (e) {
       if (token === this.detailToken) this.detailError = errorMessage(e);
     } finally {
@@ -1146,6 +1413,51 @@ export class MailStore {
     await this.loadThread(m.accountId, key);
   }
 
+  /** Ignora conversazione: i messaggi, anche quelli futuri, vanno in Posta eliminata. Di nuovo per smettere. */
+  async ignoreConversation(id: number | null = this.sel) {
+    if (id === null) return;
+    let on: boolean;
+    try {
+      on = !(await this.backend.threadIgnored(id));
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+      return;
+    }
+    const yes = await this.ask(
+      on
+        ? { title: 'Ignora conversazione', text: 'Il messaggio selezionato e tutti quelli della stessa conversazione vanno in Posta eliminata. Anche le risposte che arriveranno in futuro finiranno lì.', ok: 'Ignora conversazione' }
+        : { title: 'Smetti di ignorare', text: 'I messaggi di questa conversazione tornano in Posta in arrivo e le risposte future arriveranno di nuovo lì.', ok: 'Smetti di ignorare' },
+    );
+    if (!yes) return;
+    try {
+      const n = await this.backend.ignoreThread(id, on);
+      this.threadIgnored = on;
+      const moved = n === 1 ? '1 messaggio spostato' : `${n} messaggi spostati`;
+      this.flash({ kind: 'info', text: on ? `Conversazione ignorata: ${moved} in Posta eliminata.` : `Conversazione ripristinata: ${moved} in Posta in arrivo.` });
+      this.scheduleRefresh();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Pulisci conversazione, cartella o cartella e sottocartelle: via i messaggi già riportati nelle risposte. */
+  async cleanUp(scope: 'conversazione' | 'cartella' | 'sottocartelle') {
+    const id = this.sel;
+    const folder = this.currentFolder;
+    if (scope === 'conversazione' ? id === null : !folder) return;
+    const where = scope === 'conversazione' ? 'di questa conversazione' : scope === 'cartella' ? `della cartella ${folderLabel(folder)}` : `della cartella ${folderLabel(folder)} e delle sue sottocartelle`;
+    const title = scope === 'conversazione' ? 'Pulisci conversazione' : scope === 'cartella' ? 'Pulisci cartella' : 'Pulisci cartella e sottocartelle';
+    const yes = await this.ask({ title, text: `I messaggi ${where} già riportati per intero in una risposta successiva vanno in Posta eliminata. Restano quelli da leggere, contrassegnati o con allegati.`, ok: 'Pulisci' });
+    if (!yes) return;
+    try {
+      const n = scope === 'conversazione' ? await this.backend.cleanUp(id, null, false) : await this.backend.cleanUp(null, folder!.id, scope === 'sottocartelle');
+      this.flash({ kind: 'info', text: n === 0 ? 'Nessun messaggio da pulire: ogni messaggio contiene qualcosa che non si trova altrove.' : n === 1 ? '1 messaggio superfluo spostato in Posta eliminata.' : `${n} messaggi superflui spostati in Posta eliminata.` });
+      if (n) this.scheduleRefresh();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
   // ---------- Conferme ----------
 
   /** Chiede conferma con una finestra; vero se l'utente conferma. */
@@ -1258,6 +1570,28 @@ export class MailStore {
     if (!moving.length) return;
     this.dropFromList(moving);
     await this.act(() => this.backend.moveMessages(moving, folderId));
+  }
+
+  setReadingPane(p: ReadingPanePos) {
+    this.readingPane = p;
+    this.fullRead = false;
+    this.save();
+  }
+
+  setDensity(d: Density) {
+    this.density = d;
+    this.save();
+  }
+
+  /** Riquadro di lettura nascosto: apre il messaggio selezionato al posto dell'elenco. */
+  openFull(id: number | null = this.sel) {
+    if (id === null) return;
+    if (this.sel !== id) void this.pickMsg(id);
+    this.fullRead = true;
+  }
+
+  closeFull() {
+    this.fullRead = false;
   }
 
   toggleFolders() {
@@ -1453,6 +1787,30 @@ export class MailStore {
     const inWindow = kind === 'new' ? P.compose === 'finestra' : P.compose === 'finestra' && P.replyWin;
     await this.stashDraft();
     await this.present(d, inWindow);
+  }
+
+  /** Bozza con il messaggio intero allegato come file .eml. */
+  private attachmentDraft(m: MessageSummary, acct: Account): Draft {
+    const d = this.emptyDraft(acct.id);
+    const subject = cleanSubject(m.subject) || 'Messaggio';
+    d.subject = `I: ${subject}`;
+    const file = subject.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Messaggio';
+    d.attachments = [{ name: `${file}.eml`, size: m.size, mime: 'message/rfc822', path: null, source: null, message: m.id }];
+    return d;
+  }
+
+  /** Inoltra come allegato: il messaggio intero viaggia come file .eml. */
+  async forwardAsAttachment(id: number | null = this.sel) {
+    const m = id === null ? null : this.findMsg(id);
+    if (!m) return;
+    const acct = this.composeAccount(m.accountId);
+    if (!acct) {
+      this.openWizard(false);
+      return;
+    }
+    const d = this.attachmentDraft(m, acct);
+    await this.stashDraft();
+    await this.present(d, this.prefs.compose === 'finestra' && this.prefs.replyWin);
   }
 
   /** Scrivere a un indirizzo cliccato nel testo di un messaggio (mailto:). */
@@ -2152,6 +2510,8 @@ ${m.text}`.slice(0, 20_000);
       this.bsPage = 'info';
     } else if (v === 'impostazioni') {
       this.openSettings('aspetto');
+    } else if (v?.startsWith('impostazioni-')) {
+      this.openSettings(v.slice('impostazioni-'.length) as SettingsPage);
     } else if (v === 'account') {
       this.openSettings('account');
     } else if (v === 'informazioni') {
@@ -2177,6 +2537,34 @@ ${m.text}`.slice(0, 20_000);
       await this.cal.reload();
       const o = this.cal.occs.find((x) => x.ev.id === 'ev5');
       if (o) this.cal.reminders = [{ key: o.key, occ: o }];
+    } else if (v === 'attivita' || v === 'attivita-dettaglio' || v === 'attivita-pianificate' || v === 'attivita-contrassegnati' || v === 'attivita-elenco') {
+      this.tasks.view = v === 'attivita-pianificate' ? 'pianificate' : v === 'attivita-contrassegnati' ? 'contrassegnati' : v === 'attivita-elenco' ? 'elenco:l-bassano' : 'giornata';
+      this.setModule('attivita');
+      await this.tasks.reload();
+      if (v === 'attivita-dettaglio') this.tasks.sel = 't1';
+      if (v === 'attivita-elenco') this.tasks.doneOpen = true;
+    } else if (v === 'promemoria-attivita') {
+      await this.tasks.reload();
+      const t = this.tasks.items.find((x) => x.id === 't1');
+      if (t) this.tasks.reminders = [t];
+    } else if (v === 'azioni-rapide') {
+      this.openSettings('azioni');
+    } else if (v === 'azione-nuova') {
+      this.quickDraft = { id: '', name: 'Al commercialista', icon: 'briefcase', shortcut: 3, actions: [{ kind: 'categoria', category: 'c3' }, { kind: 'inoltra', to: [{ name: '', email: 'studio@commercialista.example' }], text: 'Da registrare, grazie.' }, { kind: 'archivia' }] };
+      this.openSettings('azioni');
+    } else if (v === 'modelli') {
+      this.openSettings('modelli');
+    } else if (v === 'lettura-basso' || v === 'lettura-nascosto') {
+      this.readingPane = v === 'lettura-basso' ? 'basso' : 'nascosto';
+    } else if (v === 'lettura-piena') {
+      this.readingPane = 'nascosto';
+      this.fullRead = true;
+    } else if (v === 'compatta' || v === 'ampia') {
+      this.density = v;
+    } else if (v === 'ignora') {
+      void this.ignoreConversation();
+    } else if (v === 'inoltra-allegato') {
+      await this.forwardAsAttachment();
     } else if (v === 'aggiungi') {
       this.openWizard(false);
     } else if (v === 'newsletter') {

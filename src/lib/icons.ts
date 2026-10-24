@@ -102,6 +102,18 @@ import Menu2 from '@tabler/icons-svelte/icons/menu-2';
 import MessageDots from '@tabler/icons-svelte/icons/message-dots';
 import MessageReply from '@tabler/icons-svelte/icons/message-reply';
 import Messages from '@tabler/icons-svelte/icons/messages';
+import Folders from '@tabler/icons-svelte/icons/folders';
+import FlagOff from '@tabler/icons-svelte/icons/flag-off';
+import Star from '@tabler/icons-svelte/icons/star';
+import StarFilled from '@tabler/icons-svelte/icons/star-filled';
+import SunHigh from '@tabler/icons-svelte/icons/sun-high';
+import Circle from '@tabler/icons-svelte/icons/circle';
+import Template from '@tabler/icons-svelte/icons/template';
+import Checklist from '@tabler/icons-svelte/icons/checklist';
+import Subtask from '@tabler/icons-svelte/icons/subtask';
+import PlaylistAdd from '@tabler/icons-svelte/icons/playlist-add';
+import Alarm from '@tabler/icons-svelte/icons/alarm';
+import CircleCheckFilled from '@tabler/icons-svelte/icons/circle-check-filled';
 import Minus from '@tabler/icons-svelte/icons/minus';
 import Moon from '@tabler/icons-svelte/icons/moon';
 import News from '@tabler/icons-svelte/icons/news';
@@ -291,6 +303,18 @@ export const icons = {
   'message-dots': MessageDots,
   'message-reply': MessageReply,
   messages: Messages,
+  folders: Folders,
+  'flag-off': FlagOff,
+  star: Star,
+  'star-filled': StarFilled,
+  'sun-high': SunHigh,
+  circle: Circle,
+  template: Template,
+  checklist: Checklist,
+  subtask: Subtask,
+  'playlist-add': PlaylistAdd,
+  alarm: Alarm,
+  'circle-check-filled': CircleCheckFilled,
   minus: Minus,
   moon: Moon,
   news: News,
@@ -380,3 +404,8 @@ export const icons = {
 } as const;
 
 export type IconName = keyof typeof icons;
+
+/** Un nome salvato (per esempio l'icona di un'azione rapida), se è fra quelle registrate. */
+export function iconOr(name: string, fallback: IconName): IconName {
+  return Object.prototype.hasOwnProperty.call(icons, name) ? (name as IconName) : fallback;
+}

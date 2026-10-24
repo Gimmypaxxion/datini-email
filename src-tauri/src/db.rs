@@ -136,6 +136,14 @@ CREATE TABLE IF NOT EXISTS autoreplied(
   PRIMARY KEY(account_id, email, period)
 );
 CREATE INDEX IF NOT EXISTS ev_uid ON events(uid);
+CREATE TABLE IF NOT EXISTS tasks(
+  id TEXT PRIMARY KEY,
+  list TEXT NOT NULL DEFAULT '',
+  done INTEGER NOT NULL DEFAULT 0,
+  due INTEGER,
+  data TEXT NOT NULL,
+  updated INTEGER NOT NULL
+);
 "#;
 
 /// Colonne aggiunte dopo la prima versione dell'archivio: si aggiungono agli
@@ -618,6 +626,17 @@ impl Db {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Messaggi contrassegnati di tutti gli account (fuori da eliminata e indesiderata), dal più recente.
+    pub fn flagged_messages(&self, limit: i64) -> Result<Vec<MsgRow>> {
+        let c = self.conn();
+        let mut st = c.prepare(&format!(
+            "SELECT {MSG_COLS} FROM messages WHERE flagged = 1 AND draft = 0 \
+             AND folder_id NOT IN (SELECT id FROM folders WHERE role IN ('deleted', 'junk')) ORDER BY date DESC LIMIT ?1"
+        ))?;
+        let rows = st.query_map([limit], msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// Messaggi di una cartella più vecchi della data indicata (secondi).
     pub fn older_than(&self, folder_id: i64, before: i64) -> Result<Vec<i64>> {
         let c = self.conn();
@@ -647,6 +666,14 @@ impl Db {
              ORDER BY date ASC, id ASC"
         ))?;
         let rows = st.query_map(params![account_id, thread], msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Messaggi di una conversazione dentro una cartella (anche Posta eliminata).
+    pub fn thread_in_folder(&self, account_id: &str, thread: &str, folder_id: i64) -> Result<Vec<MsgRow>> {
+        let c = self.conn();
+        let mut st = c.prepare(&format!("SELECT {MSG_COLS} FROM messages WHERE account_id = ?1 AND (thread = ?2 OR message_id = ?2) AND folder_id = ?3 ORDER BY date ASC, id ASC"))?;
+        let rows = st.query_map(params![account_id, thread, folder_id], msg_from_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
@@ -1204,6 +1231,44 @@ impl Db {
     pub fn delete_event(&self, id: &str) -> Result<()> {
         self.conn().execute("DELETE FROM events WHERE id = ?1", [id])?;
         Ok(())
+    }
+
+    // ---------------- Attività ----------------
+
+    pub fn tasks(&self) -> Result<Vec<Task>> {
+        let c = self.conn();
+        let mut st = c.prepare("SELECT data FROM tasks ORDER BY done, updated DESC")?;
+        let rows = st.query_map([], |r| r.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for json in rows {
+            if let Ok(t) = serde_json::from_str::<Task>(&json?) {
+                out.push(t);
+            }
+        }
+        Ok(out)
+    }
+
+    pub fn task(&self, id: &str) -> Result<Option<Task>> {
+        let json: Option<String> = self.conn().query_row("SELECT data FROM tasks WHERE id = ?1", [id], |r| r.get(0)).optional()?;
+        Ok(json.and_then(|j| serde_json::from_str(&j).ok()))
+    }
+
+    pub fn save_task(&self, t: &Task) -> Result<()> {
+        self.conn().execute(
+            "INSERT OR REPLACE INTO tasks(id, list, done, due, data, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![t.id, t.list, t.done, t.due, serde_json::to_string(t)?, now_secs()],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_task(&self, id: &str) -> Result<()> {
+        self.conn().execute("DELETE FROM tasks WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    /// Toglie un elenco: le sue attività vanno eliminate con lui.
+    pub fn delete_task_list(&self, list: &str) -> Result<usize> {
+        Ok(self.conn().execute("DELETE FROM tasks WHERE list = ?1", [list])?)
     }
 
     // ---------------- Operazioni in attesa ----------------

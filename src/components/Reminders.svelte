@@ -5,8 +5,15 @@
   import Icon from '../lib/Icon.svelte';
   import { store } from '../lib/store.svelte';
   import { timeText, untilText } from '../lib/calendar';
+  import { dueInfo } from '../lib/tasks';
 
   const cal = store.cal;
+  const tk = store.tasks;
+  const total = $derived(cal.reminders.length + tk.reminders.length);
+  function dismissAll() {
+    cal.dismissAll();
+    tk.dismissAll();
+  }
   const SNOOZE: [number, string][] = [
     [5, '5 minuti'],
     [10, '10 minuti'],
@@ -17,12 +24,12 @@
   let snoozeFor = $state(5);
 </script>
 
-{#if cal.reminders.length}
+{#if total}
   <section class="rem rise" aria-labelledby="rem-h" aria-live="assertive">
     <header class="rem-h">
       <Icon name="bell-ringing" size={18} style="color:var(--brand-ink)" />
-      <h2 id="rem-h">{cal.reminders.length === 1 ? 'Promemoria' : `${cal.reminders.length} promemoria`}</h2>
-      {#if cal.reminders.length > 1}<button class="lbtn all" onclick={() => cal.dismissAll()}>Ignora tutti</button>{/if}
+      <h2 id="rem-h">{total === 1 ? 'Promemoria' : `${total} promemoria`}</h2>
+      {#if total > 1}<button class="lbtn all" onclick={dismissAll}>Ignora tutti</button>{/if}
     </header>
     <ul class="scroll">
       {#each cal.reminders as r (r.key)}
@@ -37,6 +44,21 @@
               <button class="sec-btn" onclick={() => cal.showReminder(r)}>Apri</button>
               <button class="sec-btn" onclick={() => cal.snooze(r.key, snoozeFor)} title="Ricorda di nuovo tra {SNOOZE.find(([m]) => m === snoozeFor)?.[1]}">Posticipa</button>
               <button class="sec-btn" onclick={() => cal.dismiss(r.key)}>Ignora</button>
+            </div>
+          </div>
+        </li>
+      {/each}
+      {#each tk.reminders as t (t.id)}
+        <li class="task">
+          <Icon name="circle-check" size={16} style="color:var(--brand-ink);margin-top:2px;flex:none" />
+          <div class="txt">
+            <p class="t">{t.title}</p>
+            <p class="w">Attività{t.due !== null ? `, ${dueInfo(t.due, cal.now).text.toLowerCase()}` : ''}</p>
+            <div class="acts">
+              <button class="sec-btn" onclick={() => tk.showReminder(t)}>Apri</button>
+              <button class="sec-btn" onclick={() => tk.completeFromReminder(t)}>Completata</button>
+              <button class="sec-btn" onclick={() => tk.snooze(t, snoozeFor)} title="Ricorda di nuovo tra {SNOOZE.find(([m]) => m === snoozeFor)?.[1]}">Posticipa</button>
+              <button class="sec-btn" onclick={() => tk.dismiss(t)}>Ignora</button>
             </div>
           </div>
         </li>
@@ -65,7 +87,7 @@
   .txt { flex: 1; min-width: 0; }
   .t { margin: 0; font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
   .w { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-  .acts { margin-top: 10px; display: flex; gap: 6px; }
+  .acts { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
   .acts .sec-btn { height: 30px; padding: 0 12px; font-size: 13.5px; }
   .rem-f { padding: 8px 16px 12px; box-shadow: inset 0 1px 0 var(--rule); font-size: 13px; color: var(--ink-2); }
   .rem-f label { display: flex; align-items: center; gap: 8px; }

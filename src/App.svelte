@@ -15,6 +15,8 @@
   import CalendarView from './components/CalendarView.svelte';
   import EventEditor from './components/EventEditor.svelte';
   import Reminders from './components/Reminders.svelte';
+  import Splitter from './components/Splitter.svelte';
+  import TasksView from './components/TasksView.svelte';
   import Icon from './lib/Icon.svelte';
   import { store } from './lib/store.svelte';
   import { setWindowTitle } from './lib/platform';
@@ -40,7 +42,7 @@
     { label: 'Posta', icon: 'mail', key: 'Ctrl+1', module: 'posta' },
     { label: 'Calendario', icon: 'calendar', key: 'Ctrl+2', module: 'calendario' },
     { label: 'Contatti', icon: 'users', key: 'Ctrl+3', module: 'contatti' },
-    { label: 'Attività', icon: 'checkbox', key: 'Ctrl+4', module: null },
+    { label: 'Attività', icon: 'checkbox', key: 'Ctrl+4', module: 'attivita' },
   ] as const;
 </script>
 
@@ -49,7 +51,7 @@
 <div class="shell">
   <Header bind:this={header} />
   <Ribbon />
-  <div class="panes">
+  <div class="panes" data-reading={store.module === 'posta' ? store.readingPane : null} style="--list-w: {store.listW}px; --list-h: {(store.listH * 100).toFixed(1)}%">
     <nav class="apps" aria-label="App">
       {#each apps as a (a.label)}
         {@const current = a.module === store.module}
@@ -59,7 +61,7 @@
           aria-label={a.label}
           aria-current={current ? 'page' : undefined}
           title="{a.label} ({a.key})"
-          onclick={() => (a.module ? store.setModule(a.module) : store.soon(a.label))}
+          onclick={() => store.setModule(a.module)}
         >
           <Icon name={a.icon} size={20} stroke={current ? 1.7 : 1.6} />
         </button>
@@ -69,10 +71,20 @@
       <ContactsView />
     {:else if store.module === 'calendario'}
       <CalendarView />
+    {:else if store.module === 'attivita'}
+      <TasksView />
     {:else}
       {#if store.showFolders}<FolderPane />{/if}
-      <MessageList />
-      <ReadingPane />
+      {#if store.readingPane === 'basso'}
+        <div class="stack"><MessageList /><Splitter dir="y" /><ReadingPane /></div>
+      {:else if store.readingPane === 'nascosto'}
+        <!-- Senza riquadro di lettura il messaggio aperto prende il posto dell'elenco. -->
+        {#if (store.fullRead && store.sel !== null) || store.paneCompose}<ReadingPane />{:else}<MessageList />{/if}
+      {:else}
+        <MessageList />
+        <Splitter dir="x" />
+        <ReadingPane />
+      {/if}
     {/if}
   </div>
   <StatusBar />
@@ -89,6 +101,12 @@
 <style>
   .shell { position: relative; height: 100vh; min-height: 560px; display: flex; flex-direction: column; overflow: hidden; }
   .panes { flex: 1; min-height: 0; display: flex; }
+  /* Riquadro di lettura in basso: elenco sopra, messaggio sotto. */
+  .stack { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .stack :global(.pane-list) { width: auto; flex: 0 0 var(--list-h, 46%); min-height: 180px; margin: 0 10px 8px 0; }
+  .stack :global(.pane-read) { flex: 1; min-height: 0; padding-left: 0; }
+  /* Riquadro nascosto: l'elenco occupa tutto lo spazio. */
+  .panes[data-reading="nascosto"] :global(.pane-list) { width: auto; flex: 1 1 auto; margin-right: 10px; }
   .apps { width: 52px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 2px; }
   .app { width: 40px; height: 40px; border: 0; border-radius: 4px; background: transparent; display: grid; place-items: center; color: var(--ink-2); }
   .app.current { background: var(--brand-soft); color: var(--brand-ink); }

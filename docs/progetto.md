@@ -12,7 +12,7 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 
 **Nome (23 ottobre 2026).** Il programma si chiama Better-Look: identificativo `app.betterlook`, archivio `better-look.db`, servizio del portachiavi `Better-Look`, variabili d'ambiente `BETTERLOOK_…`. Al primo avvio `legacy.rs` sposta cartella dei dati, archivio e password delle anteprime uscite con il nome precedente. Le preferenze dell'interfaccia non si spostano (il sistema le tiene per identificativo): ricompare la scelta tra Outlook classico e nuovo. Su Windows e macOS il nuovo programma si installa accanto a quello vecchio, che va disinstallato a mano dopo il primo avvio.
 
-**Fasi da 1 a 7 completate.** Il motore in Rust è collegato all'interfaccia con comandi Tauri.
+**Fasi da 1 a 8 completate** (versione 0.2.0). Il motore in Rust è collegato all'interfaccia con comandi Tauri.
 
 | Parte | Come è fatta |
 |---|---|
@@ -34,6 +34,9 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 | Rubrica | Contatti nell'archivio. Import vCard 2.1/3.0/4.0, CSV (Outlook in italiano e inglese, Google, Thunderbird), LDIF, con riconoscimento della codifica; i contatti già presenti (stessa email) vengono completati, non duplicati. Export vCard. I suggerimenti degli indirizzi usano prima la rubrica, poi la posta. |
 | Calendario | Eventi nell'archivio (tabella `events`), un evento per serie più le occorrenze modificate a parte (stesso UID, `RECURRENCE-ID`). Le ripetizioni si espandono nell'interfaccia (`src/lib/calendar.ts`) in ora locale. File `.ics` letti e scritti in `calendar.rs`: zone orarie dai blocchi VTIMEZONE (anche i nomi di Windows di Outlook), serie scritte con la zona del computer ricavata dal sistema. Promemoria e avvisi dall'interfaccia, solo con il programma aperto. |
 | Inviti | Parte `text/calendar` o allegato `.ics` (iTIP, RFC 5546). REQUEST: Accetta, Provvisorio, Rifiuta con risposta REPLY all'organizzatore; CANCEL: togli dal calendario; REPLY: aggiorna i partecipanti delle riunioni organizzate. Le riunioni create in Better-Look mandano REQUEST, aggiornamenti con SEQUENCE crescente e CANCEL, come messaggi con testo e parte `text/calendar; method=…`. |
+| Conversazioni | Ignora conversazione: la conversazione (account + Message-ID del primo messaggio) va in un elenco nell'archivio; i suoi messaggi vanno in Posta eliminata e quelli nuovi li seguono appena arrivano, dopo le regole. Pulisci conversazione o cartella: un messaggio letto, senza contrassegno né allegati, va in Posta eliminata se il suo testo (senza la parte citata) compare per intero in un messaggio più recente della stessa conversazione (`engine/conversations.rs`). |
+| Azioni rapide e modelli | Salvati nell'archivio (`engine/quick.rs`), con gli stessi controlli nell'interfaccia (`src/lib/quicksteps.ts`): al massimo un'azione che apre un messaggio da scrivere e una che sposta. Le esegue l'interfaccia con i comandi di sempre: prima lo stato (letto, contrassegno, categorie), poi prepara la risposta, poi sposta, e alla fine apre la risposta. I modelli sono HTML ripulito; "Salva come modello" toglie firma e messaggio citato. |
+| Attività | Tabella `tasks` dell'archivio, una riga per attività con i dati in JSON; elenchi dell'utente in `meta`. Gli elenchi intelligenti (La mia giornata, Importanti, Pianificate) si calcolano nell'interfaccia (`src/lib/tasks.ts`). Completando un'attività che si ripete il motore crea subito la successiva (`calendar::next_task_date`). Posta contrassegnata: i messaggi con il contrassegno di tutti gli account; completarli toglie il contrassegno. Promemoria nella stessa finestra di quelli del calendario. |
 | Firme | Più firme con un nome, salvate nell'archivio. Ogni account sceglie la firma per i nuovi messaggi e quella per risposte e inoltri; il pulsante Firma la cambia mentre si scrive. La prima firma parte da nome e indirizzo dell'account. Nel testo la firma è il blocco `id="better-look-firma"`, la citazione `id="better-look-citazione"`: nei messaggi citati questi segni si tolgono. |
 
 **Prove automatiche.** A ogni modifica GitHub Actions esegue i test dell'interfaccia (vitest), i test del motore e una prova completa contro un server di posta vero (Dovecot e un server SMTP di prova, in `tools/posta-di-prova`). Poi prepara gli installer per Windows, macOS (Apple Silicon e Intel) e Linux.
@@ -42,11 +45,12 @@ Repository: [Gimmypaxxion/datini-email](https://github.com/Gimmypaxxion/datini-e
 - Il PST non si modifica: "Apri PST" ne fa una copia nell'archivio di Better-Look, come file di dati separato. Spostare o eliminare messaggi lì non tocca il file originale.
 - I file `.ost` non si aprono (la libreria non legge il formato di Exchange 2013 e successivi).
 - Alcuni allegati di PST generati da programmi diversi da Outlook non sono leggibili dalla libreria: vengono contati e segnalati alla fine dell'importazione.
-- Risposte automatiche, regole sui messaggi in arrivo, invio programmato e promemoria lavorano sul computer: funzionano solo mentre Better-Look è aperto.
+- Risposte automatiche, regole sui messaggi in arrivo, Ignora conversazione, invio programmato e promemoria lavorano sul computer: funzionano solo mentre Better-Look è aperto.
 - Il calendario è solo sul computer: niente Google Calendar, Microsoft 365 o CalDAV, niente calendari condivisi. "Proponi nuovo orario" non c'è ancora.
 - Dai PST si importa solo la posta (non contatti e calendario).
 - Traduci rimanda ai futuri servizi di intelligenza artificiale (prodotto separato).
-- Mancano Attività e modelli di messaggio.
+- Le attività restano sul computer: non si sincronizzano con Microsoft To Do, Google Tasks o CalDAV.
+- Estensioni: il pulsante c'è, ma il modo di farle è ancora da decidere (sezione 7).
 
 ---
 
@@ -149,7 +153,8 @@ Se un giorno il codice dovesse essere mantenuto solo da sviluppatori JavaScript,
 5. **Più account.** POP3, più account insieme e opzioni di sincronizzazione.
 6. **PST.** Import, apertura e export MBOX/EML.
 7. **Organizzazione.** Cartelle, categorie, conversazioni, stampa, lettura ad alta voce, regole e avvisi, risposte automatiche, invio programmato, pulizia, rubrica, calendario e inviti. *(fatto, 24 ottobre 2026)*
-8. **Quando sarà il momento.** OAuth Microsoft 365 e Gmail, firma del codice, aggiornamenti automatici, logo definitivo, licenza e pubblicazione.
+8. **Produttività.** Attività, azioni rapide, modelli di messaggio, Ignora e Pulisci conversazione, Inoltra come allegato, riquadro di lettura a destra, in basso o nascosto, densità dell'elenco; Cmd+Q e scorciatoie del Mac; rifinitura dell'interfaccia. *(fatto, versione 0.2.0, 24 ottobre 2026)*
+9. **Quando sarà il momento.** OAuth Microsoft 365 e Gmail, calendari online (CalDAV), firma del codice, aggiornamenti automatici, logo definitivo, licenza.
 
 **Cosa serve da Gimmy per partire:**
 - account GitHub collegato a Claude, con un repository vuoto, all'inizio privato;
@@ -331,4 +336,4 @@ Tutta la logica sta in JavaScript semplice, nella classe `Component` e nel suo m
 2. Componenti COM e macro VBA, oppure solo regole, azioni rapide ed estensioni JavaScript.
 3. Domini.
 4. ~~Repository GitHub e casella di prova.~~ Fatto: repository personale di Gimmy e server di prova automatico.
-5. Schermate non ancora progettate: Attività.
+5. ~~Schermate non ancora progettate: Attività.~~ Fatto nella versione 0.2.0.

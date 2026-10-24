@@ -157,6 +157,15 @@ export function unwrapBody(html: string): string {
   return s;
 }
 
+/** Solo il testo scritto: senza firma e senza messaggio citato (per i modelli). */
+export function ownHtml(html: string): string {
+  let s = unwrapBody(html);
+  const q = findBlock(s, QUOTE_ID);
+  if (q) s = s.slice(0, q.start);
+  s = replaceSignature(s, null);
+  return s.replace(/^(\s*<div><br\s*\/?><\/div>)+/i, '').replace(/(<div><br\s*\/?><\/div>\s*)+$/i, '').trim();
+}
+
 export function hasQuote(html: string | null | undefined): boolean {
   return !!html && findBlock(html, QUOTE_ID) !== null;
 }

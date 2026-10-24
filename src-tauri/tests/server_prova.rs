@@ -260,6 +260,7 @@ async fn ciclo_completo_imap() {
         mime: None,
         path: None,
         source: Some(AttachmentRef { message_id: lucia.id, index: d.attachments.iter().find(|a| !a.inline).unwrap().index }),
+        message: None,
     }];
     let reply_target = lucia.id;
     msg.reply_to_message = Some(reply_target);

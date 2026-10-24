@@ -25,6 +25,9 @@ use crate::smtp;
 use crate::utf7;
 
 mod agenda;
+mod conversations;
+mod quick;
+mod tasks;
 pub use agenda::InviteAction;
 
 pub type Notifier = Arc<dyn Fn(Event) + Send + Sync>;
@@ -1346,6 +1349,12 @@ impl Engine {
         }
         let ids: Vec<i64> = rows.iter().map(|m| m.id).collect();
         self.db.mark_ruled(&ids)?;
+        // Conversazioni ignorate: i messaggi nuovi vanno subito in Posta eliminata.
+        let dropped = self.drop_ignored(&rows).await?;
+        let rows: Vec<MsgRow> = rows.into_iter().filter(|m| !dropped.contains(&m.id)).collect();
+        if rows.is_empty() {
+            return Ok(());
+        }
         let outcome = self.apply_rules(&rows, &self.rules()?, None).await?;
 
         // La configurazione può essere cambiata mentre si sincronizzava.
@@ -1665,7 +1674,12 @@ impl Engine {
     async fn load_attachments(&self, list: &[DraftAttachment]) -> Result<Vec<AttachmentData>> {
         let mut out = Vec::new();
         for a in list {
-            if let Some(src) = &a.source {
+            if let Some(id) = a.message {
+                let row = self.db.message(id).map_err(|_| Error::user(format!("Il messaggio \"{}\" non è più disponibile.", a.name)))?;
+                let bytes = self.raw(&row).await?;
+                let name = if a.name.is_empty() { format!("{}.eml", row.subject.replace(['/', '\\', ':'], "_")) } else { a.name.clone() };
+                out.push(AttachmentData { name, mime: "message/rfc822".into(), bytes });
+            } else if let Some(src) = &a.source {
                 let (name, mime_type, bytes) = self
                     .attachment(src.message_id, src.index)
                     .await
@@ -1740,6 +1754,7 @@ impl Engine {
                 mime: Some(a.mime),
                 path: None,
                 source: Some(AttachmentRef { message_id: id, index: a.index }),
+                message: None,
             })
             .collect();
         self.changed(&acct.id, vec![drafts.id]);

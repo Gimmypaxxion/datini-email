@@ -259,7 +259,7 @@
     <div class="ed win-in" bind:this={box} role="dialog" aria-modal="true" aria-labelledby="ed-t-{uid}" tabindex="-1" onkeydown={onKey}>
       <header class="ed-h">
         <h2 id="ed-t-{uid}">{heading}</h2>
-        <button class="ibtn btn" onclick={close} aria-label="Chiudi" title="Chiudi (Esc)"><Icon name="x" /></button>
+        <button class="dlg-x" onclick={close} aria-label="Chiudi" title="Chiudi (Esc)"><Icon name="x" size={18} /></button>
       </header>
 
       <div class="ed-b scroll">
@@ -418,7 +418,6 @@
   .inv { flex-wrap: wrap; }
   .form { display: flex; flex-direction: column; gap: 14px; }
   .title { font-size: 16px; height: 38px; }
-  .tf select { appearance: auto; }
   .who { position: relative; }
   .who > label { font-size: 13.5px; font-weight: 600; }
   .chips-box { min-height: 34px; box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -1px 0 var(--ink-3); }

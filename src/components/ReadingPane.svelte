@@ -60,6 +60,9 @@
     </section>
   {:else if m}
     <article class="sheet scroll msg" aria-label={m.subject || 'Messaggio senza oggetto'}>
+      {#if store.readingPane === 'nascosto'}
+        <button class="lbtn back" onclick={() => store.closeFull()} title="Torna all'elenco (Esc)"><Icon name="arrow-left" size={16} />{store.listTitle || 'Torna all’elenco'}</button>
+      {/if}
       <div class="title">
         <h2>{m.subject || '(nessun oggetto)'}</h2>
         {#if m.flagged}<span class="flag" title="Contrassegnato"><Icon name="flag-filled" size={16} style="color:var(--danger)" /></span>{/if}
@@ -197,6 +200,8 @@
   .popout { position: absolute; top: 12px; right: 12px; z-index: 1; }
   .msg { flex: 1; min-height: 0; overflow: auto; box-sizing: border-box; padding: 20px 28px 32px; }
   .title { display: flex; align-items: flex-start; gap: 12px; }
+  .back { height: 30px; margin: -6px 0 10px -8px; display: inline-flex; align-items: center; gap: 8px; padding: 0 8px; font-size: 13.5px; font-weight: 600; }
+  .back:hover { background: var(--hover); }
   h2 { margin: 0; flex: 1; min-width: 0; font-size: 20px; font-weight: 600; line-height: 1.3; text-wrap: balance; overflow-wrap: anywhere; }
   .flag { margin-top: 4px; }
   .cats-r { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }

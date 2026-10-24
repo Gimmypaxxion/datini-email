@@ -337,6 +337,7 @@ impl Parsed<'_> {
                 mime: Some(a.mime),
                 path: None,
                 source: Some(AttachmentRef { message_id: local_id, index: a.index }),
+                message: None,
             })
             .collect();
         Draft {
@@ -653,6 +654,19 @@ fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as
         let with_atts = |mut mixed: MultiPart| {
             for a in atts {
                 let ct = ContentType::parse(&a.mime).unwrap_or_else(|_| ContentType::parse("application/octet-stream").expect("tipo valido"));
+                // Un messaggio allegato va lasciato com'è (RFC 2046): niente base64 se si può.
+                if a.mime == "message/rfc822" {
+                    use lettre::message::Body;
+                    let body = match String::from_utf8(a.bytes.clone()) {
+                        Ok(text) => Body::new_with_encoding(text, ContentTransferEncoding::EightBit).ok(),
+                        // Testo a 8 bit in un'altra codifica: va bene se le righe sono corte e non ci sono byte nulli.
+                        Err(_) => (!a.bytes.contains(&0) && a.bytes.split(|b| *b == b'\n').all(|l| l.len() <= 998)).then(|| Body::dangerous_pre_encoded(a.bytes.clone(), ContentTransferEncoding::EightBit)),
+                    };
+                    if let Some(body) = body {
+                        mixed = mixed.singlepart(Attachment::new(a.name.clone()).body(body, ct));
+                        continue;
+                    }
+                }
                 mixed = mixed.singlepart(Attachment::new(a.name.clone()).body(a.bytes.clone(), ct));
             }
             mixed
@@ -870,5 +884,19 @@ mod tests {
         let h = text_to_html("a < b & c\n\nnuovo");
         assert!(h.contains("a &lt; b &amp; c"));
         assert!(h.contains("<p style=\"margin:0 0 1em 0\">nuovo</p>"));
+    }
+
+    #[test]
+    fn forwards_a_whole_message_as_attachment() {
+        let inner = b"From: Davide <d@example.test>\r\nSubject: Preventivo\r\nMessage-ID: <x@example.test>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nCiao Chiara, il preventivo \xc3\xa8 pronto.\r\n";
+        let mut d = draft();
+        d.subject = "I: Preventivo".into();
+        let built = build(&account(), &d, &[AttachmentData { name: "Preventivo.eml".into(), mime: "message/rfc822".into(), bytes: inner.to_vec() }], false).unwrap();
+        let text = String::from_utf8_lossy(&built.wire).to_string();
+        assert!(text.contains("message/rfc822"), "{text}");
+        assert!(!text.contains("Content-Transfer-Encoding: base64\r\n\r\nRnJvbT"), "{text}");
+        let p = parse(&built.wire).unwrap();
+        let a = p.attachments().into_iter().find(|a| a.mime == "message/rfc822").expect("allegato .eml");
+        assert_eq!(a.name, "Preventivo.eml");
     }
 }

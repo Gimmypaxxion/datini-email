@@ -186,8 +186,8 @@
     <ul class="atts" aria-label="Allegati">
       {#each c.attachments as a, i (a.name + i)}
         <li class="att">
-          <Icon name="paperclip" size={16} style="color:var(--brand-ink)" />
-          <span class="an">{a.name}</span>
+          <Icon name={a.mime === 'message/rfc822' ? 'mail' : 'paperclip'} size={16} style="color:var(--brand-ink)" />
+          <span class="an" title={a.name}>{a.name}</span>
           {#if a.size}<span class="sz">{fileSize(a.size)}</span>{/if}
           <button class="ibtn btn rm" onclick={() => store.removeAttachment(i)} aria-label="Togli {a.name}" title="Togli allegato"><Icon name="x" size={14} /></button>
         </li>

@@ -1,7 +1,7 @@
 // Voci dei menu a comparsa usate in più punti: Sposta in, Categorizza e il
 // menu del clic destro su un messaggio (barra dei comandi, elenco, lettura).
 
-import type { IconName } from './icons';
+import { iconOr, type IconName } from './icons';
 import { store, folderLabel } from './store.svelte';
 import type { MessageSummary } from './types';
 
@@ -53,11 +53,27 @@ export function categoryItems(m: MessageSummary): MenuItem[] {
   return items;
 }
 
+/** Azioni rapide: le voci per eseguirle, poi crea e gestisci. */
+export function quickItems(noSel: boolean, id: number | null = null): MenuItem[] {
+  const items: MenuItem[] = store.quickSteps.map((q) => ({
+    label: q.name,
+    icon: iconOr(q.icon, 'bolt'),
+    keys: q.shortcut ? `Ctrl+Maiusc+${q.shortcut}` : undefined,
+    disabled: noSel,
+    onclick: () => store.runQuickStep(q, id ?? store.sel),
+  }));
+  if (!items.length) items.push({ label: 'Nessuna azione rapida', disabled: true });
+  items.push({ kind: 'sep', label: '' });
+  items.push({ label: 'Nuova azione rapida…', icon: 'plus', onclick: () => store.newQuickStep() });
+  items.push({ label: 'Gestisci azioni rapide…', icon: 'settings', onclick: () => store.manageQuickSteps() });
+  return items;
+}
+
 /**
  * Menu del clic destro su un messaggio. `sub` apre un secondo menu nello
  * stesso punto (Categorizza, Sposta in).
  */
-export function messageItems(m: MessageSummary, sub: (kind: 'categorie' | 'sposta') => void): MenuItem[] {
+export function messageItems(m: MessageSummary, sub: (kind: 'categorie' | 'sposta' | 'azioni') => void): MenuItem[] {
   const reply = (kind: 'reply' | 'replyAll' | 'forward') => async () => {
     if (store.sel !== m.id) await store.pickMsg(m.id, false);
     await store.openCompose(kind);
@@ -67,17 +83,21 @@ export function messageItems(m: MessageSummary, sub: (kind: 'categorie' | 'spost
     { label: 'Rispondi', icon: 'arrow-back-up', keys: 'Ctrl+R', disabled: draft, onclick: reply('reply') },
     { label: 'Rispondi a tutti', icon: 'arrow-back-up-double', keys: 'Ctrl+Maiusc+R', disabled: draft, onclick: reply('replyAll') },
     { label: 'Inoltra', icon: 'arrow-forward-up', keys: 'Ctrl+F', disabled: draft, onclick: reply('forward') },
+    { label: 'Inoltra come allegato', icon: 'paperclip', keys: 'Ctrl+Alt+F', disabled: draft, onclick: () => store.forwardAsAttachment(m.id) },
     { kind: 'sep', label: '' },
     m.unread
       ? { label: 'Segna come letto', icon: 'mail-opened', keys: 'Ctrl+Q', onclick: () => store.setRead(m.id, true) }
       : { label: 'Segna come da leggere', icon: 'mail', keys: 'Ctrl+U', onclick: () => store.setRead(m.id, false) },
     { label: m.flagged ? 'Rimuovi contrassegno' : 'Contrassegna', icon: 'flag', keys: 'Ins', onclick: () => store.toggleFlag(m.id) },
     { label: 'Categorizza…', icon: 'tag', onclick: () => sub('categorie') },
+    { label: 'Azioni rapide…', icon: 'bolt', disabled: draft, onclick: () => sub('azioni') },
+    { label: 'Aggiungi alle attività', icon: 'playlist-add', disabled: draft, onclick: () => store.tasks.fromMessage(m) },
     { kind: 'sep', label: '' },
     { label: 'Sposta in…', icon: 'folder-symlink', keys: 'Ctrl+Maiusc+V', onclick: () => sub('sposta') },
     { label: 'Crea regola…', icon: 'list-check', disabled: draft, onclick: () => store.newRuleFrom(m.id) },
     { label: 'Aggiungi ai contatti', icon: 'user-plus', disabled: draft || !m.from.email, onclick: () => store.addToContacts(m.from) },
     { label: 'Archivia', icon: 'archive', keys: 'Backspace', onclick: () => store.moveMsg(m.id, 'archive') },
+    { label: 'Ignora conversazione', icon: 'mail-off', disabled: draft, onclick: () => store.ignoreConversation(m.id) },
     { label: 'Elimina', icon: 'trash', keys: 'Canc', onclick: () => store.deleteMsg(m.id) },
     { label: 'Stampa', icon: 'printer', keys: 'Ctrl+P', onclick: () => store.printMsg(m.id) },
     { label: 'Segnala come posta indesiderata', icon: 'ban', onclick: () => store.moveMsg(m.id, 'junk') },
