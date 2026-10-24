@@ -105,7 +105,7 @@ Gli installer **non sono ancora firmati**, quindi al primo avvio compare un avvi
 - **Windows:** nella finestra "Windows ha protetto il PC", clicca *Ulteriori informazioni* e poi *Esegui comunque*.
 - **macOS:** apri Better-Look dalla cartella Applicazioni; se compare l'avviso, vai in *Impostazioni di Sistema › Privacy e sicurezza* e clicca *Apri comunque* (sulle versioni di macOS più vecchie basta il tasto destro sull'app e poi *Apri*).
 
-Per pubblicare una versione basta creare un tag, per esempio `v0.2.0`: GitHub pubblica la release con tutti gli installer.
+Per pubblicare una versione basta creare un tag, per esempio `v0.2.0`, anche dalla pagina [Release › Draft a new release](https://github.com/Gimmypaxxion/datini-email/releases/new) (scegli il tag nuovo e premi *Publish release*): GitHub allega da solo tutti gli installer in una ventina di minuti.
 
 ## Sviluppo
 

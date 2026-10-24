@@ -1,8 +1,9 @@
 # Installer per Windows, macOS (Apple Silicon e Intel) e Linux.
 # - A ogni modifica su main: gli installer si scaricano dalla pagina
 #   dell'esecuzione, nella sezione "Artifacts".
-# - Con un tag che inizia per "v" (per esempio v0.2.0): viene pubblicata una
-#   release su GitHub con tutti gli installer allegati, scaricabili da chiunque.
+# - Con un tag che inizia per "v" (per esempio v0.2.0), anche creato dalla
+#   pagina Release di GitHub: la release viene pubblicata con tutti gli
+#   installer allegati, scaricabili da chiunque.
 # Gli installer non sono ancora firmati: la firma arriverà più avanti.
 name: Installer
 
@@ -10,7 +11,15 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  # Anche quando la release si crea dalla pagina di GitHub (Draft a new release).
+  release:
+    types: [published]
   workflow_dispatch:
+
+# Una sola esecuzione per ramo o versione: quella nuova sostituisce quella in corso.
+concurrency:
+  group: installer-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   installer:
