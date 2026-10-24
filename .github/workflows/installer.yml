@@ -1,8 +1,8 @@
 # Installer per Windows, macOS (Apple Silicon e Intel) e Linux.
 # - A ogni modifica su main: gli installer si scaricano dalla pagina
 #   dell'esecuzione, nella sezione "Artifacts".
-# - Con un tag che inizia per "v" (per esempio v0.1.0): viene creata una
-#   release in bozza su GitHub con tutti gli installer allegati.
+# - Con un tag che inizia per "v" (per esempio v0.2.0): viene pubblicata una
+#   release su GitHub con tutti gli installer allegati, scaricabili da chiunque.
 # Gli installer non sono ancora firmati: la firma arriverà più avanti.
 name: Installer
 
