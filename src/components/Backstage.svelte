@@ -79,6 +79,14 @@
             <div><h2>Importa da file MBOX</h2><p>Porta in Better-Look la posta esportata da Thunderbird, Apple Mail o da un altro programma in formato MBOX.</p></div>
           </div>
           <div class="bs-row">
+            <button class="btn bs-tile" onclick={() => { store.setModule('contatti'); store.backstage = false; void store.importContacts(); }}><Icon name="address-book" size={30} stroke={1.5} />Importa contatti</button>
+            <div><h2>Importa la rubrica</h2><p>Porta i contatti esportati da Outlook, Gmail, Apple o Thunderbird (file vCard, CSV o LDIF). I contatti già presenti vengono completati, non duplicati.</p></div>
+          </div>
+          <div class="bs-row">
+            <button class="btn bs-tile" onclick={() => { store.setModule('calendario'); store.backstage = false; void store.cal.importIcs(); }}><Icon name="calendar-plus" size={30} stroke={1.5} />Importa calendario</button>
+            <div><h2>Importa un calendario</h2><p>Aggiungi gli appuntamenti di un file .ics esportato da Outlook, Google Calendar o Apple Calendario. Gli appuntamenti già presenti vengono aggiornati, non duplicati.</p></div>
+          </div>
+          <div class="bs-row">
             <button class="btn bs-tile" onclick={() => store.exportFolder()} disabled={!store.currentFolder}><Icon name="file-export" size={30} stroke={1.5} />Esporta cartella</button>
             <div><h2>Esporta in MBOX</h2><p>Salva una copia della cartella aperta in formato MBOX, leggibile da qualsiasi programma di posta. Per un solo messaggio usa Salva con nome dal messaggio aperto.</p></div>
           </div>
