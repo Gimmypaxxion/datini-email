@@ -103,7 +103,59 @@ CREATE TABLE IF NOT EXISTS pop_seen(
   downloaded_at INTEGER NOT NULL,
   PRIMARY KEY(account_id, uidl)
 );
+CREATE TABLE IF NOT EXISTS msg_categories(
+  mkey TEXT NOT NULL,
+  category TEXT NOT NULL,
+  PRIMARY KEY(mkey, category)
+);
+CREATE TABLE IF NOT EXISTS contacts(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  sort TEXT NOT NULL DEFAULT '',
+  emails TEXT NOT NULL DEFAULT '',
+  data TEXT NOT NULL,
+  updated INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS events(
+  id TEXT PRIMARY KEY,
+  uid TEXT NOT NULL,
+  start INTEGER NOT NULL,
+  end INTEGER NOT NULL,
+  all_day INTEGER NOT NULL DEFAULT 0,
+  recurring INTEGER NOT NULL DEFAULT 0,
+  until INTEGER,
+  data TEXT NOT NULL,
+  updated INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ev_range ON events(start, until);
+CREATE INDEX IF NOT EXISTS ev_uid ON events(uid);
 "#;
+
+/// Colonne aggiunte dopo la prima versione dell'archivio: si aggiungono agli
+/// archivi esistenti all'apertura.
+const ADDED_COLUMNS: [(&str, &str, &str); 2] = [
+    // Conversazione: Message-ID del primo messaggio della discussione.
+    ("messages", "thread", "TEXT"),
+    // Regole già applicate (1) o da applicare (0). I messaggi già presenti
+    // quando la colonna nasce non vanno toccati dalle regole.
+    ("messages", "ruled", "INTEGER NOT NULL DEFAULT 1"),
+];
+
+/// Conversazione di un messaggio: il primo riferimento, oppure il messaggio a
+/// cui risponde, oppure il messaggio stesso.
+pub fn thread_of(message_id: Option<&str>, in_reply_to: &str, refs: &str) -> Option<String> {
+    let first = |s: &str| s.split_whitespace().next().map(|t| t.trim_matches(|c| c == '<' || c == '>').to_string()).filter(|t| !t.is_empty());
+    first(refs).or_else(|| first(in_reply_to)).or_else(|| message_id.map(|m| m.trim_matches(|c| c == '<' || c == '>').to_string()).filter(|m| !m.is_empty()))
+}
+
+/// Chiave con cui le categorie restano legate a un messaggio anche quando
+/// cambia cartella: il Message-ID, oppure l'identificativo locale.
+pub fn category_key(message_id: Option<&str>, id: i64) -> String {
+    match message_id.filter(|m| !m.trim().is_empty()) {
+        Some(m) => format!("m:{m}"),
+        None => format!("l:{id}"),
+    }
+}
 
 /// Bersaglio di un'operazione sul server: per UID, o per Message-ID quando
 /// l'UID non è ancora noto (messaggio appena spostato o salvato).
@@ -134,6 +186,14 @@ pub enum Op {
     Append { folder: String, local_id: i64, flags: String },
     #[serde(rename_all = "camelCase")]
     CreateFolder { path: String },
+    #[serde(rename_all = "camelCase")]
+    RenameFolder { from: String, to: String },
+    /// Elimina la cartella (vuota) dal server.
+    #[serde(rename_all = "camelCase")]
+    DeleteFolder { path: String },
+    /// Segna come letti tutti i messaggi della cartella.
+    #[serde(rename_all = "camelCase")]
+    MarkAllRead { folder: String, local_ids: Vec<i64> },
     /// Toglie dal server le versioni precedenti di una bozza.
     #[serde(rename_all = "camelCase")]
     DeleteDraftVersions { folder: String, draft_key: String, keep_message_id: Option<String> },
@@ -177,6 +237,10 @@ pub struct MsgRow {
     pub refs: String,
     pub in_reply_to: String,
     pub pending: Option<String>,
+    pub thread: Option<String>,
+    pub categories: Vec<String>,
+    /// Messaggi della stessa conversazione nell'account (escluse eliminata e indesiderata).
+    pub thread_count: i64,
 }
 
 impl MsgRow {
@@ -198,7 +262,15 @@ impl MsgRow {
             draft: self.draft,
             has_body: self.has_body,
             folder_name: None,
+            thread: self.thread.clone(),
+            categories: self.categories.clone(),
+            size: self.size,
+            thread_count: self.thread_count,
         }
+    }
+
+    pub fn category_key(&self) -> String {
+        category_key(self.message_id.as_deref(), self.id)
     }
 
     pub fn target(&self) -> Target {
@@ -256,7 +328,12 @@ pub struct Envelope {
 
 const MSG_COLS: &str = "id, account_id, folder_id, uid, message_id, draft_key, date, from_name, from_email, \
     recipients, subject, preview, unread, flagged, answered, draft, has_atts, focused, size, has_body, refs, \
-    in_reply_to, pending";
+    in_reply_to, pending, thread, \
+    (SELECT group_concat(category, char(31)) FROM msg_categories \
+      WHERE mkey = CASE WHEN message_id IS NOT NULL AND message_id != '' THEN 'm:' || message_id ELSE 'l:' || id END), \
+    (SELECT COUNT(*) FROM messages t WHERE t.account_id = messages.account_id AND t.thread = messages.thread \
+      AND (t.pending IS NULL OR t.pending != 'sending') \
+      AND t.folder_id NOT IN (SELECT id FROM folders WHERE role IN ('deleted', 'junk')))";
 
 fn msg_from_row(r: &Row) -> rusqlite::Result<MsgRow> {
     let recipients: String = r.get(9)?;
@@ -283,6 +360,9 @@ fn msg_from_row(r: &Row) -> rusqlite::Result<MsgRow> {
         refs: r.get(20)?,
         in_reply_to: r.get(21)?,
         pending: r.get(22)?,
+        thread: r.get(23)?,
+        categories: r.get::<_, Option<String>>(24)?.map(|s| s.split('\u{1f}').map(String::from).collect()).unwrap_or_default(),
+        thread_count: r.get(25)?,
     })
 }
 
@@ -348,6 +428,20 @@ impl Db {
 
     fn init(conn: Connection) -> Result<Db> {
         conn.execute_batch(SCHEMA)?;
+        for (table, col, def) in ADDED_COLUMNS {
+            let has: bool = conn.prepare(&format!("SELECT 1 FROM pragma_table_info('{table}') WHERE name = ?1"))?.exists([col])?;
+            if !has {
+                conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {col} {def}"))?;
+            }
+        }
+        conn.execute_batch(
+            "UPDATE messages SET thread = CASE
+               WHEN refs != '' THEN substr(refs, 1, instr(refs || ' ', ' ') - 1)
+               WHEN in_reply_to != '' THEN substr(in_reply_to, 1, instr(in_reply_to || ' ', ' ') - 1)
+               ELSE message_id END
+             WHERE thread IS NULL;
+             CREATE INDEX IF NOT EXISTS msg_thread ON messages(account_id, thread);",
+        )?;
         conn.busy_timeout(std::time::Duration::from_secs(10))?;
         Ok(Db { conn: Arc::new(Mutex::new(conn)) })
     }
@@ -463,6 +557,132 @@ impl Db {
         Ok(())
     }
 
+    /// Sottocartelle di una cartella, a qualsiasi profondità.
+    pub fn subfolders(&self, id: i64) -> Result<Vec<FolderRow>> {
+        let f = self.folder(id)?;
+        let prefix = format!("{}{}", f.path, f.delim.as_deref().unwrap_or("/"));
+        Ok(self.folders(&f.account_id)?.into_iter().filter(|x| x.id != f.id && x.path.starts_with(&prefix)).collect())
+    }
+
+    /// Rinomina una cartella e aggiorna il percorso delle sue sottocartelle.
+    pub fn rename_folder(&self, id: i64, new_path: &str, new_name: &str) -> Result<()> {
+        let f = self.folder(id)?;
+        let kids = self.subfolders(id)?;
+        let delim = f.delim.clone().unwrap_or_else(|| "/".into());
+        let c = self.conn();
+        c.execute("UPDATE folders SET path = ?2, name = ?3 WHERE id = ?1", params![id, new_path, new_name])?;
+        for k in kids {
+            let rest = &k.path[f.path.len() + delim.len()..];
+            c.execute("UPDATE folders SET path = ?2 WHERE id = ?1", params![k.id, format!("{new_path}{delim}{rest}")])?;
+        }
+        Ok(())
+    }
+
+    /// Messaggi non letti di una cartella.
+    pub fn unread_in_folder(&self, folder_id: i64) -> Result<Vec<MsgRow>> {
+        let c = self.conn();
+        let mut st = c.prepare(&format!("SELECT {MSG_COLS} FROM messages WHERE folder_id = ?1 AND unread = 1"))?;
+        let rows = st.query_map([folder_id], msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Numero di messaggi e spazio occupato da ogni cartella di un account.
+    pub fn folder_sizes(&self, account_id: &str) -> Result<Vec<(i64, i64, i64)>> {
+        let c = self.conn();
+        let mut st = c.prepare(
+            "SELECT f.id, COUNT(m.id), COALESCE(SUM(m.size), 0) FROM folders f LEFT JOIN messages m ON m.folder_id = f.id
+             WHERE f.account_id = ?1 GROUP BY f.id",
+        )?;
+        let rows = st.query_map([account_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Messaggi più grandi di `min_size` byte in un account, dal più grande.
+    pub fn large_messages(&self, account_id: &str, min_size: i64, limit: i64) -> Result<Vec<MsgRow>> {
+        let c = self.conn();
+        let mut st = c.prepare(&format!("SELECT {MSG_COLS} FROM messages WHERE account_id = ?1 AND size >= ?2 ORDER BY size DESC LIMIT ?3"))?;
+        let rows = st.query_map(params![account_id, min_size, limit], msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Messaggi di una cartella più vecchi della data indicata (secondi).
+    pub fn older_than(&self, folder_id: i64, before: i64) -> Result<Vec<i64>> {
+        let c = self.conn();
+        let mut st = c.prepare("SELECT id FROM messages WHERE folder_id = ?1 AND date < ?2 AND draft = 0")?;
+        let rows = st.query_map(params![folder_id, before], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Tutti i messaggi di una cartella (solo gli identificativi).
+    pub fn folder_message_ids(&self, folder_id: i64) -> Result<Vec<i64>> {
+        let c = self.conn();
+        let mut st = c.prepare("SELECT id FROM messages WHERE folder_id = ?1")?;
+        let rows = st.query_map([folder_id], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    // ---------------- Conversazioni ----------------
+
+    /// Messaggi di una conversazione in tutte le cartelle dell'account,
+    /// tranne Posta eliminata e Indesiderata.
+    pub fn thread_messages(&self, account_id: &str, thread: &str) -> Result<Vec<MsgRow>> {
+        let c = self.conn();
+        let mut st = c.prepare(&format!(
+            "SELECT {MSG_COLS} FROM messages WHERE account_id = ?1 AND (thread = ?2 OR message_id = ?2)
+               AND folder_id NOT IN (SELECT id FROM folders WHERE account_id = ?1 AND role IN ('deleted', 'junk'))
+               AND (pending IS NULL OR pending != 'sending')
+             ORDER BY date ASC, id ASC"
+        ))?;
+        let rows = st.query_map(params![account_id, thread], msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    // ---------------- Categorie ----------------
+
+    pub fn set_category(&self, keys: &[String], category: &str, on: bool) -> Result<()> {
+        let c = self.conn();
+        for k in keys {
+            if on {
+                c.execute("INSERT OR IGNORE INTO msg_categories(mkey, category) VALUES (?1, ?2)", params![k, category])?;
+            } else {
+                c.execute("DELETE FROM msg_categories WHERE mkey = ?1 AND category = ?2", params![k, category])?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn clear_categories(&self, keys: &[String]) -> Result<()> {
+        let c = self.conn();
+        for k in keys {
+            c.execute("DELETE FROM msg_categories WHERE mkey = ?1", [k])?;
+        }
+        Ok(())
+    }
+
+    /// Una categoria eliminata sparisce da tutti i messaggi.
+    pub fn forget_category(&self, category: &str) -> Result<()> {
+        self.conn().execute("DELETE FROM msg_categories WHERE category = ?1", [category])?;
+        Ok(())
+    }
+
+    // ---------------- Regole ----------------
+
+    /// Messaggi arrivati nella cartella e non ancora passati dalle regole.
+    pub fn unruled(&self, folder_id: i64) -> Result<Vec<MsgRow>> {
+        let c = self.conn();
+        let mut st = c.prepare(&format!("SELECT {MSG_COLS} FROM messages WHERE folder_id = ?1 AND ruled = 0 ORDER BY date ASC"))?;
+        let rows = st.query_map([folder_id], msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    pub fn mark_ruled(&self, ids: &[i64]) -> Result<()> {
+        let c = self.conn();
+        for id in ids {
+            c.execute("UPDATE messages SET ruled = 1 WHERE id = ?1", [id])?;
+        }
+        Ok(())
+    }
+
     pub fn set_folder_state(&self, id: i64, uidvalidity: Option<u32>, highest_uid: u32, uidnext: Option<u32>) -> Result<()> {
         self.conn().execute(
             "UPDATE folders SET uidvalidity = ?2, highest_uid = ?3, uidnext = ?4, last_sync = ?5 WHERE id = ?1",
@@ -548,11 +768,12 @@ impl Db {
             }
         }
         let recipients = serde_json::to_string(&m.recipients)?;
+        let thread = thread_of(m.message_id.as_deref(), &m.in_reply_to, &m.refs);
         c.execute(
             "INSERT INTO messages(account_id, folder_id, uid, message_id, draft_key, pop_uidl, date, from_name, from_email,
                recipients, subject, preview, unread, flagged, answered, draft, has_atts, focused, size, has_body, refs,
-               in_reply_to, pending, added_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+               in_reply_to, pending, added_at, thread, ruled)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, 0)",
             params![
                 account_id,
                 folder_id,
@@ -577,7 +798,8 @@ impl Db {
                 m.refs,
                 m.in_reply_to,
                 m.pending,
-                now_secs()
+                now_secs(),
+                thread
             ],
         )?;
         let id = c.last_insert_rowid();
@@ -655,14 +877,21 @@ impl Db {
     pub fn search(&self, query: &str, account_id: Option<&str>, limit: i64) -> Result<Vec<(MsgRow, String)>> {
         let Some(q) = fts_query(query) else { return Ok(Vec::new()) };
         let c = self.conn();
-        let cols = MSG_COLS.split(", ").map(|col| format!("m.{col}")).collect::<Vec<_>>().join(", ");
         let sql = format!(
-            "SELECT {cols}, f.name FROM search s JOIN messages m ON m.id = s.rowid JOIN folders f ON f.id = m.folder_id
-             WHERE search MATCH ?1 AND (?2 IS NULL OR m.account_id = ?2)
-             ORDER BY m.date DESC LIMIT ?3"
+            "SELECT {MSG_COLS} FROM messages WHERE id IN (SELECT rowid FROM search WHERE search MATCH ?1)
+               AND (?2 IS NULL OR account_id = ?2) ORDER BY date DESC LIMIT ?3"
         );
+        let names: std::collections::HashMap<i64, String> = {
+            let mut st = c.prepare("SELECT id, name FROM folders")?;
+            let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect::<rusqlite::Result<_>>()?
+        };
         let mut st = c.prepare(&sql)?;
-        let rows = st.query_map(params![q, account_id, limit], |r| Ok((msg_from_row(r)?, r.get::<_, String>(23)?)))?;
+        let rows = st.query_map(params![q, account_id, limit], |r| {
+            let m = msg_from_row(r)?;
+            let name = names.get(&m.folder_id).cloned().unwrap_or_default();
+            Ok((m, name))
+        })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
@@ -777,8 +1006,22 @@ impl Db {
         let recipients = serde_json::to_string(&m.recipients)?;
         c.execute(
             "UPDATE messages SET message_id = ?2, date = ?3, from_name = ?4, from_email = ?5, recipients = ?6, subject = ?7,
-               preview = ?8, has_atts = ?9, size = ?10, has_body = 1, refs = ?11, in_reply_to = ?12 WHERE id = ?1",
-            params![id, m.message_id, m.date, m.from.name, m.from.email, recipients, m.subject, m.preview, m.has_atts, m.size, m.refs, m.in_reply_to],
+               preview = ?8, has_atts = ?9, size = ?10, has_body = 1, refs = ?11, in_reply_to = ?12, thread = ?13 WHERE id = ?1",
+            params![
+                id,
+                m.message_id,
+                m.date,
+                m.from.name,
+                m.from.email,
+                recipients,
+                m.subject,
+                m.preview,
+                m.has_atts,
+                m.size,
+                m.refs,
+                m.in_reply_to,
+                thread_of(m.message_id.as_deref(), &m.in_reply_to, &m.refs)
+            ],
         )?;
         if let Some(raw) = &m.raw {
             c.execute("INSERT OR REPLACE INTO bodies(message_id, raw) VALUES (?1, ?2)", params![id, raw])?;
@@ -1120,6 +1363,72 @@ mod tests {
         let id = db.outbox_add(&a, b"raw", b"copy", &env, &draft, 0).unwrap();
         assert!(db.outbox_claim(id).unwrap());
         assert!(db.outbox_cancel(id).unwrap().is_none());
+    }
+
+    #[test]
+    fn conversations_join_replies_from_other_folders() {
+        let db = Db::memory().unwrap();
+        let a = account(&db);
+        let inbox = db.upsert_folder(&a, "INBOX", "Posta in arrivo", Some("inbox"), Some("/"), true).unwrap();
+        let sent = db.upsert_folder(&a, "Sent", "Posta inviata", Some("sent"), Some("/"), true).unwrap();
+        let trash = db.upsert_folder(&a, "Trash", "Posta eliminata", Some("deleted"), Some("/"), true).unwrap();
+        db.insert_message(&a, sent, &msg(Some(1), "root@x", "Campionario")).unwrap();
+        let reply = NewMessage { refs: "<root@x>".into(), in_reply_to: "<root@x>".into(), ..msg(Some(1), "r1@x", "Re: Campionario") };
+        let r = db.insert_message(&a, inbox, &reply).unwrap().unwrap();
+        let deleted = NewMessage { refs: "<root@x> <r1@x>".into(), ..msg(Some(2), "r2@x", "Re: Re: Campionario") };
+        db.insert_message(&a, trash, &deleted).unwrap();
+        let row = db.message(r).unwrap();
+        assert_eq!(row.thread.as_deref(), Some("root@x"));
+        // Due messaggi: quello in Posta eliminata non conta.
+        assert_eq!(row.thread_count, 2);
+        let all = db.thread_messages(&a, "root@x").unwrap();
+        assert_eq!(all.iter().map(|m| m.subject.as_str()).collect::<Vec<_>>(), vec!["Campionario", "Re: Campionario"]);
+    }
+
+    #[test]
+    fn categories_follow_the_message_id() {
+        let db = Db::memory().unwrap();
+        let a = account(&db);
+        let f = db.upsert_folder(&a, "INBOX", "Posta in arrivo", Some("inbox"), Some("/"), true).unwrap();
+        let g = db.upsert_folder(&a, "Clienti", "Clienti", None, Some("/"), true).unwrap();
+        let id = db.insert_message(&a, f, &msg(Some(1), "c@x", "Fattura")).unwrap().unwrap();
+        let key = db.message(id).unwrap().category_key();
+        db.set_category(&[key.clone()], "rosso", true).unwrap();
+        db.set_category(&[key.clone()], "blu", true).unwrap();
+        assert_eq!(db.message(id).unwrap().categories.len(), 2);
+        // Lo stesso messaggio ricomparso in un'altra cartella (spostato da un altro programma).
+        let again = db.insert_message(&a, g, &msg(Some(9), "c@x", "Fattura")).unwrap().unwrap();
+        let mut cats = db.message(again).unwrap().categories;
+        cats.sort();
+        assert_eq!(cats, vec!["blu", "rosso"]);
+        db.forget_category("rosso").unwrap();
+        assert_eq!(db.message(id).unwrap().categories, vec!["blu"]);
+        db.clear_categories(&[key]).unwrap();
+        assert!(db.message(id).unwrap().categories.is_empty());
+    }
+
+    #[test]
+    fn renaming_a_folder_moves_its_subfolders() {
+        let db = Db::memory().unwrap();
+        let a = account(&db);
+        let p = db.upsert_folder(&a, "Clienti", "Clienti", None, Some("/"), true).unwrap();
+        let k = db.upsert_folder(&a, "Clienti/Bassano", "Bassano", None, Some("/"), true).unwrap();
+        db.upsert_folder(&a, "Clienti2", "Clienti2", None, Some("/"), true).unwrap();
+        assert_eq!(db.subfolders(p).unwrap().len(), 1);
+        db.rename_folder(p, "Committenti", "Committenti").unwrap();
+        assert_eq!(db.folder(k).unwrap().path, "Committenti/Bassano");
+        assert!(db.folder_by_path(&a, "Clienti2").unwrap().is_some());
+    }
+
+    #[test]
+    fn new_messages_wait_for_the_rules() {
+        let db = Db::memory().unwrap();
+        let a = account(&db);
+        let f = db.upsert_folder(&a, "INBOX", "Posta in arrivo", Some("inbox"), Some("/"), true).unwrap();
+        let id = db.insert_message(&a, f, &msg(Some(1), "n@x", "Nuovo")).unwrap().unwrap();
+        assert_eq!(db.unruled(f).unwrap().len(), 1);
+        db.mark_ruled(&[id]).unwrap();
+        assert!(db.unruled(f).unwrap().is_empty());
     }
 
     #[test]

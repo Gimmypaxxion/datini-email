@@ -32,6 +32,7 @@
       {#each items as [id, label] (id)}
         <button class="bs-it" data-on={store.bsPage === id ? 'si' : 'no'} aria-current={store.bsPage === id ? 'page' : undefined} onclick={() => (store.bsPage = id)}>{label}</button>
       {/each}
+      <button class="bs-it" disabled={store.sel === null} onclick={() => { store.backstage = false; void store.printMsg(); }}>Stampa</button>
       <span style="flex:1"></span>
       <button class="bs-it" data-on={store.bsPage === 'about' ? 'si' : 'no'} aria-current={store.bsPage === 'about' ? 'page' : undefined} onclick={() => (store.bsPage = 'about')}>Informazioni su Better-Look</button>
       <button class="bs-it" onclick={() => store.openSettings('aspetto')}>Opzioni</button>

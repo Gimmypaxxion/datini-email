@@ -21,6 +21,7 @@ use crate::pop3;
 use crate::sanitize;
 use crate::secrets::Secrets;
 use crate::smtp;
+use crate::utf7;
 
 pub type Notifier = Arc<dyn Fn(Event) + Send + Sync>;
 
@@ -35,6 +36,8 @@ struct Worker {
 
 /// Chiave dell'archivio in cui stanno le firme.
 const SIGNATURES_KEY: &str = "firme";
+/// Chiave dell'archivio in cui stanno le categorie colorate.
+const CATEGORIES_KEY: &str = "categorie";
 /// Immagini incollate da una pagina web: oltre questa dimensione restano un collegamento.
 const MAX_PASTED_IMAGE: u64 = 5 * 1024 * 1024;
 
@@ -1012,6 +1015,262 @@ impl Engine {
             self.move_messages(&rows.iter().map(|m| m.id).collect::<Vec<_>>(), dest.id).await?;
         }
         Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Categorie colorate
+    // ------------------------------------------------------------------
+
+    pub fn categories(&self) -> Result<Vec<Category>> {
+        if let Some(list) = self.db.meta(CATEGORIES_KEY)?.and_then(|s| serde_json::from_str(&s).ok()) {
+            return Ok(list);
+        }
+        // Le sei categorie iniziali di Outlook, una per colore.
+        Ok([
+            ("rosso", "Categoria rossa"),
+            ("arancione", "Categoria arancione"),
+            ("giallo", "Categoria gialla"),
+            ("verde", "Categoria verde"),
+            ("blu", "Categoria blu"),
+            ("viola", "Categoria viola"),
+        ]
+        .into_iter()
+        .map(|(c, n)| Category { id: c.into(), name: n.into(), color: c.into() })
+        .collect())
+    }
+
+    /// Salva l'elenco delle categorie. Quelle tolte spariscono dai messaggi.
+    pub fn save_categories(&self, list: Vec<Category>) -> Result<Vec<Category>> {
+        let mut out: Vec<Category> = Vec::new();
+        for mut c in list {
+            c.name = c.name.trim().chars().take(60).collect();
+            if c.name.is_empty() {
+                return Err(Error::user("Ogni categoria deve avere un nome."));
+            }
+            if out.iter().any(|o| o.name.to_lowercase() == c.name.to_lowercase()) {
+                return Err(Error::user(format!("Esiste già una categoria \"{}\".", c.name)));
+            }
+            if !CATEGORY_COLORS.contains(&c.color.as_str()) {
+                c.color = "grigio".into();
+            }
+            if c.id.is_empty() {
+                c.id = mime::random_id()[..10].to_string();
+            }
+            out.push(c);
+        }
+        for old in self.categories()? {
+            if !out.iter().any(|c| c.id == old.id) {
+                self.db.forget_category(&old.id)?;
+            }
+        }
+        self.db.set_meta(CATEGORIES_KEY, &serde_json::to_string(&out)?)?;
+        self.emit(Event::Categories);
+        self.changed("", vec![]);
+        Ok(out)
+    }
+
+    /// Assegna o toglie una categoria ai messaggi.
+    pub fn set_category(&self, ids: &[i64], category: &str, on: bool) -> Result<()> {
+        let rows = self.db.messages_by_ids(ids)?;
+        let keys: Vec<String> = rows.iter().map(|m| m.category_key()).collect();
+        self.db.set_category(&keys, category, on)?;
+        for m in &rows {
+            self.changed(&m.account_id, vec![m.folder_id]);
+        }
+        Ok(())
+    }
+
+    pub fn clear_categories(&self, ids: &[i64]) -> Result<()> {
+        let rows = self.db.messages_by_ids(ids)?;
+        let keys: Vec<String> = rows.iter().map(|m| m.category_key()).collect();
+        self.db.clear_categories(&keys)?;
+        for m in &rows {
+            self.changed(&m.account_id, vec![m.folder_id]);
+        }
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Conversazioni
+    // ------------------------------------------------------------------
+
+    /// Messaggi di una conversazione, in tutte le cartelle dell'account.
+    pub fn thread(&self, account_id: &str, thread: &str) -> Result<Vec<MessageSummary>> {
+        let names: HashMap<i64, String> = self.db.folders(account_id)?.into_iter().map(|f| (f.id, f.name)).collect();
+        Ok(self
+            .db
+            .thread_messages(account_id, thread)?
+            .into_iter()
+            .map(|m| {
+                let mut s = m.summary();
+                s.folder_name = names.get(&m.folder_id).cloned();
+                s
+            })
+            .collect())
+    }
+
+    // ------------------------------------------------------------------
+    // Gestione delle cartelle
+    // ------------------------------------------------------------------
+
+    fn clean_folder_name(name: &str, delim: &str) -> Result<String> {
+        let n = name.trim();
+        if n.is_empty() {
+            return Err(Error::user("Scrivi il nome della cartella."));
+        }
+        if n.chars().count() > 120 {
+            return Err(Error::user("Il nome della cartella è troppo lungo."));
+        }
+        if n.contains(delim) || n.chars().any(|c| c.is_control()) {
+            return Err(Error::user(format!("Il nome della cartella non può contenere il carattere \"{delim}\".")));
+        }
+        Ok(n.to_string())
+    }
+
+    fn folder_delim(&self, account_id: &str) -> Result<String> {
+        Ok(self.db.folders(account_id)?.iter().find_map(|f| f.delim.clone()).filter(|d| !d.is_empty()).unwrap_or_else(|| "/".into()))
+    }
+
+    /// Percorso di una cartella nuova, dentro `parent` o al primo livello
+    /// dell'account (dentro INBOX sui server che mettono lì tutto).
+    fn child_path(&self, acct: &AccountConfig, parent: Option<&FolderRow>, name: &str) -> Result<String> {
+        let delim = self.folder_delim(&acct.id)?;
+        let enc = if acct.kind == AccountKind::Imap { utf7::encode(name) } else { name.to_string() };
+        Ok(match parent {
+            Some(p) => format!("{}{delim}{enc}", p.path),
+            None => {
+                let folders = self.db.folders(&acct.id)?;
+                let others: Vec<&FolderRow> = folders.iter().filter(|f| !f.path.eq_ignore_ascii_case("INBOX")).collect();
+                let under_inbox = acct.kind == AccountKind::Imap
+                    && !others.is_empty()
+                    && others.iter().all(|f| f.path.to_ascii_uppercase().starts_with(&format!("INBOX{delim}")));
+                if under_inbox {
+                    format!("INBOX{delim}{enc}")
+                } else {
+                    enc
+                }
+            }
+        })
+    }
+
+    /// Crea una cartella, dentro un'altra o al primo livello dell'account.
+    pub fn create_folder(&self, account_id: &str, parent_id: Option<i64>, name: &str) -> Result<i64> {
+        let acct = self.db.account(account_id)?;
+        let delim = self.folder_delim(account_id)?;
+        let name = Self::clean_folder_name(name, &delim)?;
+        let parent = match parent_id {
+            Some(id) => Some(self.db.folder(id)?),
+            None => None,
+        };
+        let path = self.child_path(&acct, parent.as_ref(), &name)?;
+        if self.db.folder_by_path(account_id, &path)?.is_some() {
+            return Err(Error::user(format!("Esiste già una cartella \"{name}\" in questa posizione.")));
+        }
+        let id = self.db.upsert_folder(account_id, &path, &name, None, Some(&delim), true)?;
+        if acct.kind == AccountKind::Imap {
+            self.db.push_op(account_id, &Op::CreateFolder { path })?;
+            self.wake(account_id);
+        }
+        self.changed(account_id, vec![]);
+        Ok(id)
+    }
+
+    pub fn rename_folder(&self, folder_id: i64, name: &str) -> Result<()> {
+        let f = self.db.folder(folder_id)?;
+        if f.role.is_some() {
+            return Err(Error::user("Le cartelle predefinite non si possono rinominare."));
+        }
+        let acct = self.db.account(&f.account_id)?;
+        let delim = f.delim.clone().filter(|d| !d.is_empty()).unwrap_or_else(|| "/".into());
+        let name = Self::clean_folder_name(name, &delim)?;
+        let enc = if acct.kind == AccountKind::Imap { utf7::encode(&name) } else { name.clone() };
+        let path = match f.path.rsplit_once(delim.as_str()) {
+            Some((parent, _)) => format!("{parent}{delim}{enc}"),
+            None => enc,
+        };
+        if path == f.path {
+            return Ok(());
+        }
+        if self.db.folder_by_path(&f.account_id, &path)?.is_some() {
+            return Err(Error::user(format!("Esiste già una cartella \"{name}\" in questa posizione.")));
+        }
+        self.db.rename_folder(f.id, &path, &name)?;
+        if acct.kind == AccountKind::Imap {
+            self.db.push_op(&acct.id, &Op::RenameFolder { from: f.path.clone(), to: path })?;
+            self.wake(&acct.id);
+        }
+        self.changed(&acct.id, vec![]);
+        Ok(())
+    }
+
+    /// Elimina una cartella e le sue sottocartelle. I messaggi vanno in Posta
+    /// eliminata; se la cartella è già lì dentro, spariscono del tutto.
+    pub async fn delete_folder(&self, folder_id: i64) -> Result<()> {
+        let f = self.db.folder(folder_id)?;
+        if f.role.is_some() {
+            return Err(Error::user("Le cartelle predefinite non si possono eliminare."));
+        }
+        let acct = self.db.account(&f.account_id)?;
+        let mut all = self.db.subfolders(f.id)?;
+        all.push(f.clone());
+        // Dalla più profonda: il server non elimina le cartelle che ne contengono altre.
+        all.sort_by_key(|x| std::cmp::Reverse(x.path.len()));
+        let trash = self.db.folder_by_role(&acct.id, "deleted")?;
+        let inside_trash = trash.as_ref().map(|t| f.path.starts_with(&format!("{}{}", t.path, f.delim.as_deref().unwrap_or("/")))).unwrap_or(false);
+        for x in &all {
+            let ids = self.db.folder_message_ids(x.id)?;
+            if ids.is_empty() {
+                continue;
+            }
+            if inside_trash || (acct.kind == AccountKind::Local && trash.is_none()) {
+                let rows = self.db.messages_by_ids(&ids)?;
+                self.remove_permanently(&acct, x, &rows)?;
+            } else {
+                let t = self.role_folder(&acct, "deleted")?;
+                self.move_messages(&ids, t.id).await?;
+            }
+        }
+        for x in &all {
+            self.db.delete_folder(x.id)?;
+            if acct.kind == AccountKind::Imap {
+                self.db.push_op(&acct.id, &Op::DeleteFolder { path: x.path.clone() })?;
+            }
+        }
+        if acct.kind == AccountKind::Imap {
+            self.wake(&acct.id);
+        }
+        self.changed(&acct.id, vec![]);
+        Ok(())
+    }
+
+    pub fn mark_folder_read(&self, folder_id: i64) -> Result<()> {
+        let f = self.db.folder(folder_id)?;
+        let acct = self.db.account(&f.account_id)?;
+        let rows = self.db.unread_in_folder(f.id)?;
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let ids: Vec<i64> = rows.iter().map(|m| m.id).collect();
+        let imap = acct.kind == AccountKind::Imap;
+        self.db.set_local_flags(&ids, Some(true), None, None, imap)?;
+        if imap {
+            self.db.push_op(&acct.id, &Op::MarkAllRead { folder: f.path.clone(), local_ids: ids })?;
+            self.wake(&acct.id);
+        }
+        self.changed(&acct.id, vec![f.id]);
+        Ok(())
+    }
+
+    /// Svuota una cartella: i messaggi spariscono del tutto (per Posta
+    /// eliminata e Posta indesiderata).
+    pub fn empty_folder(&self, folder_id: i64) -> Result<usize> {
+        let f = self.db.folder(folder_id)?;
+        let acct = self.db.account(&f.account_id)?;
+        let ids = self.db.folder_message_ids(f.id)?;
+        let rows = self.db.messages_by_ids(&ids)?;
+        let n = rows.len();
+        self.remove_permanently(&acct, &f, &rows)?;
+        Ok(n)
     }
 
     // ------------------------------------------------------------------

@@ -4,6 +4,7 @@
 
 import type {
   Account,
+  Category,
   Draft,
   DraftAttachment,
   EngineEvent,
@@ -43,6 +44,20 @@ export interface Backend {
   moveMessages(ids: number[], folderId: number): Promise<void>;
   moveToRole(ids: number[], role: Role): Promise<void>;
   deleteMessages(ids: number[]): Promise<void>;
+  categories(): Promise<Category[]>;
+  saveCategories(list: Category[]): Promise<Category[]>;
+  setCategory(ids: number[], category: string, on: boolean): Promise<void>;
+  clearCategories(ids: number[]): Promise<void>;
+  /** Messaggi di una conversazione in tutte le cartelle dell'account, dal più vecchio. */
+  thread(accountId: string, thread: string): Promise<MessageSummary[]>;
+  /** Nuova cartella dentro `parentId`, o al primo livello dell'account. Restituisce l'identificativo. */
+  createFolder(accountId: string, parentId: number | null, name: string): Promise<number>;
+  renameFolder(id: number, name: string): Promise<void>;
+  /** Elimina la cartella e le sottocartelle; i messaggi vanno in Posta eliminata. */
+  deleteFolder(id: number): Promise<void>;
+  markFolderRead(id: number): Promise<void>;
+  /** Elimina definitivamente tutti i messaggi della cartella. Restituisce quanti erano. */
+  emptyFolder(id: number): Promise<number>;
   saveDraft(d: Draft): Promise<SavedDraft>;
   closeDraft(d: Draft): Promise<SavedDraft | null>;
   discardDraft(accountId: string, key: string): Promise<void>;
@@ -67,6 +82,14 @@ export interface Backend {
   /** Apre il messaggio in una finestra del sistema. Falso se non è possibile. */
   openComposeWindow(d: Draft): Promise<boolean>;
   takeComposeDraft(): Promise<Draft | null>;
+  /** Finestra con il messaggio pronto da stampare. Falso se non si può aprire. */
+  openPrintWindow(id: number, remote: boolean): Promise<boolean>;
+  /** Finestra di stampa del sistema per la pagina corrente. */
+  printPage(): Promise<void>;
+  /** Lettura con la voce del sistema, quando la pagina non ha voci proprie. */
+  speak(text: string): Promise<void>;
+  speaking(): Promise<boolean>;
+  stopSpeaking(): Promise<void>;
   onEvent(cb: (e: EngineEvent) => void): () => void;
 }
 
@@ -136,6 +159,36 @@ export class TauriBackend implements Backend {
   }
   deleteMessages(ids: number[]) {
     return this.call<void>('delete_messages', { ids });
+  }
+  categories() {
+    return this.call<Category[]>('categories');
+  }
+  saveCategories(list: Category[]) {
+    return this.call<Category[]>('save_categories', { list });
+  }
+  setCategory(ids: number[], category: string, on: boolean) {
+    return this.call<void>('set_category', { ids, category, on });
+  }
+  clearCategories(ids: number[]) {
+    return this.call<void>('clear_categories', { ids });
+  }
+  thread(accountId: string, thread: string) {
+    return this.call<MessageSummary[]>('thread', { accountId, thread });
+  }
+  createFolder(accountId: string, parentId: number | null, name: string) {
+    return this.call<number>('create_folder', { accountId, parentId, name });
+  }
+  renameFolder(id: number, name: string) {
+    return this.call<void>('rename_folder', { id, name });
+  }
+  deleteFolder(id: number) {
+    return this.call<void>('delete_folder', { id });
+  }
+  markFolderRead(id: number) {
+    return this.call<void>('mark_folder_read', { id });
+  }
+  emptyFolder(id: number) {
+    return this.call<number>('empty_folder', { id });
   }
   saveDraft(draft: Draft) {
     return this.call<SavedDraft>('save_draft', { draft });
@@ -213,6 +266,22 @@ export class TauriBackend implements Backend {
   }
   takeComposeDraft() {
     return this.call<Draft | null>('take_compose_draft');
+  }
+  async openPrintWindow(id: number, remote: boolean) {
+    await this.call<void>('open_print_window', { id, remote });
+    return true;
+  }
+  printPage() {
+    return this.call<void>('print_page');
+  }
+  speak(text: string) {
+    return this.call<void>('speak', { text });
+  }
+  speaking() {
+    return this.call<boolean>('speaking');
+  }
+  stopSpeaking() {
+    return this.call<void>('stop_speaking');
   }
   onEvent(cb: (e: EngineEvent) => void) {
     let stop: (() => void) | null = null;

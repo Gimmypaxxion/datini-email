@@ -6,7 +6,8 @@
   import type { IconName } from '../lib/icons';
   import Composer from './Composer.svelte';
   import MailFrame from './MailFrame.svelte';
-  import Menu, { type MenuItem } from './Menu.svelte';
+  import Menu from './Menu.svelte';
+  import { categoryItems, type MenuItem } from '../lib/menus';
   import { store } from '../lib/store.svelte';
   import { fileSize, initials, linkify, longDate, peopleText, personLabel, tint } from '../lib/format';
   import type { AttachmentInfo } from '../lib/types';
@@ -19,6 +20,7 @@
 
   let moreBtn: HTMLButtonElement | undefined = $state();
   let moreOpen = $state(false);
+  let catsOpen = $state(false);
 
   function fileIcon(a: AttachmentInfo): { icon: IconName; color: string } {
     const n = a.name.toLowerCase();
@@ -36,7 +38,10 @@
       ? [
           { label: 'Segna come non letto', icon: 'mail-opened', onclick: () => store.setRead(m.id, false) },
           { label: m.flagged ? 'Rimuovi contrassegno' : 'Contrassegna', icon: 'flag', onclick: () => store.toggleFlag(m.id) },
+          { label: 'Categorizza…', icon: 'tag', onclick: () => setTimeout(() => (catsOpen = true), 0) },
           { kind: 'sep', label: '' },
+          { label: 'Stampa', icon: 'printer', keys: 'Ctrl+P', onclick: () => store.printMsg(m.id) },
+          { label: 'Leggi ad alta voce', icon: 'volume', onclick: () => store.toggleSpeech() },
           { label: 'Salva con nome', icon: 'download', onclick: () => store.saveMessageAs(), disabled: !store.backend.real },
           { label: 'Segnala come posta indesiderata', icon: 'ban', onclick: () => store.moveMsg(m.id, 'junk') },
           { label: 'Elimina', icon: 'trash', onclick: () => store.deleteMsg(m.id) },
@@ -57,6 +62,19 @@
         <h2>{m.subject || '(nessun oggetto)'}</h2>
         {#if m.flagged}<span class="flag" title="Contrassegnato"><Icon name="flag-filled" size={16} style="color:var(--danger)" /></span>{/if}
       </div>
+      {#if m.categories.length}
+        <div class="cats-r" aria-label="Categorie">
+          {#each m.categories as id (id)}
+            {@const c = store.category(id)}
+            {#if c}
+              <span class="cat" style:background="var(--cat-{c.color}-bg)" style:color="var(--cat-{c.color}-fg)">
+                <span class="cat-t">{c.name}</span>
+                <button class="cat-x" onclick={() => store.toggleCategory(m.id, c.id)} aria-label="Togli la categoria {c.name}" title="Togli la categoria"><Icon name="x" size={12} stroke={2} /></button>
+              </span>
+            {/if}
+          {/each}
+        </div>
+      {/if}
       <div class="hdr">
         <span class="avatar" aria-hidden="true" style="width:44px;height:44px;font-size:15px;background:{t.bg};color:{t.fg}">{initials(name)}</span>
         <div class="who">
@@ -75,6 +93,17 @@
           <span class="date">{longDate(m.date)}</span>
         </div>
       </div>
+
+      {#if store.speech !== 'off'}
+        <div class="note-bar info speech" role="status">
+          <Icon name="volume" style="color:var(--brand-ink)" />
+          <span class="t">{store.speech === 'paused' ? 'Lettura in pausa' : 'Lettura ad alta voce in corso'}</span>
+          {#if store.canPauseSpeech}
+            <button class="act" onclick={() => store.pauseSpeech()}><Icon name={store.speech === 'paused' ? 'player-play' : 'player-pause'} size={16} />{store.speech === 'paused' ? 'Riprendi' : 'Pausa'}</button>
+          {/if}
+          <button class="act" onclick={() => store.stopSpeech()}><Icon name="player-stop" size={16} />Interrompi</button>
+        </div>
+      {/if}
 
       {#if m.remoteImages > 0 && !m.remoteAllowed}
         <div class="note-bar info privacy" role="note">
@@ -121,6 +150,9 @@
     {#if moreOpen && moreBtn}
       <Menu anchor={moreBtn} items={moreItems} label="Altre azioni" onclose={() => (moreOpen = false)} />
     {/if}
+    {#if catsOpen && moreBtn}
+      <Menu anchor={moreBtn} items={categoryItems(m)} label="Categorizza" onclose={() => (catsOpen = false)} />
+    {/if}
   {:else if store.sel !== null && store.detailError}
     <div class="sheet none" role="alert">
       <Icon name="alert-circle" size={56} stroke={1.2} style="color:var(--danger)" />
@@ -163,6 +195,10 @@
   .title { display: flex; align-items: flex-start; gap: 12px; }
   h2 { margin: 0; flex: 1; min-width: 0; font-size: 20px; font-weight: 600; line-height: 1.3; text-wrap: balance; overflow-wrap: anywhere; }
   .flag { margin-top: 4px; }
+  .cats-r { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .cats-r .cat { height: 22px; padding-right: 2px; font-size: 12.5px; max-width: 220px; }
+  .cat-x { width: 18px; height: 18px; flex: none; margin-left: 1px; border: 0; border-radius: 3px; background: transparent; color: inherit; display: grid; place-items: center; opacity: .75; }
+  .cat-x:hover { opacity: 1; background: color-mix(in srgb, currentColor 14%, transparent); }
   .hdr { margin-top: 16px; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; column-gap: 14px; align-items: start; }
   .who { min-width: 0; padding-top: 1px; }
   .from { margin: 0; font-size: 15px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -173,7 +209,8 @@
   .acts { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   .row-btns { display: flex; gap: 2px; }
   .date { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .privacy { margin: 16px 0 0 58px; border-radius: 4px; }
+  .privacy, .speech { margin: 16px 0 0 58px; border-radius: 4px; }
+  .speech .act { display: inline-flex; align-items: center; gap: 6px; }
   .atts { margin: 14px 0 0 58px; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
   .att { position: relative; display: flex; align-items: center; max-width: 300px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--rule-2); }
   .open { min-width: 0; height: 50px; display: flex; align-items: center; gap: 10px; padding: 0 14px 0 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; }
@@ -189,6 +226,6 @@
   .none { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 32px; }
   .none .t { margin: 16px 0 4px; font-size: 15px; font-weight: 600; }
   .none .d { margin: 0; max-width: 46ch; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
-  @media (max-width: 1200px) { .body, .atts, .foot, .privacy { margin-left: 0; } }
+  @media (max-width: 1200px) { .body, .atts, .foot, .privacy, .speech { margin-left: 0; } }
   @media (max-width: 760px) { .pane-read { display: none; } }
 </style>

@@ -1,39 +1,47 @@
 <script lang="ts" module>
-  import type { IconName } from '../lib/icons';
-
-  export interface MenuItem {
-    label: string;
-    icon?: IconName;
-    disabled?: boolean;
-    /** Rientro per le sottocartelle. */
-    depth?: number;
-    onclick?: () => void;
-    kind?: 'item' | 'sep' | 'head';
-  }
+  export type { MenuItem } from '../lib/menus';
 </script>
 
 <script lang="ts">
   // Menu a comparsa sotto un pulsante. Si chiude con Esc, con un clic fuori
   // o dopo aver scelto una voce; le frecce spostano il fuoco tra le voci.
   import Icon from '../lib/Icon.svelte';
+  import type { MenuItem } from '../lib/menus';
 
-  let { anchor, items, label, onclose }: { anchor: HTMLElement; items: MenuItem[]; label: string; onclose: () => void } = $props();
+  let {
+    anchor,
+    items,
+    label,
+    onclose,
+    at = undefined,
+  }: {
+    anchor: HTMLElement;
+    items: MenuItem[];
+    label: string;
+    onclose: () => void;
+    /** Punto in cui aprire il menu (clic destro); altrimenti sotto `anchor`. */
+    at?: { x: number; y: number };
+  } = $props();
 
   let el: HTMLDivElement | undefined = $state();
   let pos = $state({ left: 0, top: 0 });
 
   // In fondo alla pagina, così la posizione è sempre quella dello schermo.
+  // Il menu esce dal contenitore: va tolto a mano quando si chiude.
   $effect(() => {
-    if (el && el.parentElement !== document.body) document.body.appendChild(el);
+    const node = el;
+    if (node && node.parentElement !== document.body) document.body.appendChild(node);
+    return () => node?.remove();
   });
 
   $effect(() => {
-    const r = anchor.getBoundingClientRect();
+    const r = at ? { left: at.x, top: at.y, bottom: at.y } : anchor.getBoundingClientRect();
     const w = el?.offsetWidth ?? 240;
     const h = el?.offsetHeight ?? 200;
+    const gap = at ? 0 : 4;
     pos = {
       left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)),
-      top: r.bottom + 4 + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 4) : r.bottom + 4,
+      top: r.bottom + gap + h > window.innerHeight - 8 ? Math.max(8, r.top - h - gap) : r.bottom + gap,
     };
     el?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
     const away = (e: MouseEvent) => {
@@ -64,6 +72,7 @@
   }
 </script>
 
+<div class="portal">
 <!-- svelte-ignore a11y_interactive_supports_focus -->
 <div class="menu rise" bind:this={el} role="menu" aria-label={label} style:left="{pos.left}px" style:top="{pos.top}px" onkeydown={onkey}>
   {#each items as it, i (i)}
@@ -74,7 +83,8 @@
     {:else}
       <button
         class="menu-it"
-        role="menuitem"
+        role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+        aria-checked={it.checked}
         disabled={it.disabled}
         style:padding-left={it.depth ? `${10 + it.depth * 16}px` : undefined}
         onclick={() => {
@@ -82,9 +92,12 @@
           it.onclick?.();
         }}
       >
-        {#if it.icon}<Icon name={it.icon} size={17} />{/if}
+        {#if it.swatch}<span class="menu-sw" style:background={it.swatch} aria-hidden="true"></span>{:else if it.icon}<Icon name={it.icon} size={17} />{/if}
         <span class="lab">{it.label}</span>
+        {#if it.keys}<span class="menu-k">{it.keys}</span>{/if}
+        {#if it.checked}<Icon name="check" size={16} class="menu-ck" />{/if}
       </button>
     {/if}
   {/each}
+</div>
 </div>

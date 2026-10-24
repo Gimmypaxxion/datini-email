@@ -2,12 +2,18 @@ import './app.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
 import ComposeApp from './components/ComposeApp.svelte';
+import PrintApp from './components/PrintApp.svelte';
 import { store, type StyleName, type ThemeChoice } from './lib/store.svelte';
 
 const params = new URLSearchParams(location.search);
 const target = document.getElementById('app')!;
 
-if (params.get('finestra') === 'messaggio') {
+if (params.get('finestra') === 'stampa') {
+  // Finestra di stampa di un messaggio.
+  store.mode = 'messaggio';
+  store.onboarding = false;
+  mount(PrintApp, { target, props: { id: Number(params.get('id')), remote: params.get('remoto') === '1' } });
+} else if (params.get('finestra') === 'messaggio') {
   // Finestra separata per scrivere un messaggio.
   store.mode = 'messaggio';
   store.onboarding = false;

@@ -5,8 +5,9 @@
   import RB from './RB.svelte';
   import RibbonCompose from './RibbonCompose.svelte';
   import Icon from '../lib/Icon.svelte';
-  import Menu, { type MenuItem } from './Menu.svelte';
-  import { store, folderLabel, type RibbonTab } from '../lib/store.svelte';
+  import Menu from './Menu.svelte';
+  import { store, TRANSLATE_LANGS, type RibbonTab } from '../lib/store.svelte';
+  import { categoryItems, moveItems } from '../lib/menus';
   import { REPO_URL } from '../lib/platform';
 
   const TAB_NAMES: Record<RibbonTab, string> = {
@@ -24,28 +25,16 @@
   const sel = $derived(store.sel);
 
   let moveAnchor = $state<HTMLElement | null>(null);
-  const moveItems = $derived.by<MenuItem[]>(() => {
-    const m = store.selected;
-    if (!m) return [];
-    const folders = store.foldersOf(m.accountId).filter((f) => f.id !== m.folderId && f.selectable);
-    const items: MenuItem[] = folders.map((f) => ({
-      label: folderLabel(f),
-      icon: f.role === 'archive' ? 'archive' : f.role === 'deleted' ? 'trash' : f.role === 'junk' ? 'ban' : f.role === 'inbox' ? 'inbox' : 'folder',
-      depth: f.role ? 0 : Math.max(0, f.depth - (/^inbox[./]/i.test(f.path) ? 1 : 0)),
-      onclick: () => store.moveToFolder(m.id, f.id),
-    }));
-    const others = store.accounts.filter((a) => a.id !== m.accountId);
-    for (const a of others) {
-      const fs = store.foldersOf(a.id).filter((f) => f.selectable && f.role !== 'drafts' && f.role !== 'sent');
-      if (!fs.length) continue;
-      items.push({ kind: 'head', label: a.kind === 'local' ? a.name : a.email });
-      for (const f of fs) items.push({ label: folderLabel(f), icon: 'folder', onclick: () => store.moveToFolder(m.id, f.id) });
-    }
-    return items;
-  });
+  let catAnchor = $state<HTMLElement | null>(null);
+  let trAnchor = $state<HTMLElement | null>(null);
+  const trItems = TRANSLATE_LANGS.map(([code, name]) => ({ label: `Traduci in ${name}`, icon: 'language' as const, onclick: () => store.translate(code) }));
 
   function openMove(e: MouseEvent) {
     moveAnchor = moveAnchor ? null : (e.currentTarget as HTMLElement);
+  }
+
+  function openCats(e: MouseEvent) {
+    catAnchor = catAnchor ? null : (e.currentTarget as HTMLElement);
   }
 </script>
 
@@ -105,7 +94,7 @@
 
       <div class="rg"><div class="rgb"><div class="rs">
         <RB icon="mail-opened" tone="c-brand" label="Letto/Non letto" title="Segna come letto (Ctrl+Q) o non letto (Ctrl+U)" disabled={noSel} onclick={() => store.toggleRead(sel)} />
-        <RB menu labelExtOnly icon="tag" tone="c-amber" label="Categorizza" disabled={noSel} onclick={() => store.soon('Categorie')} />
+        <RB menu labelExtOnly icon="tag" tone="c-amber" label="Categorizza" disabled={noSel} pressed={!!catAnchor} onclick={openCats} />
         <RB icon="flag" tone="c-red" label="Contrassegna" title="Contrassegna (Ins)" disabled={noSel} onclick={() => store.toggleFlag(sel)} />
       </div></div><span class="rgl">Tag</span></div>
 
@@ -114,11 +103,11 @@
       </div><span class="rgl">Trova</span></div>
 
       <div class="rg only-e p1"><div class="rgb">
-        <RB big icon="volume" tone="c-brand" label="Leggi ad alta voce" onclick={() => store.soon('Leggi ad alta voce')} />
+        <RB big icon={store.speech === 'off' ? 'volume' : 'player-stop'} tone="c-brand" label={store.speech === 'off' ? 'Leggi ad alta voce' : 'Interrompi la lettura'} title="Leggi ad alta voce il messaggio (Ctrl+Alt+Spazio)" disabled={noSel && store.speech === 'off'} pressed={store.speech !== 'off'} onclick={() => store.toggleSpeech()} />
       </div><span class="rgl">Comandi vocali</span></div>
 
       <div class="rg only-e p1"><div class="rgb">
-        <RB big menu icon="language" tone="c-brand" label="Traduci" title="Traduci il messaggio" onclick={() => store.soon('Traduci')} />
+        <RB big menu icon="language" tone="c-brand" label="Traduci" title="Traduci il messaggio" disabled={noSel} pressed={!!trAnchor} onclick={(e) => (trAnchor = trAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Lingua</span></div>
 
       <div class="rg only-e p2"><div class="rgb">
@@ -131,7 +120,7 @@
       </div><span class="rgl">Layout</span></div>
       <div class="rg"><div class="rgb">
         <RB big menu icon="layout-rows" label="Densità" onclick={() => store.soon('Densità')} />
-        <RB big icon="messages" label="Conversazioni" onclick={() => store.soon('Vista per conversazioni')} />
+        <RB big icon="messages" label="Conversazioni" title="Mostra i messaggi raggruppati per conversazione" pressed={store.conversations} onclick={() => store.toggleConversations()} />
       </div><span class="rgl">Elenco messaggi</span></div>
       <div class="rg"><div class="rgb">
         <RB big icon={store.theme === 'scuro' ? 'sun' : 'moon'} tone={store.theme === 'scuro' ? 'c-amber' : ''} label={store.theme === 'scuro' ? 'Tema chiaro' : 'Tema scuro'} onclick={() => store.toggleTheme()} />
@@ -152,8 +141,14 @@
     {/if}
     </div>
 
-    {#if moveAnchor}
-      <Menu anchor={moveAnchor} items={moveItems} label="Sposta in" onclose={() => (moveAnchor = null)} />
+    {#if moveAnchor && store.selected}
+      <Menu anchor={moveAnchor} items={moveItems(store.selected)} label="Sposta in" onclose={() => (moveAnchor = null)} />
+    {/if}
+    {#if trAnchor}
+      <Menu anchor={trAnchor} items={trItems} label="Traduci" onclose={() => (trAnchor = null)} />
+    {/if}
+    {#if catAnchor && store.selected}
+      <Menu anchor={catAnchor} items={categoryItems(store.selected)} label="Categorizza" onclose={() => (catAnchor = null)} />
     {/if}
     <button class="rb ico rib-tg" onclick={() => store.toggleRibbon()} aria-label={ext ? 'Passa alla barra compatta' : 'Passa alla barra estesa'} title={ext ? 'Passa alla barra compatta' : 'Passa alla barra estesa'}>
       <Icon name={ext ? 'chevron-up' : 'chevron-down'} />

@@ -1,8 +1,12 @@
 <script lang="ts">
   // Elenco messaggi: schede Prioritaria/Altre, gruppi per data, azioni rapide
   // al passaggio del mouse, posta in uscita e avvisi (offline, invio, bozze).
+  // Con la vista per conversazioni i messaggi della stessa discussione stanno
+  // in una riga sola, che si apre con la freccia. Clic destro: menu del messaggio.
   import Icon from '../lib/Icon.svelte';
-  import { store, folderLabel } from '../lib/store.svelte';
+  import Menu from './Menu.svelte';
+  import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
+  import { categoryItems, messageItems, moveItems, type MenuItem } from '../lib/menus';
   import { GROUP_ORDER, groupLabel, initials, listTime, peopleText, personLabel, tint } from '../lib/format';
   import type { MessageSummary, Role } from '../lib/types';
 
@@ -26,12 +30,39 @@
   const role = $derived(store.currentFolder?.role ?? null);
   const showRecipients = $derived(!q && (role === 'sent' || role === 'drafts'));
   const now = $derived(new Date(store.list.length ? Date.now() : 0));
-  const groups = $derived.by(() => {
-    const by = new Map<string, MessageSummary[]>();
+  /** Una riga dell'elenco: un messaggio, o l'ultimo messaggio di una conversazione. */
+  interface Row {
+    m: MessageSummary;
+    /** Vista per conversazioni: chiave e numero di messaggi (anche di altre cartelle). */
+    conv?: { key: string; count: number; unread: boolean };
+  }
+
+  const convMode = $derived(store.conversations && !q && store.view === 'cartella');
+
+  const rows = $derived.by<Row[]>(() => {
+    if (!convMode) return store.list.map((m) => ({ m }));
+    const out: Row[] = [];
+    const seen = new Map<string, Row>();
     for (const m of store.list) {
-      const g = groupLabel(m.date, now);
+      const key = m.thread;
+      const prev = key ? seen.get(key) : undefined;
+      if (prev?.conv) {
+        if (m.unread) prev.conv.unread = true;
+        continue;
+      }
+      const row: Row = { m, conv: key ? { key, count: Math.max(m.threadCount, 1), unread: m.unread } : undefined };
+      if (key) seen.set(key, row);
+      out.push(row);
+    }
+    return out;
+  });
+
+  const groups = $derived.by(() => {
+    const by = new Map<string, Row[]>();
+    for (const r of rows) {
+      const g = groupLabel(r.m.date, now);
       if (!by.has(g)) by.set(g, []);
-      by.get(g)!.push(m);
+      by.get(g)!.push(r);
     }
     return GROUP_ORDER.filter((g) => by.has(g)).map((g) => ({ label: g, items: by.get(g)! }));
   });
@@ -54,11 +85,138 @@
     return folderLabel(store.folders.find((f) => f.id === m.folderId)) || m.folderName || '';
   }
 
+  // ---------- Menu del clic destro ----------
+
+  let ctx = $state<{ el: HTMLElement; x: number; y: number; items: MenuItem[]; label: string } | null>(null);
+
+  function openMenu(e: MouseEvent, m: MessageSummary) {
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    const at = { x: e.clientX, y: e.clientY };
+    const sub = (kind: 'categorie' | 'sposta') => {
+      // Il secondo menu si apre nello stesso punto, appena chiuso il primo.
+      setTimeout(() => {
+        ctx = kind === 'categorie' ? { el, ...at, items: categoryItems(m), label: 'Categorizza' } : { el, ...at, items: moveItems(m), label: 'Sposta in' };
+      }, 0);
+    };
+    ctx = { el, ...at, items: messageItems(m, sub), label: 'Azioni sul messaggio' };
+  }
+
+  function menuKey(e: KeyboardEvent, m: MessageSummary) {
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      openMenu(new MouseEvent('contextmenu', { clientX: r.left + 60, clientY: r.top + 30 }), m);
+      e.preventDefault();
+    }
+  }
+
+  /** Trascinare un messaggio su una cartella lo sposta lì. */
+  function dragStart(e: DragEvent, m: MessageSummary) {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData(DRAG_TYPE, JSON.stringify([m.id]));
+    e.dataTransfer.setData('text/plain', m.subject || '(nessun oggetto)');
+  }
+
   function onscroll(e: Event) {
     const el = e.currentTarget as HTMLElement;
     if (el.scrollTop + el.clientHeight > el.scrollHeight - 400) void store.loadMore();
   }
 </script>
+
+{#snippet cats(m: MessageSummary)}
+  {#each m.categories as id (id)}
+    {@const c = store.category(id)}
+    {#if c}<span class="cat" style:background="var(--cat-{c.color}-bg)" style:color="var(--cat-{c.color}-fg)"><span class="cat-t">{c.name}</span></span>{/if}
+  {/each}
+{/snippet}
+
+{#snippet msgRow(m: MessageSummary, conv: Row['conv'])}
+  {@const on = m.id === store.sel}
+  {@const name = who(m)}
+  {@const t = tint(name)}
+  {@const unread = conv ? conv.unread : m.unread}
+  {@const strong = unread && !on}
+  {@const open = !!(conv && store.threadOpen[conv.key])}
+  {@const many = !!conv && conv.count > 1}
+  <div class="row" class:conv={convMode} data-sel={on ? 'si' : 'no'}>
+    <button
+      class="row-main"
+      draggable="true"
+      ondragstart={(e) => dragStart(e, m)}
+      oncontextmenu={(e) => openMenu(e, m)}
+      onkeydown={(e) => menuKey(e, m)}
+      onclick={() => store.pickMsg(m.id)}
+      aria-current={on ? 'true' : undefined}
+      aria-label={`${unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${many ? `Conversazione di ${conv!.count} messaggi. ` : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
+    >
+      <span class="bar" aria-hidden="true" style:background={unread ? 'var(--brand)' : 'transparent'}></span>
+      <span class="avatar" aria-hidden="true" style="width:36px;height:36px;font-size:13px;background:{t.bg};color:{t.fg}">{initials(name)}</span>
+      <span class="txt">
+        <span class="l1">
+          <span class="from" style:font-weight={unread ? 600 : 400}>{name}</span>
+          {#if m.answered}<Icon name="arrow-back-up" size={14} stroke={1.8} style="color:var(--ink-3)" />{/if}
+          {#if many}<span class="count" title="{conv!.count} messaggi nella conversazione">{conv!.count}</span>{/if}
+          <span class="time" style:font-weight={unread ? 600 : 400} style:color={strong ? 'var(--brand-ink)' : 'var(--ink-3)'}>{listTime(m.date, now)}</span>
+        </span>
+        <span class="l2">
+          <span class="subj" style:font-weight={unread ? 600 : 400} style:color={strong ? 'var(--brand-ink)' : 'var(--ink)'}>{m.subject || '(nessun oggetto)'}</span>
+          {#if m.hasAttachments}<Icon name="paperclip" size={15} stroke={1.7} style="color:var(--ink-3)" />{/if}
+          {#if m.flagged}<Icon name="flag-filled" size={15} style="color:var(--danger)" />{/if}
+        </span>
+        <span class="l3">
+          {#if m.categories.length}{@render cats(m)}{/if}
+          <span class="prev">
+            {#if q}<span class="in">{folderOf(m)}</span>{/if}
+            {#if m.draft}<span class="draft">[Bozza] </span>{/if}{m.preview}
+          </span>
+        </span>
+      </span>
+    </button>
+    {#if many}
+      <button class="ibtn btn tog" aria-expanded={open} onclick={() => store.toggleThread(m)} aria-label={open ? 'Chiudi la conversazione' : `Mostra i ${conv!.count} messaggi della conversazione`} title={open ? 'Chiudi la conversazione' : 'Mostra la conversazione'}>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} stroke={1.8} />
+      </button>
+    {/if}
+    {#if !m.draft || role !== 'drafts'}
+      <div class="row-acts">
+        <button class="ibtn btn" onclick={() => store.deleteMsg(m.id)} aria-label="Elimina" title="Elimina"><Icon name="trash" size={16} /></button>
+        <button class="ibtn btn" style="color:var(--danger)" onclick={() => store.toggleFlag(m.id)} aria-label={m.flagged ? 'Rimuovi contrassegno' : 'Contrassegna'} title={m.flagged ? 'Rimuovi contrassegno' : 'Contrassegna'}><Icon name="flag" size={16} /></button>
+        <button class="ibtn btn" style="color:var(--brand-ink)" onclick={() => store.toggleRead(m.id)} aria-label={m.unread ? 'Segna come letto' : 'Segna come non letto'} title={m.unread ? 'Segna come letto' : 'Segna come non letto'}><Icon name="mail-opened" size={16} /></button>
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet childRow(k: MessageSummary)}
+  {@const on = k.id === store.sel}
+  {@const elsewhere = k.folderId !== store.folderId}
+  <div class="row kid" data-sel={on ? 'si' : 'no'}>
+    <button
+      class="row-main"
+      draggable={!elsewhere}
+      ondragstart={(e) => dragStart(e, k)}
+      oncontextmenu={(e) => openMenu(e, k)}
+      onkeydown={(e) => menuKey(e, k)}
+      onclick={() => store.pickMsg(k.id)}
+      aria-current={on ? 'true' : undefined}
+      aria-label={`${k.unread ? 'Non letto. ' : ''}${personLabel(k.from)}, ${listTime(k.date, now)}${elsewhere ? `, in ${folderOf(k)}` : ''}`}
+    >
+      <span class="bar" aria-hidden="true" style:background={k.unread ? 'var(--brand)' : 'transparent'}></span>
+      <span class="txt">
+        <span class="l1">
+          <span class="from" style:font-weight={k.unread ? 600 : 400}>{personLabel(k.from) || 'Mittente sconosciuto'}</span>
+          {#if k.hasAttachments}<Icon name="paperclip" size={14} stroke={1.7} style="color:var(--ink-3)" />{/if}
+          <span class="time" style:color="var(--ink-3)">{listTime(k.date, now)}</span>
+        </span>
+        <span class="l3">
+          {#if elsewhere}<span class="in">{folderOf(k)}</span>{/if}
+          <span class="prev">{k.preview || k.subject}</span>
+        </span>
+      </span>
+    </button>
+  </div>
+{/snippet}
 
 <section class="pane-list" aria-label="Elenco messaggi" aria-busy={store.listLoading}>
   {#if store.offline}
@@ -141,45 +299,17 @@
 
       {#each groups as g (g.label)}
         <h2 class="group">{g.label}</h2>
-        {#each g.items as m (m.id)}
-          {@const on = m.id === store.sel}
-          {@const name = who(m)}
-          {@const t = tint(name)}
-          {@const strong = m.unread && !on}
-          <div class="row" data-sel={on ? 'si' : 'no'}>
-            <button
-              class="row-main"
-              onclick={() => store.pickMsg(m.id)}
-              aria-current={on ? 'true' : undefined}
-              aria-label={`${m.unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
-            >
-              <span class="bar" aria-hidden="true" style:background={m.unread ? 'var(--brand)' : 'transparent'}></span>
-              <span class="avatar" aria-hidden="true" style="width:36px;height:36px;font-size:13px;background:{t.bg};color:{t.fg}">{initials(name)}</span>
-              <span class="txt">
-                <span class="l1">
-                  <span class="from" style:font-weight={m.unread ? 600 : 400}>{name}</span>
-                  {#if m.answered}<Icon name="arrow-back-up" size={14} stroke={1.8} style="color:var(--ink-3)" />{/if}
-                  <span class="time" style:font-weight={m.unread ? 600 : 400} style:color={strong ? 'var(--brand-ink)' : 'var(--ink-3)'}>{listTime(m.date, now)}</span>
-                </span>
-                <span class="l2">
-                  <span class="subj" style:font-weight={m.unread ? 600 : 400} style:color={strong ? 'var(--brand-ink)' : 'var(--ink)'}>{m.subject || '(nessun oggetto)'}</span>
-                  {#if m.hasAttachments}<Icon name="paperclip" size={15} stroke={1.7} style="color:var(--ink-3)" />{/if}
-                  {#if m.flagged}<Icon name="flag-filled" size={15} style="color:var(--danger)" />{/if}
-                </span>
-                <span class="prev">
-                  {#if q}<span class="in">{folderOf(m)}</span>{/if}
-                  {#if m.draft}<span class="draft">[Bozza] </span>{/if}{m.preview}
-                </span>
-              </span>
-            </button>
-            {#if !m.draft || role !== 'drafts'}
-              <div class="row-acts">
-                <button class="ibtn btn" onclick={() => store.deleteMsg(m.id)} aria-label="Elimina" title="Elimina"><Icon name="trash" size={16} /></button>
-                <button class="ibtn btn" style="color:var(--danger)" onclick={() => store.toggleFlag(m.id)} aria-label={m.flagged ? 'Rimuovi contrassegno' : 'Contrassegna'} title={m.flagged ? 'Rimuovi contrassegno' : 'Contrassegna'}><Icon name="flag" size={16} /></button>
-                <button class="ibtn btn" style="color:var(--brand-ink)" onclick={() => store.toggleRead(m.id)} aria-label={m.unread ? 'Segna come letto' : 'Segna come non letto'} title={m.unread ? 'Segna come letto' : 'Segna come non letto'}><Icon name="mail-opened" size={16} /></button>
-              </div>
+        {#each g.items as r (r.m.id)}
+          {@render msgRow(r.m, r.conv)}
+          {#if r.conv && store.threadOpen[r.conv.key]}
+            {@const items = store.threadOpen[r.conv.key]}
+            {#if !items.length}
+              <div class="kid-wait" aria-hidden="true"><span class="skel" style="width:60%;height:10px"></span></div>
             {/if}
-          </div>
+            {#each items as k (k.id)}
+              {@render childRow(k)}
+            {/each}
+          {/if}
         {/each}
       {/each}
       {#if !store.listEnd && store.list.length}
@@ -187,6 +317,10 @@
       {/if}
     {/if}
   </div>
+
+  {#if ctx}
+    <Menu anchor={ctx.el} at={{ x: ctx.x, y: ctx.y }} items={ctx.items} label={ctx.label} onclose={() => (ctx = null)} />
+  {/if}
 
   {#if store.toast}
     {@const t = store.toast}
@@ -222,9 +356,18 @@
   .time { flex: none; font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .l2 { display: flex; align-items: center; gap: 6px; }
   .subj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
-  .prev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-3); }
+  .l3 { display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .prev { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-3); }
+  .l3 .cat { height: 18px; font-size: 11.5px; max-width: 120px; }
+  .count { flex: none; min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 5px; border-radius: 9px; background: var(--rail); color: var(--ink-2); font-size: 11.5px; font-weight: 600; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+  .row.conv :global(.row-main) { padding-left: 32px; }
+  .tog { position: absolute; left: 6px; top: 18px; width: 24px; height: 24px; color: var(--ink-2); }
+  .row.kid :global(.row-main) { grid-template-columns: minmax(0, 1fr); padding: 6px 12px 7px 62px; }
+  .row.kid .bar { left: 50px; top: 8px; bottom: 8px; }
+  .row.kid .from { font-size: 13.5px; }
+  .kid-wait { padding: 8px 20px 8px 62px; }
   .prev.err { color: var(--danger); white-space: normal; }
-  .in { margin-right: 6px; padding: 1px 6px; border-radius: 3px; background: var(--rail); color: var(--ink-2); font-size: 12px; }
+  .in { flex: none; margin-right: 6px; padding: 1px 6px; border-radius: 3px; background: var(--rail); color: var(--ink-2); font-size: 12px; }
   .draft { color: var(--danger); font-weight: 600; }
   .out { cursor: default; }
   .open { align-self: flex-start; margin-top: 6px; padding: 2px 0; font-size: 13.5px; font-weight: 600; }

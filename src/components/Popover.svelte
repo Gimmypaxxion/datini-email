@@ -19,7 +19,9 @@
   // Il riquadro va in fondo alla pagina: dentro una finestra animata la
   // posizione fissa sarebbe calcolata dalla finestra, non dallo schermo.
   $effect(() => {
-    if (el && el.parentElement !== document.body) document.body.appendChild(el);
+    const node = el;
+    if (node && node.parentElement !== document.body) document.body.appendChild(node);
+    return () => node?.remove();
   });
 
   $effect(() => {
@@ -59,9 +61,11 @@
   }
 </script>
 
+<div class="portal">
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="pop rise" bind:this={el} {role} aria-label={label} style:left="{pos.left}px" style:top="{pos.top}px" style:width={width ? `${width}px` : undefined} onkeydown={onkey}>
   {@render children()}
+</div>
 </div>
 
 <style>

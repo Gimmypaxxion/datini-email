@@ -6,6 +6,7 @@ import { mockData, type MockMessage } from './mock';
 import { textToHtml } from './compose-html';
 import type {
   Account,
+  Category,
   Draft,
   DraftAttachment,
   EngineEvent,
@@ -50,6 +51,10 @@ function summary(m: MockMessage): MessageSummary {
     draft: m.draft,
     hasBody: m.hasBody,
     folderName: null,
+    thread: m.thread,
+    categories: [...m.categories],
+    size: m.size,
+    threadCount: 1,
   };
 }
 
@@ -69,6 +74,13 @@ export class MockBackend implements Backend {
       name: 'Chiara Valli',
       html: '<div>Chiara Valli</div><div style="color: #595959;">Ufficio acquisti, Valli Arredi</div><div style="color: #595959;">Tel. 0574 152 638</div>',
     },
+  ];
+  private cats: Category[] = [
+    { id: 'c1', name: 'Clienti', color: 'verde' },
+    { id: 'c2', name: 'Fornitori', color: 'blu' },
+    { id: 'c3', name: 'Amministrazione', color: 'viola' },
+    { id: 'c4', name: 'Urgente', color: 'rosso' },
+    { id: 'c5', name: 'Fiera di gennaio', color: 'arancione' },
   ];
   /** Ritardo simulato per la ricerca dei server. */
   addDelay = 0;
@@ -164,13 +176,69 @@ export class MockBackend implements Backend {
     });
   }
 
+  /** Messaggi della conversazione fuori da Posta eliminata e Indesiderata. */
+  private threadOf(m: MockMessage): MockMessage[] {
+    const skip = new Set(this.folderList.filter((f) => f.accountId === m.accountId && (f.role === 'deleted' || f.role === 'junk')).map((f) => f.id));
+    return this.msgs.filter((x) => x.accountId === m.accountId && x.thread === m.thread && !skip.has(x.folderId) && x.folderId !== -1);
+  }
+
+  private withCount(m: MockMessage): MessageSummary {
+    return { ...summary(m), threadCount: this.threadOf(m).length };
+  }
+
   async messages(folderId: number, tab: Tab | null, offset = 0, limit = 400) {
     const f = this.folderList.find((x) => x.id === folderId);
     return this.msgs
       .filter((m) => m.folderId === folderId && (f?.role !== 'inbox' || !tab || m.focused === (tab === 'prio')))
       .sort((a, b) => b.date - a.date || b.id - a.id)
       .slice(offset, offset + limit)
-      .map(summary);
+      .map((m) => this.withCount(m));
+  }
+
+  async thread(accountId: string, thread: string) {
+    const first = this.msgs.find((m) => m.accountId === accountId && m.thread === thread);
+    if (!first) return [];
+    return this.threadOf(first)
+      .sort((a, b) => a.date - b.date)
+      .map((m) => ({ ...this.withCount(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
+  }
+
+  async categories() {
+    return this.cats.map((c) => ({ ...c }));
+  }
+
+  async saveCategories(list: Category[]) {
+    const out: Category[] = [];
+    for (const c of list) {
+      const name = c.name.trim();
+      if (!name) throw err('utente', 'Ogni categoria deve avere un nome.');
+      if (out.some((o) => o.name.toLowerCase() === name.toLowerCase())) throw err('utente', `Esiste già una categoria "${name}".`);
+      out.push({ ...c, name, id: c.id || `c${this.nextId++}` });
+    }
+    const gone = this.cats.filter((c) => !out.some((o) => o.id === c.id)).map((c) => c.id);
+    for (const m of this.msgs) m.categories = m.categories.filter((x) => !gone.includes(x));
+    this.cats = out;
+    this.emit({ type: 'categories' });
+    this.changed('', []);
+    return out.map((c) => ({ ...c }));
+  }
+
+  async setCategory(ids: number[], category: string, on: boolean) {
+    for (const id of ids) {
+      const m = this.find(id);
+      const has = m.categories.includes(category);
+      if (on && !has) m.categories = [...m.categories, category];
+      if (!on && has) m.categories = m.categories.filter((c) => c !== category);
+      this.changed(m.accountId, [m.folderId]);
+    }
+  }
+
+  async clearCategories(ids: number[]) {
+    for (const id of ids) {
+      const m = this.find(id);
+      m.categories = [];
+      this.changed(m.accountId, [m.folderId]);
+    }
   }
 
   async search(query: string, accountId: string | null) {
@@ -188,7 +256,7 @@ export class MockBackend implements Backend {
         return words.every((w) => hay.includes(w));
       })
       .sort((a, b) => b.date - a.date)
-      .map((m) => ({ ...summary(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
+      .map((m) => ({ ...this.withCount(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
   }
 
   async quoteHtml(id: number) {
@@ -265,6 +333,58 @@ export class MockBackend implements Backend {
     this.changed('', []);
   }
 
+  async createFolder(accountId: string, parentId: number | null, name: string) {
+    const n = name.trim();
+    if (!n) throw err('utente', 'Scrivi il nome della cartella.');
+    if (n.includes('/')) throw err('utente', 'Il nome della cartella non può contenere il carattere "/".');
+    const parent = parentId === null ? null : this.folderList.find((f) => f.id === parentId);
+    const path = parent ? `${parent.path}/${n}` : n;
+    if (this.folderList.some((f) => f.accountId === accountId && f.path === path)) throw err('utente', `Esiste già una cartella "${n}" in questa posizione.`);
+    const f: Folder = { id: this.nextId++, accountId, path, name: n, role: null, depth: parent ? parent.depth + 1 : 0, selectable: true, unread: 0, total: 0 };
+    this.folderList.push(f);
+    this.changed(accountId, []);
+    return f.id;
+  }
+
+  async renameFolder(id: number, name: string) {
+    const f = this.folderList.find((x) => x.id === id);
+    if (!f) throw err('non-trovato', 'Cartella non trovata.');
+    if (f.role) throw err('utente', 'Le cartelle predefinite non si possono rinominare.');
+    const n = name.trim();
+    if (!n) throw err('utente', 'Scrivi il nome della cartella.');
+    const parent = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : '';
+    const path = parent ? `${parent}/${n}` : n;
+    if (path !== f.path && this.folderList.some((x) => x.accountId === f.accountId && x.path === path)) throw err('utente', `Esiste già una cartella "${n}" in questa posizione.`);
+    for (const k of this.folderList) if (k.accountId === f.accountId && k.path.startsWith(`${f.path}/`)) k.path = path + k.path.slice(f.path.length);
+    f.path = path;
+    f.name = n;
+    this.changed(f.accountId, []);
+  }
+
+  async deleteFolder(id: number) {
+    const f = this.folderList.find((x) => x.id === id);
+    if (!f) return;
+    if (f.role) throw err('utente', 'Le cartelle predefinite non si possono eliminare.');
+    const gone = this.folderList.filter((x) => x.accountId === f.accountId && (x.id === id || x.path.startsWith(`${f.path}/`)));
+    const trash = this.roleFolder(f.accountId, 'deleted');
+    const ids = new Set(gone.map((x) => x.id));
+    for (const m of this.msgs) if (ids.has(m.folderId)) m.folderId = trash.id;
+    this.folderList = this.folderList.filter((x) => !ids.has(x.id));
+    this.changed(f.accountId, []);
+  }
+
+  async markFolderRead(id: number) {
+    for (const m of this.msgs) if (m.folderId === id) m.unread = false;
+    this.changed('', [id]);
+  }
+
+  async emptyFolder(id: number) {
+    const n = this.msgs.filter((m) => m.folderId === id).length;
+    this.msgs = this.msgs.filter((m) => m.folderId !== id);
+    this.changed('', [id]);
+    return n;
+  }
+
   async deleteMessages(ids: number[]) {
     for (const id of ids) {
       const m = this.find(id);
@@ -298,6 +418,10 @@ export class MockBackend implements Backend {
       draft: true,
       hasBody: true,
       folderName: null,
+      thread: `${d.key}@bozza`,
+      categories: [],
+      size: d.body.length * 2 + 3000,
+      threadCount: 1,
       messageId: `${d.key}@bozza`,
       references: d.references,
       html: d.html ?? null,
@@ -481,4 +605,21 @@ export class MockBackend implements Backend {
   async takeComposeDraft() {
     return null;
   }
+
+  async openPrintWindow(id: number, remote: boolean) {
+    const url = `${location.pathname}?finestra=stampa&id=${id}&remoto=${remote ? 1 : 0}`;
+    return !!globalThis.open?.(url, '_blank');
+  }
+
+  async printPage() {
+    globalThis.print?.();
+  }
+
+  async speak() {}
+
+  async speaking() {
+    return false;
+  }
+
+  async stopSpeaking() {}
 }

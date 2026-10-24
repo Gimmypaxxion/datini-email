@@ -1,8 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permessi della finestra principale e delle finestre dei messaggi",
-  "windows": ["main", "messaggio-*"],
+  "description": "Permessi della finestra principale, delle finestre dei messaggi e della stampa",
+  "windows": [
+    "main",
+    "messaggio-*",
+    "stampa-*"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",

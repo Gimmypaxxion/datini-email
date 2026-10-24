@@ -15,7 +15,7 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   const ctrl = e.ctrlKey || e.metaKey;
   const key = e.key.toLowerCase();
   const typing = isTyping(e.target);
-  const overlay = store.settings || store.backstage || store.wizard.open;
+  const overlay = store.settings || store.backstage || store.wizard.open || !!store.confirm;
 
   // La webview ricarica la pagina con Ctrl+R e F5, e apre la ricerca con Ctrl+F:
   // in un programma di posta questi tasti hanno altri significati.
@@ -38,6 +38,23 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
     void store.openCompose('new');
     return;
   }
+  if (ctrl && e.shiftKey && key === 'e') {
+    // Nuova cartella, dentro quella aperta.
+    e.preventDefault();
+    const f = store.currentFolder;
+    if (f) store.startNewFolder(f.accountId, f.id);
+    return;
+  }
+  if (ctrl && !e.shiftKey && key === 'p') {
+    e.preventDefault();
+    void store.printMsg();
+    return;
+  }
+  if (ctrl && e.altKey && e.key === ' ') {
+    e.preventDefault();
+    void store.toggleSpeech();
+    return;
+  }
   if (ctrl && key === 'e') {
     e.preventDefault();
     ui.focusSearch();
@@ -49,6 +66,9 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
     void store.openCompose(e.shiftKey ? 'replyAll' : 'reply');
   } else if (ctrl && key === 'f') {
     void store.openCompose('forward');
+  } else if (ctrl && e.shiftKey && key === 'v') {
+    e.preventDefault();
+    document.querySelector<HTMLButtonElement>('.rib button[aria-label="Sposta in"]')?.click();
   } else if (ctrl && key === 'q') {
     e.preventDefault();
     void store.setRead(store.sel, true);

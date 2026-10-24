@@ -531,6 +531,34 @@ pub async fn exec_op(s: &mut Session, db: &Db, caps: &Caps, op: &Op) -> Result<(
             }
             let _ = s.subscribe(path).await;
         }
+        Op::RenameFolder { from, to } => {
+            if let Err(e) = s.rename(from, to).await {
+                let e: Error = e.into();
+                let low = e.to_string().to_ascii_lowercase();
+                // Già rinominata (per esempio da un tentativo precedente).
+                if !(low.contains("exist") || low.contains("nonexistent")) {
+                    return Err(e);
+                }
+            }
+            let _ = s.unsubscribe(from).await;
+            let _ = s.subscribe(to).await;
+        }
+        Op::DeleteFolder { path } => {
+            let _ = s.unsubscribe(path).await;
+            if let Err(e) = s.delete(path).await {
+                let e: Error = e.into();
+                if !e.to_string().to_ascii_lowercase().contains("exist") {
+                    return Err(e);
+                }
+            }
+        }
+        Op::MarkAllRead { folder, local_ids } => {
+            let mb = s.select(folder).await?;
+            if mb.exists > 0 {
+                store_flag(s, "1:*", true, "\\Seen").await?;
+            }
+            db.clear_dirty(local_ids)?;
+        }
         Op::DeleteDraftVersions { folder, draft_key, keep_message_id } => {
             s.select(folder).await?;
             let mut q = format!("HEADER {} {}", mime::DRAFT_HEADER, quote(draft_key));

@@ -19,6 +19,8 @@
   --brand-soft: #EBF3FC;
   --brand-sel: #CFE4FA;
   --danger: #C50F1F;
+  --danger-fill: #C50F1F;
+  --on-danger: #FFFFFF;
   --warn: #8A6200;
   --warn-soft: #FFF4CE;
   --green: #107C10;
@@ -38,6 +40,17 @@
   --av3-bg: #E7DDF4; --av3-fg: #5C2E91;
   --av4-bg: #FCE0D4; --av4-fg: #8E3C0E;
   --av5-bg: #DFF0D6; --av5-fg: #2E6A0F;
+  /* Categorie colorate: quadratino, fondo ed etichetta (palette Fluent 2). */
+  --cat-rosso: #D13438; --cat-rosso-bg: #FDE7E9; --cat-rosso-fg: #A4262C;
+  --cat-arancione: #CA5010; --cat-arancione-bg: #FDEDE4; --cat-arancione-fg: #8A3707;
+  --cat-giallo: #C19C00; --cat-giallo-bg: #FEF6D3; --cat-giallo-fg: #6C5700;
+  --cat-verde: #107C10; --cat-verde-bg: #E6F4E6; --cat-verde-fg: #0B5A08;
+  --cat-verdeacqua: #038387; --cat-verdeacqua-bg: #E1F4F4; --cat-verdeacqua-fg: #02585B;
+  --cat-blu: #0078D4; --cat-blu-bg: #E3F0FB; --cat-blu-fg: #004E8C;
+  --cat-viola: #8764B8; --cat-viola-bg: #EFEAF7; --cat-viola-fg: #5C447E;
+  --cat-rosa: #E3008C; --cat-rosa-bg: #FCE4F2; --cat-rosa-fg: #9B005F;
+  --cat-marrone: #8E562E; --cat-marrone-bg: #F5ECE5; --cat-marrone-fg: #613A1F;
+  --cat-grigio: #7A7574; --cat-grigio-bg: #EFEEED; --cat-grigio-fg: #484644;
   color-scheme: light;
 }
 
@@ -57,6 +70,8 @@
   --brand-soft: #082338;
   --brand-sel: #0A3354;
   --danger: #E37D80;
+  --danger-fill: #C50F1F;
+  --on-danger: #FFFFFF;
   --warn: #FFC83D;
   --warn-soft: #463100;
   --green: #54B054;
@@ -76,6 +91,16 @@
   --av3-bg: #3A2556; --av3-fg: #C9B3EA;
   --av4-bg: #4A2412; --av4-fg: #F2B597;
   --av5-bg: #203A12; --av5-fg: #A9D98F;
+  --cat-rosso-bg: #3F1416; --cat-rosso-fg: #F4B6B8;
+  --cat-arancione-bg: #3D1C0A; --cat-arancione-fg: #F2C1A2;
+  --cat-giallo-bg: #3A3000; --cat-giallo-fg: #F2DE8A;
+  --cat-verde-bg: #0D2B0D; --cat-verde-fg: #9FD89F;
+  --cat-verdeacqua-bg: #062B2C; --cat-verdeacqua-fg: #8CD3D5;
+  --cat-blu-bg: #0B2843; --cat-blu-fg: #A9D3F2;
+  --cat-viola-bg: #2A2238; --cat-viola-fg: #D2C2EC;
+  --cat-rosa-bg: #40112F; --cat-rosa-fg: #F5B8DE;
+  --cat-marrone-bg: #2F2016; --cat-marrone-fg: #DDC3B0;
+  --cat-grigio-bg: #2B2A29; --cat-grigio-fg: #D2D0CE;
   color-scheme: dark;
 }
 
@@ -140,6 +165,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .row:hover .row-acts, .row:focus-within .row-acts { opacity: 1; }
 .row-acts .ibtn { width: 28px; height: 28px; }
 .avatar { border-radius: 50%; display: grid; place-items: center; font-weight: 600; flex: none; }
+
+/* Etichette delle categorie */
+.cat { display: inline-flex; align-items: center; gap: 5px; height: 20px; max-width: 160px; padding: 0 7px 0 5px; border-radius: 4px; font-size: 12px; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+.cat-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cat::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: currentColor; flex: none; opacity: .9; }
 
 /* Barra dei comandi (ribbon) */
 .rib { display: flex; align-items: center; padding: 0 6px; background: var(--sheet); border-radius: 8px; box-shadow: var(--sheet-shadow); overflow: hidden; }
@@ -263,12 +293,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .danger-btn { color: var(--danger); }
 
 /* Menu a comparsa (Sposta in, Altre azioni) */
+.portal { display: contents; }
 .menu { position: fixed; z-index: 40; min-width: 220px; max-width: 320px; max-height: min(420px, calc(100vh - 24px)); overflow: auto; padding: 4px; border-radius: 6px; background: var(--sheet); box-shadow: var(--win-shadow), 0 0 0 1px var(--rule-2); }
 .menu-it { width: 100%; min-height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; }
 .menu-it:hover:not(:disabled), .menu-it:focus-visible { background: var(--hover); outline: none; }
 .menu-it svg.i { color: var(--ink-2); }
 .menu-it .lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .menu-sep { height: 1px; margin: 4px 6px; background: var(--rule); }
+.menu-sw { width: 14px; height: 14px; flex: none; margin: 0 1px; border-radius: 3px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent); }
+.menu-k { flex: none; font-size: 12px; color: var(--ink-3); }
+.menu-it svg.menu-ck { color: var(--brand-ink); }
 .menu-h { padding: 8px 10px 4px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
 
 /* Caricamento: scheletri della stessa forma del contenuto */

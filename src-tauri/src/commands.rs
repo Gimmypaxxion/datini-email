@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, Webview, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::engine::{Engine, NewAccount, SavedDraft};
@@ -103,6 +103,56 @@ pub async fn move_to_role(e: E<'_>, ids: Vec<i64>, role: String) -> Result<()> {
 #[tauri::command]
 pub async fn delete_messages(e: E<'_>, ids: Vec<i64>) -> Result<()> {
     e.delete_messages(&ids).await
+}
+
+#[tauri::command]
+pub async fn categories(e: E<'_>) -> Result<Vec<Category>> {
+    e.categories()
+}
+
+#[tauri::command]
+pub async fn save_categories(e: E<'_>, list: Vec<Category>) -> Result<Vec<Category>> {
+    e.save_categories(list)
+}
+
+#[tauri::command]
+pub async fn set_category(e: E<'_>, ids: Vec<i64>, category: String, on: bool) -> Result<()> {
+    e.set_category(&ids, &category, on)
+}
+
+#[tauri::command]
+pub async fn clear_categories(e: E<'_>, ids: Vec<i64>) -> Result<()> {
+    e.clear_categories(&ids)
+}
+
+#[tauri::command]
+pub async fn thread(e: E<'_>, account_id: String, thread: String) -> Result<Vec<MessageSummary>> {
+    e.thread(&account_id, &thread)
+}
+
+#[tauri::command]
+pub async fn create_folder(e: E<'_>, account_id: String, parent_id: Option<i64>, name: String) -> Result<i64> {
+    e.create_folder(&account_id, parent_id, &name)
+}
+
+#[tauri::command]
+pub async fn rename_folder(e: E<'_>, id: i64, name: String) -> Result<()> {
+    e.rename_folder(id, &name)
+}
+
+#[tauri::command]
+pub async fn delete_folder(e: E<'_>, id: i64) -> Result<()> {
+    e.delete_folder(id).await
+}
+
+#[tauri::command]
+pub async fn mark_folder_read(e: E<'_>, id: i64) -> Result<()> {
+    e.mark_folder_read(id)
+}
+
+#[tauri::command]
+pub async fn empty_folder(e: E<'_>, id: i64) -> Result<usize> {
+    e.empty_folder(id)
 }
 
 #[tauri::command]
@@ -236,8 +286,113 @@ pub async fn open_compose_window(app: AppHandle, w: State<'_, ComposeWindows>, d
         .title(title)
         .inner_size(980.0, 760.0)
         .min_inner_size(640.0, 480.0)
+        .disable_drag_drop_handler()
         .build()
         .map_err(|e| Error::user(format!("Impossibile aprire la finestra: {e}")))?;
+    Ok(())
+}
+
+// ----------------------------------------------------------------------
+// Stampa
+// ----------------------------------------------------------------------
+
+/// Apre la finestra di stampa di un messaggio.
+#[tauri::command]
+pub async fn open_print_window(app: AppHandle, w: State<'_, ComposeWindows>, id: i64, remote: bool) -> Result<()> {
+    let n = w.next.fetch_add(1, Ordering::Relaxed) + 1;
+    let label = format!("stampa-{n}");
+    let url = format!("index.html?finestra=stampa&id={id}&remoto={}", if remote { 1 } else { 0 });
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+        .title("Stampa")
+        .inner_size(860.0, 900.0)
+        .min_inner_size(560.0, 480.0)
+        .disable_drag_drop_handler()
+        .build()
+        .map_err(|e| Error::user(format!("Impossibile aprire la finestra di stampa: {e}")))?;
+    Ok(())
+}
+
+/// Apre la finestra di dialogo di stampa del sistema per la pagina.
+#[tauri::command]
+pub async fn print_page(webview: Webview) -> Result<()> {
+    webview.print().map_err(|e| Error::user(format!("Impossibile stampare: {e}")))
+}
+
+// ----------------------------------------------------------------------
+// Lettura ad alta voce con la voce del sistema (quando la pagina non ne ha)
+// ----------------------------------------------------------------------
+
+#[derive(Default)]
+pub struct Speech(Mutex<Option<std::process::Child>>);
+
+fn speech_command(text: &str) -> Option<std::process::Command> {
+    use std::process::Command;
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = Command::new("say");
+        c.arg(text);
+        return Some(c);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut c = Command::new("powershell");
+        c.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Speak([Console]::In.ReadToEnd())",
+        ]);
+        c.creation_flags(0x0800_0000);
+        return Some(c);
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        for (prog, args) in [("spd-say", vec!["-w", "-l", "it"]), ("espeak-ng", vec!["-v", "it"]), ("espeak", vec!["-v", "it"])] {
+            let found = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).any(|d| d.join(prog).is_file())).unwrap_or(false);
+            if found {
+                let mut c = Command::new(prog);
+                c.args(args).arg(text);
+                return Some(c);
+            }
+        }
+        None
+    }
+}
+
+#[tauri::command]
+pub async fn speak(s: State<'_, Speech>, text: String) -> Result<()> {
+    use std::io::Write;
+    let mut guard = s.0.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(mut c) = guard.take() {
+        let _ = c.kill();
+    }
+    let text: String = text.chars().take(20_000).collect();
+    let mut cmd = speech_command(&text).ok_or_else(|| Error::user("Su questo computer non c'è una voce per leggere il testo. Su Linux si installa con il pacchetto speech-dispatcher o espeak-ng."))?;
+    cmd.stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+    let mut child = cmd.spawn().map_err(|e| Error::user(format!("Impossibile avviare la lettura: {e}")))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    *guard = Some(child);
+    Ok(())
+}
+
+/// Vero mentre la voce del sistema sta ancora leggendo.
+#[tauri::command]
+pub async fn speaking(s: State<'_, Speech>) -> Result<bool> {
+    let mut guard = s.0.lock().unwrap_or_else(|e| e.into_inner());
+    Ok(match guard.as_mut() {
+        Some(c) => matches!(c.try_wait(), Ok(None)),
+        None => false,
+    })
+}
+
+#[tauri::command]
+pub async fn stop_speaking(s: State<'_, Speech>) -> Result<()> {
+    if let Some(mut c) = s.0.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        let _ = c.kill();
+    }
     Ok(())
 }
 

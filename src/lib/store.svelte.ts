@@ -22,6 +22,7 @@ import {
   errorKind,
   errorMessage,
   type Account,
+  type Category,
   type Draft,
   type EngineEvent,
   type Folder,
@@ -44,7 +45,7 @@ export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inseris
 export type WinTab = 'messaggio' | 'inserisci' | 'formato';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
-export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'info';
+export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'categorie' | 'info';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -95,6 +96,43 @@ interface LastSent {
   win: boolean;
 }
 
+/** Domanda di conferma prima di un'azione che non si può annullare. */
+export interface Confirm {
+  title: string;
+  text: string;
+  /** Etichetta del pulsante che conferma (per esempio "Elimina"). */
+  ok: string;
+  danger?: boolean;
+  /** Casella da spuntare (per esempio "Non chiedere più"): il valore resta qui. */
+  check?: { label: string; value: boolean };
+  resolve: (yes: boolean) => void;
+}
+
+/** Lingue proposte da Traduci (codice per il traduttore, nome). */
+export const TRANSLATE_LANGS: [string, string][] = [
+  ['it', 'italiano'],
+  ['en', 'inglese'],
+  ['fr', 'francese'],
+  ['de', 'tedesco'],
+  ['es', 'spagnolo'],
+];
+
+/** Nome di una cartella che si sta scrivendo nel riquadro (nuova o da rinominare). */
+export interface FolderEdit {
+  kind: 'new' | 'rename';
+  accountId: string;
+  /** Cartella che conterrà la nuova (null: primo livello dell'account). */
+  parentId: number | null;
+  /** Cartella da rinominare. */
+  folderId: number | null;
+  value: string;
+  error: string;
+  busy: boolean;
+}
+
+/** Tipo dei dati trascinati quando si sposta un messaggio su una cartella. */
+export const DRAG_TYPE = 'application/x-better-look-messaggi';
+
 interface Saved {
   prefs: Prefs;
   onboardingDone: boolean;
@@ -104,6 +142,10 @@ interface Saved {
   showFolders: boolean;
   collapsed?: Record<string, boolean>;
   font?: { family: string; size: number };
+  /** Vista per conversazioni. */
+  conversations?: boolean;
+  /** Traduci: l'utente ha già accettato di mandare il testo al traduttore. */
+  translateOk?: boolean;
 }
 
 const STORAGE_KEY = 'better-look.interfaccia.v1';
@@ -146,6 +188,16 @@ export class MailStore {
   detailError = $state('');
   remoteOk = $state<Record<number, boolean>>({});
   collapsed = $state<Record<string, boolean>>({});
+  categories = $state<Category[]>([]);
+  /** Vista per conversazioni (Visualizza › Conversazioni). */
+  conversations = $state(false);
+  /** Conversazioni aperte nell'elenco: chiave → messaggi di tutte le cartelle, dal più recente. */
+  threadOpen = $state<Record<string, MessageSummary[]>>({});
+  /** Leggi ad alta voce: spento, in lettura o in pausa. */
+  speech = $state<'off' | 'playing' | 'paused'>('off');
+  private speechPoll: ReturnType<typeof setInterval> | undefined;
+  private speechNative = false;
+  private translateOk = false;
 
   // Aspetto
   prefs = $state<Prefs>({ ...PRESETS.classico });
@@ -192,6 +244,8 @@ export class MailStore {
   /** Passaggio a testo normale: la formattazione si perde, si chiede conferma. */
   askPlain = $state(false);
   toast = $state<Toast | null>(null);
+  confirm = $state<Confirm | null>(null);
+  folderEdit = $state<FolderEdit | null>(null);
   /** Importazione di un archivio in corso (total 0 se non si conosce ancora). */
   importing = $state<{ name: string; done: number; total: number } | null>(null);
   private lastSent: LastSent | null = null;
@@ -217,6 +271,8 @@ export class MailStore {
         if (typeof saved.showFolders === 'boolean') this.showFolders = saved.showFolders;
         if (saved.collapsed) this.collapsed = saved.collapsed;
         if (saved.font?.family && saved.font.size) this.font = { ...saved.font };
+        this.conversations = !!saved.conversations;
+        this.translateOk = !!saved.translateOk;
       }
     }
     if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
@@ -254,6 +310,8 @@ export class MailStore {
       showFolders: this.showFolders,
       collapsed: { ...this.collapsed },
       font: { ...this.font },
+      conversations: this.conversations,
+      translateOk: this.translateOk,
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -267,7 +325,7 @@ export class MailStore {
   async init() {
     this.unsubscribe?.();
     this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
-    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures()]);
+    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories()]);
     if (this.mode === 'principale') {
       const inbox = this.defaultInbox();
       if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
@@ -312,6 +370,9 @@ export class MailStore {
       case 'signatures':
         void this.reloadSignatures();
         break;
+      case 'categories':
+        void this.reloadCategories();
+        break;
       case 'outbox':
         void this.reloadOutbox();
         if (this.mode !== 'principale') break;
@@ -334,10 +395,26 @@ export class MailStore {
   async refresh() {
     await this.reloadFolders();
     await this.loadList(false);
+    for (const key of Object.keys(this.threadOpen)) {
+      const first = this.threadOpen[key][0];
+      if (first) void this.loadThread(first.accountId, key);
+    }
     if (this.sel !== null && this.detail && this.detail.id === this.sel) {
       const s = this.list.find((m) => m.id === this.sel);
       if (s) Object.assign(this.detail, { unread: s.unread, flagged: s.flagged, answered: s.answered });
     }
+  }
+
+  async reloadCategories() {
+    try {
+      this.categories = await this.backend.categories();
+    } catch {
+      /* senza categorie si legge e si scrive lo stesso */
+    }
+  }
+
+  category(id: string): Category | undefined {
+    return this.categories.find((c) => c.id === id);
   }
 
   async reloadSignatures() {
@@ -395,7 +472,29 @@ export class MailStore {
   }
 
   get selected(): MessageSummary | null {
-    return this.list.find((m) => m.id === this.sel) ?? null;
+    return this.sel === null ? null : this.findMsg(this.sel);
+  }
+
+  /** Un messaggio dell'elenco o di una conversazione aperta. */
+  findMsg(id: number): MessageSummary | null {
+    const inList = this.list.find((m) => m.id === id);
+    if (inList) return inList;
+    for (const items of Object.values(this.threadOpen)) {
+      const m = items.find((x) => x.id === id);
+      if (m) return m;
+    }
+    return null;
+  }
+
+  /** Applica una modifica a tutte le copie del messaggio (elenco, conversazioni, lettura). */
+  private eachCopy(id: number, fn: (m: MessageSummary) => void) {
+    const l = this.list.find((m) => m.id === id);
+    if (l) fn(l);
+    for (const items of Object.values(this.threadOpen)) {
+      const m = items.find((x) => x.id === id);
+      if (m) fn(m);
+    }
+    if (this.detail?.id === id) fn(this.detail);
   }
 
   get offline(): boolean {
@@ -572,8 +671,9 @@ export class MailStore {
   }
 
   async pickMsg(id: number, markRead = true) {
-    const m = this.list.find((x) => x.id === id);
+    const m = this.findMsg(id);
     if (!m) return;
+    if (this.speech !== 'off' && this.sel !== id) this.stopSpeech();
     if (m.draft && this.currentFolder?.role === 'drafts' && !this.q.trim()) {
       await this.reopenDraft(m.id);
       return;
@@ -582,7 +682,7 @@ export class MailStore {
     this.sel = id;
     this.err = '';
     if (markRead && m.unread) {
-      m.unread = false;
+      this.eachCopy(id, (x) => (x.unread = false));
       this.bumpFolder(m.folderId, -1);
       void this.backend.setFlags([id], true, null).catch((e) => this.flash({ kind: 'error', text: errorMessage(e) }));
     }
@@ -597,7 +697,7 @@ export class MailStore {
     try {
       const d = await this.backend.message(id, !!this.remoteOk[id]);
       if (token !== this.detailToken) return;
-      const s = this.list.find((x) => x.id === id);
+      const s = this.findMsg(id);
       this.detail = s ? { ...d, unread: s.unread, flagged: s.flagged } : d;
     } catch (e) {
       if (token === this.detailToken) this.detailError = errorMessage(e);
@@ -633,6 +733,7 @@ export class MailStore {
     const gone = new Set(ids);
     for (const m of l) if (gone.has(m.id) && m.unread) this.bumpFolder(m.folderId, -1);
     this.list = l.filter((m) => !gone.has(m.id));
+    for (const k of Object.keys(this.threadOpen)) this.threadOpen[k] = this.threadOpen[k].filter((m) => !gone.has(m.id));
     if (this.sel !== null && gone.has(this.sel)) {
       const rest = this.list;
       const next = rest.length ? rest[Math.min(Math.max(i, 0), rest.length - 1)] : null;
@@ -672,26 +773,188 @@ export class MailStore {
   }
 
   async toggleFlag(id: number | null) {
-    const m = id === null ? null : this.list.find((x) => x.id === id);
+    const m = id === null ? null : this.findMsg(id);
     if (!m) return;
-    m.flagged = !m.flagged;
-    if (this.detail?.id === m.id) this.detail.flagged = m.flagged;
-    await this.act(() => this.backend.setFlags([m.id], null, m.flagged));
+    const flagged = !m.flagged;
+    this.eachCopy(m.id, (x) => (x.flagged = flagged));
+    await this.act(() => this.backend.setFlags([m.id], null, flagged));
   }
 
   async toggleRead(id: number | null) {
-    const m = id === null ? null : this.list.find((x) => x.id === id);
+    const m = id === null ? null : this.findMsg(id);
     if (!m) return;
     await this.setRead(m.id, m.unread);
   }
 
   async setRead(id: number | null, read: boolean) {
-    const m = id === null ? null : this.list.find((x) => x.id === id);
+    const m = id === null ? null : this.findMsg(id);
     if (!m || m.unread === !read) return;
-    m.unread = !read;
+    this.eachCopy(m.id, (x) => (x.unread = !read));
     this.bumpFolder(m.folderId, read ? -1 : 1);
-    if (this.detail?.id === m.id) this.detail.unread = m.unread;
     await this.act(() => this.backend.setFlags([m.id], read, null));
+  }
+
+  // ---------- Categorie ----------
+
+  /** Assegna o toglie una categoria (Categorizza). */
+  async toggleCategory(id: number | null, catId: string) {
+    const m = id === null ? null : this.findMsg(id);
+    if (!m) return;
+    const on = !m.categories.includes(catId);
+    this.eachCopy(m.id, (x) => (x.categories = on ? [...x.categories, catId] : x.categories.filter((c) => c !== catId)));
+    await this.act(() => this.backend.setCategory([m.id], catId, on));
+  }
+
+  async clearMsgCategories(id: number | null) {
+    const m = id === null ? null : this.findMsg(id);
+    if (!m || !m.categories.length) return;
+    this.eachCopy(m.id, (x) => (x.categories = []));
+    await this.act(() => this.backend.clearCategories([m.id]));
+  }
+
+  /** Salva l'elenco delle categorie (nomi, colori, nuove, eliminate). */
+  async saveCategories(list: Category[]): Promise<string> {
+    try {
+      this.categories = await this.backend.saveCategories(list);
+      return '';
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  // ---------- Conversazioni ----------
+
+  toggleConversations() {
+    this.conversations = !this.conversations;
+    this.threadOpen = {};
+    this.save();
+  }
+
+  private async loadThread(accountId: string, key: string) {
+    try {
+      const items = await this.backend.thread(accountId, key);
+      if (key in this.threadOpen || !items.length) this.threadOpen[key] = items.reverse();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Apre o chiude una conversazione nell'elenco. */
+  async toggleThread(m: MessageSummary) {
+    const key = m.thread;
+    if (!key) return;
+    if (this.threadOpen[key]) {
+      delete this.threadOpen[key];
+      return;
+    }
+    this.threadOpen[key] = [];
+    await this.loadThread(m.accountId, key);
+  }
+
+  // ---------- Conferme ----------
+
+  /** Chiede conferma con una finestra; vero se l'utente conferma. */
+  ask(c: Omit<Confirm, 'resolve'>): Promise<boolean> {
+    this.confirm?.resolve(false);
+    return new Promise((resolve) => {
+      this.confirm = { ...c, resolve };
+    });
+  }
+
+  answer(yes: boolean) {
+    const c = this.confirm;
+    this.confirm = null;
+    c?.resolve(yes);
+  }
+
+  // ---------- Cartelle ----------
+
+  /** Inizia a scrivere il nome di una cartella nuova, dentro `parentId` o al primo livello. */
+  startNewFolder(accountId: string, parentId: number | null) {
+    this.collapsed[accountId] = false;
+    this.folderEdit = { kind: 'new', accountId, parentId, folderId: null, value: '', error: '', busy: false };
+  }
+
+  startRenameFolder(folderId: number) {
+    const f = this.folders.find((x) => x.id === folderId);
+    if (!f || f.role) return;
+    this.folderEdit = { kind: 'rename', accountId: f.accountId, parentId: null, folderId, value: f.name, error: '', busy: false };
+  }
+
+  cancelFolderEdit() {
+    this.folderEdit = null;
+  }
+
+  async commitFolderEdit() {
+    const e = this.folderEdit;
+    if (!e || e.busy) return;
+    const name = e.value.trim();
+    if (!name) {
+      this.folderEdit = null;
+      return;
+    }
+    e.busy = true;
+    try {
+      if (e.kind === 'new') await this.backend.createFolder(e.accountId, e.parentId, name);
+      else if (e.folderId !== null) await this.backend.renameFolder(e.folderId, name);
+      this.folderEdit = null;
+      await this.reloadFolders();
+    } catch (err) {
+      e.error = errorMessage(err);
+      e.busy = false;
+    }
+  }
+
+  async deleteFolder(folderId: number) {
+    const f = this.folders.find((x) => x.id === folderId);
+    if (!f || f.role) return;
+    const inside = this.folders.filter((x) => x.accountId === f.accountId && (x.id === f.id || x.path.startsWith(`${f.path}/`) || x.path.startsWith(`${f.path}.`)));
+    const total = inside.reduce((n, x) => n + x.total, 0);
+    const what = total === 0 ? 'La cartella è vuota.' : total === 1 ? 'Il messaggio che contiene va in Posta eliminata.' : `I ${total.toLocaleString('it-IT')} messaggi che contiene vanno in Posta eliminata.`;
+    const subs = inside.length > 1 ? ' Vengono eliminate anche le sue sottocartelle.' : '';
+    const ok = await this.ask({ title: `Eliminare la cartella “${folderLabel(f)}”?`, text: `${what}${subs}`, ok: 'Elimina', danger: true });
+    if (!ok) return;
+    await this.act(async () => {
+      await this.backend.deleteFolder(folderId);
+      await this.reloadFolders();
+    });
+  }
+
+  async markFolderRead(folderId: number) {
+    for (const m of this.list) if (m.folderId === folderId) m.unread = false;
+    const f = this.folders.find((x) => x.id === folderId);
+    if (f) f.unread = 0;
+    await this.act(() => this.backend.markFolderRead(folderId));
+  }
+
+  async emptyFolder(folderId: number) {
+    const f = this.folders.find((x) => x.id === folderId);
+    if (!f) return;
+    const n = f.total;
+    const ok = await this.ask({
+      title: `Svuotare “${folderLabel(f)}”?`,
+      text: n === 1 ? 'Il messaggio verrà eliminato definitivamente.' : `${n.toLocaleString('it-IT')} messaggi verranno eliminati definitivamente.`,
+      ok: 'Svuota',
+      danger: true,
+    });
+    if (!ok) return;
+    await this.act(async () => {
+      await this.backend.emptyFolder(folderId);
+      if (this.folderId === folderId) {
+        this.list = [];
+        this.sel = null;
+        this.detail = null;
+      }
+      await this.reloadFolders();
+    });
+  }
+
+  /** Messaggi trascinati su una cartella. */
+  async dropOnFolder(ids: number[], folderId: number) {
+    const moving = ids.filter((id) => this.list.find((m) => m.id === id)?.folderId !== folderId);
+    if (!moving.length) return;
+    this.dropFromList(moving);
+    await this.act(() => this.backend.moveMessages(moving, folderId));
   }
 
   toggleFolders() {
@@ -1248,6 +1511,142 @@ export class MailStore {
     } catch {
       return [];
     }
+  }
+
+  // ---------- Stampa, lettura ad alta voce, traduzione ----------
+
+  /** Stampa il messaggio aperto in una finestra pronta per la stampa (Ctrl+P). */
+  async printMsg(id: number | null = this.sel) {
+    if (id === null) return;
+    if (this.sel !== id) await this.pickMsg(id, false);
+    await this.act(async () => {
+      if (!(await this.backend.openPrintWindow(id, !!this.remoteOk[id]))) this.flash({ kind: 'error', text: 'Non riesco ad aprire la finestra di stampa.' });
+    });
+  }
+
+  /** Testo da leggere: oggetto, mittente e testo del messaggio aperto. */
+  private speechText(): string {
+    const m = this.detail;
+    if (!m) return '';
+    const who = m.from.name || m.from.email;
+    return `${m.subject || 'Messaggio senza oggetto'}. Da ${who}.
+
+${m.text}`.slice(0, 20_000);
+  }
+
+  /** Voci della pagina (quelle del sistema, se il motore web le offre). */
+  private async webVoices(): Promise<SpeechSynthesisVoice[]> {
+    const synth = globalThis.speechSynthesis;
+    if (!synth) return [];
+    let voices = synth.getVoices();
+    if (voices.length) return voices;
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(resolve, 600);
+      synth.addEventListener?.('voiceschanged', () => {
+        clearTimeout(t);
+        resolve();
+      }, { once: true });
+    });
+    voices = synth.getVoices();
+    return voices;
+  }
+
+  /** Leggi ad alta voce: avvia o interrompe la lettura del messaggio aperto. */
+  async toggleSpeech() {
+    if (this.speech !== 'off') {
+      this.stopSpeech();
+      return;
+    }
+    const text = this.speechText();
+    if (!text.trim()) return;
+    const voices = await this.webVoices();
+    if (voices.length) {
+      const synth = globalThis.speechSynthesis;
+      const voice = voices.find((v) => v.lang?.toLowerCase().startsWith('it')) ?? null;
+      synth.cancel();
+      // Frasi brevi: alcune voci si fermano da sole sui testi lunghi.
+      const parts = text.match(/[^.!?\n]+[.!?]*|\n+/g)?.map((p) => p.trim()).filter(Boolean) ?? [text];
+      parts.forEach((p, i) => {
+        const u = new SpeechSynthesisUtterance(p);
+        u.lang = voice?.lang ?? 'it-IT';
+        if (voice) u.voice = voice;
+        if (i === parts.length - 1) u.onend = () => (this.speech = 'off');
+        u.onerror = () => (this.speech = 'off');
+        synth.speak(u);
+      });
+      this.speechNative = false;
+      this.speech = 'playing';
+      return;
+    }
+    try {
+      await this.backend.speak(text);
+      this.speechNative = true;
+      this.speech = 'playing';
+      clearInterval(this.speechPoll);
+      this.speechPoll = setInterval(async () => {
+        if (!(await this.backend.speaking().catch(() => false))) {
+          clearInterval(this.speechPoll);
+          this.speech = 'off';
+        }
+      }, 1000);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) }, 9000);
+    }
+  }
+
+  /** Pausa e ripresa (solo con le voci della pagina). */
+  pauseSpeech() {
+    const synth = globalThis.speechSynthesis;
+    if (this.speechNative || !synth) return;
+    if (this.speech === 'playing') {
+      synth.pause();
+      this.speech = 'paused';
+    } else if (this.speech === 'paused') {
+      synth.resume();
+      this.speech = 'playing';
+    }
+  }
+
+  get canPauseSpeech(): boolean {
+    return !this.speechNative;
+  }
+
+  stopSpeech() {
+    clearInterval(this.speechPoll);
+    if (this.speechNative) void this.backend.stopSpeaking().catch(() => {});
+    else globalThis.speechSynthesis?.cancel();
+    this.speech = 'off';
+  }
+
+  /**
+   * Traduci: il testo va a Google Traduttore, nel browser. Prima volta: si
+   * chiede il permesso, perché il messaggio esce dal computer.
+   */
+  async translate(lang: string) {
+    const m = this.detail;
+    if (!m) return;
+    if (!this.translateOk) {
+      const check = { label: 'Non chiedere più', value: false };
+      const ok = await this.ask({
+        title: 'Tradurre con Google Traduttore?',
+        text: 'Per la traduzione il testo del messaggio viene mandato a Google Traduttore e si apre nel browser.',
+        ok: 'Traduci',
+        check,
+      });
+      if (!ok) return;
+      if (check.value) {
+        this.translateOk = true;
+        this.save();
+      }
+    }
+    const full = `${m.subject}
+
+${m.text}`.trim();
+    const MAX = 4500;
+    const text = full.length > MAX ? full.slice(0, MAX) : full;
+    const url = `https://translate.google.com/?sl=auto&tl=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}&op=translate`;
+    await this.act(() => this.backend.openLink(url));
+    if (full.length > MAX) this.hint('Il messaggio è lungo: nel traduttore arriva solo la prima parte.');
   }
 
   // ---------- Allegati ed esportazione ----------

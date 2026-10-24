@@ -129,6 +129,66 @@ import Volume from '@tabler/icons-svelte/icons/volume';
 import WifiOff from '@tabler/icons-svelte/icons/wifi-off';
 import X from '@tabler/icons-svelte/icons/x';
 
+import FolderPlus from '@tabler/icons-svelte/icons/folder-plus';
+import Pencil from '@tabler/icons-svelte/icons/pencil';
+import Printer from '@tabler/icons-svelte/icons/printer';
+import PlayerStop from '@tabler/icons-svelte/icons/player-stop';
+import PlayerPlay from '@tabler/icons-svelte/icons/player-play';
+import PlayerPause from '@tabler/icons-svelte/icons/player-pause';
+import VolumeOff from '@tabler/icons-svelte/icons/volume-off';
+import Tags from '@tabler/icons-svelte/icons/tags';
+import ClockHour4 from '@tabler/icons-svelte/icons/clock-hour-4';
+import CalendarEvent from '@tabler/icons-svelte/icons/calendar-event';
+import CalendarWeek from '@tabler/icons-svelte/icons/calendar-week';
+import CalendarMonth from '@tabler/icons-svelte/icons/calendar-month';
+import CalendarTime from '@tabler/icons-svelte/icons/calendar-time';
+import CalendarCheck from '@tabler/icons-svelte/icons/calendar-check';
+import CalendarX from '@tabler/icons-svelte/icons/calendar-x';
+import CalendarQuestion from '@tabler/icons-svelte/icons/calendar-question';
+import Repeat from '@tabler/icons-svelte/icons/repeat';
+import Bell from '@tabler/icons-svelte/icons/bell';
+import BellRinging from '@tabler/icons-svelte/icons/bell-ringing';
+import MapPin from '@tabler/icons-svelte/icons/map-pin';
+import AddressBook from '@tabler/icons-svelte/icons/address-book';
+import User from '@tabler/icons-svelte/icons/user';
+import Phone from '@tabler/icons-svelte/icons/phone';
+import DeviceMobile from '@tabler/icons-svelte/icons/device-mobile';
+import Building from '@tabler/icons-svelte/icons/building';
+import Briefcase from '@tabler/icons-svelte/icons/briefcase';
+import World from '@tabler/icons-svelte/icons/world';
+import Cake from '@tabler/icons-svelte/icons/cake';
+import Notes from '@tabler/icons-svelte/icons/notes';
+import MailForward from '@tabler/icons-svelte/icons/mail-forward';
+import ChevronLeft from '@tabler/icons-svelte/icons/chevron-left';
+import Upload from '@tabler/icons-svelte/icons/upload';
+import FileUpload from '@tabler/icons-svelte/icons/file-upload';
+import CircleX from '@tabler/icons-svelte/icons/circle-x';
+import CircleDashed from '@tabler/icons-svelte/icons/circle-dashed';
+import Hourglass from '@tabler/icons-svelte/icons/hourglass';
+import CalendarDue from '@tabler/icons-svelte/icons/calendar-due';
+import ListDetails from '@tabler/icons-svelte/icons/list-details';
+import ArrowRight from '@tabler/icons-svelte/icons/arrow-right';
+import Home from '@tabler/icons-svelte/icons/home';
+import MailFast from '@tabler/icons-svelte/icons/mail-fast';
+import Send2 from '@tabler/icons-svelte/icons/send-2';
+import ClockPlay from '@tabler/icons-svelte/icons/clock-play';
+import SortDescending from '@tabler/icons-svelte/icons/sort-descending';
+import LayoutList from '@tabler/icons-svelte/icons/layout-list';
+import Category from '@tabler/icons-svelte/icons/category';
+import CalendarOff from '@tabler/icons-svelte/icons/calendar-off';
+import CalendarShare from '@tabler/icons-svelte/icons/calendar-share';
+import UserSearch from '@tabler/icons-svelte/icons/user-search';
+import UsersGroup from '@tabler/icons-svelte/icons/users-group';
+import FileDownload from '@tabler/icons-svelte/icons/file-download';
+import InboxOff from '@tabler/icons-svelte/icons/inbox-off';
+import ArrowDown from '@tabler/icons-svelte/icons/arrow-down';
+import ArrowUp from '@tabler/icons-svelte/icons/arrow-up';
+import TrashOff from '@tabler/icons-svelte/icons/trash-off';
+import Help from '@tabler/icons-svelte/icons/help';
+import InfoCircle from '@tabler/icons-svelte/icons/info-circle';
+import DoorExit from '@tabler/icons-svelte/icons/door-exit';
+import Plane from '@tabler/icons-svelte/icons/plane';
+import Sparkles from '@tabler/icons-svelte/icons/sparkles';
 export const icons = {
   highlight: Highlight,
   palette: Palette,
@@ -257,6 +317,66 @@ export const icons = {
   volume: Volume,
   'wifi-off': WifiOff,
   x: X,
+  'folder-plus': FolderPlus,
+  pencil: Pencil,
+  printer: Printer,
+  'player-stop': PlayerStop,
+  'player-play': PlayerPlay,
+  'player-pause': PlayerPause,
+  'volume-off': VolumeOff,
+  tags: Tags,
+  'clock-hour-4': ClockHour4,
+  'calendar-event': CalendarEvent,
+  'calendar-week': CalendarWeek,
+  'calendar-month': CalendarMonth,
+  'calendar-time': CalendarTime,
+  'calendar-check': CalendarCheck,
+  'calendar-x': CalendarX,
+  'calendar-question': CalendarQuestion,
+  repeat: Repeat,
+  bell: Bell,
+  'bell-ringing': BellRinging,
+  'map-pin': MapPin,
+  'address-book': AddressBook,
+  user: User,
+  phone: Phone,
+  'device-mobile': DeviceMobile,
+  building: Building,
+  briefcase: Briefcase,
+  world: World,
+  cake: Cake,
+  notes: Notes,
+  'mail-forward': MailForward,
+  'chevron-left': ChevronLeft,
+  upload: Upload,
+  'file-upload': FileUpload,
+  'circle-x': CircleX,
+  'circle-dashed': CircleDashed,
+  hourglass: Hourglass,
+  'calendar-due': CalendarDue,
+  'list-details': ListDetails,
+  'arrow-right': ArrowRight,
+  home: Home,
+  'mail-fast': MailFast,
+  'send-2': Send2,
+  'clock-play': ClockPlay,
+  'sort-descending': SortDescending,
+  'layout-list': LayoutList,
+  category: Category,
+  'calendar-off': CalendarOff,
+  'calendar-share': CalendarShare,
+  'user-search': UserSearch,
+  'users-group': UsersGroup,
+  'file-download': FileDownload,
+  'inbox-off': InboxOff,
+  'arrow-down': ArrowDown,
+  'arrow-up': ArrowUp,
+  'trash-off': TrashOff,
+  help: Help,
+  'info-circle': InfoCircle,
+  'door-exit': DoorExit,
+  plane: Plane,
+  sparkles: Sparkles,
 } as const;
 
 export type IconName = keyof typeof icons;

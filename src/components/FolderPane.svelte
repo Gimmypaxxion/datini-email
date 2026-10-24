@@ -1,9 +1,12 @@
 <script lang="ts">
   // Riquadro cartelle: Preferiti, poi le cartelle di ogni account e dei file
-  // di dati, richiudibili, con i conteggi come in Outlook.
+  // di dati, richiudibili, con i conteggi come in Outlook. Clic destro su una
+  // cartella o sull'account: nuova cartella, rinomina, elimina, segna tutti
+  // come letti, svuota. I messaggi si trascinano sulle cartelle.
   import Icon from '../lib/Icon.svelte';
   import type { IconName } from '../lib/icons';
-  import { store, folderLabel } from '../lib/store.svelte';
+  import Menu, { type MenuItem } from './Menu.svelte';
+  import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
   import type { Account, Folder, Role } from '../lib/types';
 
   const ICON: Record<Role, IconName> = {
@@ -42,24 +45,153 @@
     if (a.status.state === 'errore') return { icon: 'alert-triangle', text: a.status.message ?? 'Errore di sincronizzazione' };
     return null;
   }
+
+  // ---------- Menu contestuale ----------
+
+  let ctx = $state<{ el: HTMLElement; x: number; y: number; items: MenuItem[]; label: string } | null>(null);
+
+  function folderMenu(f: Folder): MenuItem[] {
+    const items: MenuItem[] = [
+      { label: 'Nuova cartella', icon: 'folder-plus', onclick: () => store.startNewFolder(f.accountId, f.id) },
+      { label: 'Rinomina cartella', icon: 'pencil', keys: 'F2', disabled: !!f.role, onclick: () => store.startRenameFolder(f.id) },
+      { label: 'Elimina cartella', icon: 'trash', disabled: !!f.role, onclick: () => store.deleteFolder(f.id) },
+      { kind: 'sep', label: '' },
+      { label: 'Segna tutti come letti', icon: 'mail-opened', disabled: f.unread === 0, onclick: () => store.markFolderRead(f.id) },
+    ];
+    if (f.role === 'deleted' || f.role === 'junk') {
+      items.push({ label: f.role === 'deleted' ? 'Svuota Posta eliminata' : 'Svuota Posta indesiderata', icon: 'trash-x', disabled: f.total === 0, onclick: () => store.emptyFolder(f.id) });
+    }
+    return items;
+  }
+
+  function openFolderMenu(e: MouseEvent, f: Folder) {
+    e.preventDefault();
+    ctx = { el: e.currentTarget as HTMLElement, x: e.clientX, y: e.clientY, items: folderMenu(f), label: `Cartella ${folderLabel(f)}` };
+  }
+
+  function openAccountMenu(e: MouseEvent, a: Account) {
+    e.preventDefault();
+    ctx = {
+      el: e.currentTarget as HTMLElement,
+      x: e.clientX,
+      y: e.clientY,
+      label: `Account ${title(a)}`,
+      items: [{ label: 'Nuova cartella', icon: 'folder-plus', onclick: () => store.startNewFolder(a.id, null) }],
+    };
+  }
+
+  /** Tasto Menu o Maiusc+F10 sulla cartella: lo stesso menu, sotto la cartella. */
+  function folderKey(e: KeyboardEvent, f: Folder) {
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      e.preventDefault();
+      const el = e.currentTarget as HTMLElement;
+      const r = el.getBoundingClientRect();
+      ctx = { el, x: r.left + 24, y: r.bottom, items: folderMenu(f), label: `Cartella ${folderLabel(f)}` };
+    } else if (e.key === 'F2' && !f.role) {
+      e.preventDefault();
+      store.startRenameFolder(f.id);
+    }
+  }
+
+  // ---------- Trascinamento dei messaggi ----------
+
+  let dropOn = $state<number | null>(null);
+
+  function canDrop(e: DragEvent, f: Folder): boolean {
+    return f.selectable && !!e.dataTransfer?.types.includes(DRAG_TYPE);
+  }
+
+  function ondragover(e: DragEvent, f: Folder) {
+    if (!canDrop(e, f)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    dropOn = f.id;
+  }
+
+  function ondrop(e: DragEvent, f: Folder) {
+    dropOn = null;
+    if (!canDrop(e, f)) return;
+    e.preventDefault();
+    try {
+      const ids = JSON.parse(e.dataTransfer!.getData(DRAG_TYPE)) as number[];
+      if (Array.isArray(ids) && ids.length) void store.dropOnFolder(ids, f.id);
+    } catch {
+      /* dati trascinati da altrove */
+    }
+  }
+
+  function focusInput(el: HTMLInputElement) {
+    el.focus();
+    el.select();
+  }
 </script>
+
+{#snippet nameInput(depth: number)}
+  {@const e = store.folderEdit!}
+  <div class="edit" style:padding-left="{28 + depth * 16}px">
+    <Icon name="folder" />
+    <input
+      use:focusInput
+      class="ph"
+      value={e.value}
+      aria-label={e.kind === 'new' ? 'Nome della nuova cartella' : 'Nuovo nome della cartella'}
+      aria-invalid={!!e.error}
+      aria-describedby={e.error ? 'fold-err' : undefined}
+      placeholder="Nome della cartella"
+      disabled={e.busy}
+      oninput={(ev) => {
+        e.value = ev.currentTarget.value;
+        e.error = '';
+      }}
+      onkeydown={(ev) => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          void store.commitFolderEdit();
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault();
+          ev.stopPropagation();
+          store.cancelFolderEdit();
+        }
+      }}
+      onblur={() => {
+        if (store.folderEdit && !store.folderEdit.error) void store.commitFolderEdit();
+      }}
+    />
+  </div>
+  {#if e.error}<p class="err" id="fold-err" role="alert" style:padding-left="{28 + depth * 16}px">{e.error}</p>{/if}
+{/snippet}
 
 {#snippet folderRow(f: Folder, prefix: string, depth: number)}
   {@const id = `${prefix}-${f.id}`}
   {@const on = store.folderSel === id}
   {@const c = count(f)}
-  <button
-    class="btn fold"
-    data-sel={on ? 'si' : 'no'}
-    aria-current={on ? 'page' : undefined}
-    style:padding-left="{28 + depth * 16}px"
-    disabled={!f.selectable}
-    onclick={() => store.pickFolder(f.id, id)}
-  >
-    <Icon name={f.role ? ICON[f.role] : 'folder'} />
-    <span class="name" style:font-weight={on ? 600 : 400}>{folderLabel(f)}</span>
-    {#if c.n}<span class="cnt" style:color={c.muted ? 'var(--ink-3)' : 'var(--brand-ink)'}>{c.n}</span>{/if}
-  </button>
+  {@const edit = store.folderEdit}
+  {#if edit?.kind === 'rename' && edit.folderId === f.id && prefix === 'acc'}
+    {@render nameInput(depth)}
+  {:else}
+    <button
+      class="btn fold"
+      data-sel={on ? 'si' : 'no'}
+      data-drop={dropOn === f.id ? 'si' : undefined}
+      aria-current={on ? 'page' : undefined}
+      style:padding-left="{28 + depth * 16}px"
+      disabled={!f.selectable}
+      onclick={() => store.pickFolder(f.id, id)}
+      oncontextmenu={(e) => openFolderMenu(e, f)}
+      onkeydown={(e) => folderKey(e, f)}
+      ondragover={(e) => ondragover(e, f)}
+      ondragenter={(e) => ondragover(e, f)}
+      ondragleave={() => (dropOn = dropOn === f.id ? null : dropOn)}
+      ondrop={(e) => ondrop(e, f)}
+    >
+      <Icon name={f.role ? ICON[f.role] : 'folder'} />
+      <span class="name" style:font-weight={on ? 600 : 400}>{folderLabel(f)}</span>
+      {#if c.n}<span class="cnt" style:color={c.muted ? 'var(--ink-3)' : 'var(--brand-ink)'}>{c.n}</span>{/if}
+    </button>
+  {/if}
+  {#if edit?.kind === 'new' && edit.parentId === f.id && prefix === 'acc'}
+    {@render nameInput(depth + 1)}
+  {/if}
 {/snippet}
 
 <nav class="pane-folders scroll" aria-label="Cartelle">
@@ -77,7 +209,7 @@
     {@const st = statusIcon(a)}
     {@const out = store.outbox.filter((o) => o.accountId === a.id).length}
     <h2 class="acct">
-      <button class="btn grp-h toggle" onclick={() => store.toggleSection(a.id)} aria-expanded={open} title={title(a)}>
+      <button class="btn grp-h toggle" onclick={() => store.toggleSection(a.id)} oncontextmenu={(e) => openAccountMenu(e, a)} aria-expanded={open} title={title(a)}>
         <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} stroke={1.8} />
         {#if a.kind === 'local'}<Icon name="database" size={15} style="color:var(--ink-2)" />{/if}
         <span class="aname">{title(a)}</span>
@@ -86,6 +218,9 @@
     </h2>
     {#if open}
       {#each store.foldersOf(a.id) as f (f.id)}{@render folderRow(f, 'acc', depthOf(f))}{/each}
+      {#if store.folderEdit?.kind === 'new' && store.folderEdit.parentId === null && store.folderEdit.accountId === a.id}
+        {@render nameInput(0)}
+      {/if}
       {#if out}
         {@const on = store.folderSel === `uscita-${a.id}`}
         <button class="btn fold" data-sel={on ? 'si' : 'no'} aria-current={on ? 'page' : undefined} onclick={() => store.pickOutbox(`uscita-${a.id}`)}>
@@ -104,6 +239,10 @@
   <button class="btn add" onclick={() => store.openWizard(false)}><Icon name="user-plus" />Aggiungi account</button>
 </nav>
 
+{#if ctx}
+  <Menu anchor={ctx.el} at={{ x: ctx.x, y: ctx.y }} items={ctx.items} label={ctx.label} onclose={() => (ctx = null)} />
+{/if}
+
 <style>
   .pane-folders { width: 240px; flex: none; box-sizing: border-box; overflow: auto; padding: 0 8px 20px 2px; background: var(--ground); }
   .top { height: 34px; display: flex; align-items: center; }
@@ -113,4 +252,10 @@
   .st { display: inline-flex; }
   .none { margin: 16px 10px 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
   .add { width: 100%; height: 32px; margin-top: 10px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 4px; background: transparent; color: var(--brand-ink); font-size: 14px; text-align: left; }
+  .fold[data-drop="si"] { background: var(--brand-sel); box-shadow: inset 0 0 0 1px var(--brand); }
+  .edit { height: 32px; display: flex; align-items: center; gap: 10px; padding-right: 4px; color: var(--ink-2); }
+  .edit input { flex: 1; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px; border: 0; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -2px 0 var(--brand); color: var(--ink); font: inherit; font-size: 14px; }
+  .edit input:focus { outline: none; }
+  .edit input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger), inset 0 -2px 0 var(--danger); }
+  .err { margin: 2px 4px 6px; font-size: 12.5px; line-height: 1.4; color: var(--danger); }
 </style>

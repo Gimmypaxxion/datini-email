@@ -43,6 +43,29 @@ export interface Account {
   status: AccountStatus;
 }
 
+/** Categoria colorata, come in Outlook. */
+export interface Category {
+  id: string;
+  name: string;
+  color: CategoryColor;
+}
+
+export type CategoryColor = 'rosso' | 'arancione' | 'giallo' | 'verde' | 'verdeacqua' | 'blu' | 'viola' | 'rosa' | 'marrone' | 'grigio';
+
+/** Colori delle categorie, con il nome da mostrare. */
+export const CATEGORY_COLORS: [CategoryColor, string][] = [
+  ['rosso', 'Rosso'],
+  ['arancione', 'Arancione'],
+  ['giallo', 'Giallo'],
+  ['verde', 'Verde'],
+  ['verdeacqua', 'Verde acqua'],
+  ['blu', 'Blu'],
+  ['viola', 'Viola'],
+  ['rosa', 'Rosa'],
+  ['marrone', 'Marrone'],
+  ['grigio', 'Grigio'],
+];
+
 /** Firma: vale per tutti gli account, ognuno sceglie quale usare. */
 export interface Signature {
   id: string;
@@ -85,6 +108,14 @@ export interface MessageSummary {
   draft: boolean;
   hasBody: boolean;
   folderName: string | null;
+  /** Conversazione: Message-ID del primo messaggio della discussione. */
+  thread: string | null;
+  /** Categorie colorate assegnate (identificativi). */
+  categories: string[];
+  /** Dimensione in byte. */
+  size: number;
+  /** Messaggi della stessa conversazione nell'account (escluse eliminata e indesiderata). */
+  threadCount: number;
 }
 
 export interface AttachmentInfo {
@@ -171,7 +202,8 @@ export type EngineEvent =
   | { type: 'outbox'; accountId: string; outboxId: number; state: string; error: string | null }
   | { type: 'accounts' }
   | { type: 'import'; name: string; done: number; total: number }
-  | { type: 'signatures' };
+  | { type: 'signatures' }
+  | { type: 'categories' };
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {

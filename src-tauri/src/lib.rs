@@ -66,6 +66,7 @@ pub fn run() {
             );
             app.manage(engine.clone());
             app.manage(commands::ComposeWindows::default());
+            app.manage(commands::Speech::default());
             tauri::async_runtime::spawn(async move { engine.start() });
             Ok(())
         })
@@ -88,6 +89,16 @@ pub fn run() {
             commands::move_messages,
             commands::move_to_role,
             commands::delete_messages,
+            commands::categories,
+            commands::save_categories,
+            commands::set_category,
+            commands::clear_categories,
+            commands::thread,
+            commands::create_folder,
+            commands::rename_folder,
+            commands::delete_folder,
+            commands::mark_folder_read,
+            commands::empty_folder,
             commands::save_draft,
             commands::close_draft,
             commands::discard_draft,
@@ -105,6 +116,11 @@ pub fn run() {
             commands::open_link,
             commands::open_compose_window,
             commands::take_compose_draft,
+            commands::open_print_window,
+            commands::print_page,
+            commands::speak,
+            commands::speaking,
+            commands::stop_speaking,
             pst::import_pst,
             pst::import_mbox,
         ])

@@ -8,6 +8,7 @@
   import Backstage from './components/Backstage.svelte';
   import Settings from './components/Settings.svelte';
   import Onboarding from './components/Onboarding.svelte';
+  import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AccountWizard from './components/AccountWizard.svelte';
   import StatusBar from './components/StatusBar.svelte';
   import Icon from './lib/Icon.svelte';
@@ -69,6 +70,7 @@
   <Settings />
   <AccountWizard />
   <Onboarding />
+  <ConfirmDialog />
 </div>
 
 <style>

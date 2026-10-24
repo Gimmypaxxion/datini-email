@@ -5,10 +5,11 @@
   import About from './About.svelte';
   import RichEditor from './RichEditor.svelte';
   import LinkDialog from './LinkDialog.svelte';
+  import Popover from './Popover.svelte';
   import { store, type Prefs, type ThemeChoice } from '../lib/store.svelte';
   import { EditorCtl, FONTS, SIZES, fontStack } from '../lib/editor.svelte';
   import { ACCENT_SWATCHES, DEFAULT_ACCENT, accentPalette, accentShift, normalizeHex, readableOn } from '../lib/accent';
-  import type { ServerConfig, Signature, SyncOptions } from '../lib/types';
+  import { CATEGORY_COLORS, type Category, type CategoryColor, type ServerConfig, type Signature, type SyncOptions } from '../lib/types';
 
   interface Opt {
     on: boolean;
@@ -76,6 +77,7 @@
     ['aspetto', 'Aspetto'],
     ['account', 'Account e sincronizzazione'],
     ['composizione', 'Composizione e risposta'],
+    ['categorie', 'Categorie'],
     ['info', 'Informazioni su Better-Look'],
   ] as const;
 
@@ -169,6 +171,54 @@
   }
 
   const sizeText = (s: number) => String(s).replace('.', ',');
+
+  // ---------- Categorie ----------
+  let catDraft = $state<Category[]>([]);
+  let catErr = $state('');
+  let catColorFor = $state<{ index: number; el: HTMLElement } | null>(null);
+  let catFocusLast = false;
+  // Copia modificabile, aggiornata quando cambiano le categorie salvate.
+  $effect(() => {
+    catDraft = store.categories.map((c) => ({ ...c }));
+  });
+
+  async function saveCats() {
+    const err = await store.saveCategories(catDraft.map((c) => ({ ...c })));
+    catErr = err;
+  }
+
+  function addCat() {
+    const used = new Set(catDraft.map((c) => c.color));
+    const color = (CATEGORY_COLORS.find(([c]) => !used.has(c)) ?? CATEGORY_COLORS[0])[0];
+    let n = 1;
+    while (catDraft.some((c) => c.name.toLowerCase() === `nuova categoria${n > 1 ? ` ${n}` : ''}`)) n++;
+    catDraft = [...catDraft, { id: '', name: `Nuova categoria${n > 1 ? ` ${n}` : ''}`, color }];
+    catFocusLast = true;
+    void saveCats();
+  }
+
+  function focusNew(el: HTMLInputElement, last: boolean) {
+    if (last && catFocusLast) {
+      catFocusLast = false;
+      el.focus();
+      el.select();
+    }
+  }
+
+  async function removeCat(i: number) {
+    const c = catDraft[i];
+    const ok = await store.ask({ title: `Eliminare la categoria “${c.name}”?`, text: 'Verrà tolta da tutti i messaggi a cui è assegnata.', ok: 'Elimina', danger: true });
+    if (!ok) return;
+    catDraft = catDraft.filter((_, j) => j !== i);
+    void saveCats();
+  }
+
+  function pickColor(color: CategoryColor) {
+    if (!catColorFor) return;
+    catDraft[catColorFor.index].color = color;
+    catColorFor = null;
+    void saveCats();
+  }
 
   async function savePw() {
     if (!acct || !newPw) return;
@@ -498,6 +548,42 @@
             </div>
             <p class="preview" style:font-family={fontStack(store.font.family)} style:font-size="{store.font.size}pt">Gentile cliente, le invio il preventivo aggiornato.</p>
           </div>
+        {:else if store.setPage === 'categorie'}
+          <h3>Categorie</h3>
+          <p class="intro">Le categorie colorano i messaggi per ritrovarli a colpo d’occhio. Assegnale con Categorizza o con il clic destro su un messaggio.</p>
+          <ul class="cats" aria-label="Categorie">
+            {#each catDraft as c, i (c.id || `nuova-${i}`)}
+              <li class="cat-row">
+                <button class="cat-sw" style:background="var(--cat-{c.color})" aria-label="Colore di {c.name}: {CATEGORY_COLORS.find(([k]) => k === c.color)?.[1]}" title="Cambia colore" onclick={(e) => (catColorFor = { index: i, el: e.currentTarget })}></button>
+                <input
+                  class="cat-name"
+                  value={c.name}
+                  aria-label="Nome della categoria"
+                  use:focusNew={i === catDraft.length - 1}
+                  oninput={(e) => (c.name = e.currentTarget.value)}
+                  onchange={() => void saveCats()}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                  }}
+                />
+                <span class="cat" style:background="var(--cat-{c.color}-bg)" style:color="var(--cat-{c.color}-fg)" aria-hidden="true"><span class="cat-t">{c.name || 'Senza nome'}</span></span>
+                <button class="ibtn btn" onclick={() => removeCat(i)} aria-label="Elimina {c.name}" title="Elimina"><Icon name="trash" size={17} /></button>
+              </li>
+            {/each}
+          </ul>
+          {#if catErr}<p class="cat-err" role="alert">{catErr}</p>{/if}
+          <button class="btn add" style="margin-top:8px" onclick={addCat}><Icon name="plus" size={16} />Nuova categoria</button>
+          {#if catColorFor}
+            <Popover anchor={catColorFor.el} label="Colore della categoria" onclose={() => (catColorFor = null)}>
+              <div class="cat-colors" role="radiogroup" aria-label="Colore">
+                {#each CATEGORY_COLORS as [k, label] (k)}
+                  {@const on = catDraft[catColorFor.index]?.color === k}
+                  <button class="cat-pick" role="radio" aria-checked={on} style:background="var(--cat-{k})" aria-label={label} title={label} data-first={on ? '' : undefined} onclick={() => pickColor(k)}>
+                  </button>
+                {/each}
+              </div>
+            </Popover>
+          {/if}
         {:else}
           <h3>Informazioni su Better-Look</h3>
           <div style="margin-top:30px"><About /></div>
@@ -534,6 +620,18 @@
   .sw.pick:hover { box-shadow: inset 0 0 0 1px var(--rule-2), 0 0 0 2px var(--sheet), 0 0 0 3px var(--rule-2); }
   .sw.pick[data-on="si"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 14%, transparent), 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink); }
   .hex input { width: 96px; font-variant-numeric: tabular-nums; text-transform: uppercase; }
+  .cats { margin: 22px 0 0; padding: 0; list-style: none; max-width: 560px; }
+  .cat-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px 34px; gap: 12px; align-items: center; padding: 6px 0; }
+  .cat-row + .cat-row { box-shadow: inset 0 1px 0 var(--rule); }
+  .cat-sw { width: 24px; height: 24px; border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent); cursor: pointer; }
+  .cat-name { height: 32px; min-width: 0; box-sizing: border-box; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; }
+  .cat-name:hover { box-shadow: inset 0 0 0 1px var(--rule-2); }
+  .cat-name:focus { outline: none; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -2px 0 var(--brand); }
+  .cat-row .cat { justify-self: start; }
+  .cat-err { margin: 8px 0 0; font-size: 13px; color: var(--danger); }
+  .cat-colors { display: grid; grid-template-columns: repeat(5, 30px); gap: 8px; padding: 6px; }
+  .cat-pick { width: 30px; height: 30px; border: 0; border-radius: 4px; display: grid; place-items: center; cursor: pointer; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 18%, transparent); }
+  .cat-pick[aria-checked="true"] { box-shadow: 0 0 0 2px var(--sheet), 0 0 0 4px var(--ink); }
   .check { margin-top: 14px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
   .check input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); }
   .acc-grid { margin-top: 24px; display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 28px; align-items: start; }

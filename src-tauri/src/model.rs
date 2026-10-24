@@ -129,6 +129,20 @@ pub struct Signature {
     pub html: String,
 }
 
+/// Categoria colorata, come in Outlook. Il colore è uno dei nomi della
+/// palette dell'interfaccia (rosso, arancione, giallo, verde...).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Category {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+
+/// Colori disponibili per le categorie.
+pub const CATEGORY_COLORS: [&str; 10] = ["rosso", "arancione", "giallo", "verde", "verdeacqua", "blu", "viola", "rosa", "marrone", "grigio"];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStatus {
@@ -222,6 +236,14 @@ pub struct MessageSummary {
     pub has_body: bool,
     /// Solo nei risultati di ricerca: la cartella del messaggio.
     pub folder_name: Option<String>,
+    /// Conversazione: Message-ID del primo messaggio della discussione.
+    pub thread: Option<String>,
+    /// Categorie colorate assegnate (identificativi).
+    pub categories: Vec<String>,
+    /// Dimensione in byte.
+    pub size: i64,
+    /// Messaggi della stessa conversazione nell'account.
+    pub thread_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -341,6 +363,8 @@ pub enum Event {
     Import { name: String, done: u32, total: u32 },
     /// Le firme sono cambiate (anche le altre finestre devono rileggerle).
     Signatures,
+    /// Le categorie sono cambiate.
+    Categories,
 }
 
 pub fn now_secs() -> i64 {
