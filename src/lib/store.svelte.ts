@@ -685,8 +685,8 @@ export class MailStore {
 
   // ---------- Azioni rapide ----------
 
+  // Anche nelle finestre del messaggio: le loro impostazioni salvano l'elenco intero.
   async reloadQuickSteps() {
-    if (this.mode !== 'principale') return;
     try {
       this.quickSteps = await this.backend.quickSteps();
     } catch {
@@ -873,8 +873,8 @@ export class MailStore {
 
   // ---------- Regole, risposte automatiche e avvisi ----------
 
+  // Anche nelle finestre del messaggio: le loro impostazioni salvano l'elenco intero.
   async reloadRules() {
-    if (this.mode !== 'principale') return;
     try {
       this.rules = await this.backend.rules();
     } catch {
