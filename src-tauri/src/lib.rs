@@ -6,6 +6,7 @@
 
 pub mod autoconfig;
 pub mod commands;
+pub mod contacts;
 pub mod db;
 pub mod engine;
 pub mod error;
@@ -112,6 +113,11 @@ pub fn run() {
             commands::save_rules,
             commands::run_rules,
             commands::set_auto_reply,
+            commands::address_book,
+            commands::save_contact,
+            commands::delete_contacts,
+            commands::import_contacts,
+            commands::export_contacts,
             commands::mailbox_usage,
             commands::large_messages,
             commands::older_messages,

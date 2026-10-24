@@ -450,6 +450,88 @@ pub struct OutboxItem {
     pub send_after: i64,
 }
 
+/// Numero di telefono di un contatto. `kind`: cellulare, lavoro, casa, fax, altro.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Phone {
+    #[serde(default)]
+    pub kind: String,
+    pub number: String,
+}
+
+/// Contatto della rubrica.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Contact {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub first_name: String,
+    #[serde(default)]
+    pub last_name: String,
+    /// Nome da mostrare; se manca si compone da nome e cognome.
+    #[serde(default)]
+    pub display_name: String,
+    #[serde(default)]
+    pub emails: Vec<String>,
+    #[serde(default)]
+    pub phones: Vec<Phone>,
+    #[serde(default)]
+    pub company: String,
+    #[serde(default)]
+    pub job_title: String,
+    /// Indirizzo su più righe.
+    #[serde(default)]
+    pub address: String,
+    #[serde(default)]
+    pub website: String,
+    /// "AAAA-MM-GG", oppure "--MM-GG" senza anno.
+    #[serde(default)]
+    pub birthday: String,
+    #[serde(default)]
+    pub notes: String,
+}
+
+impl Contact {
+    /// Nome con cui il contatto compare negli elenchi.
+    pub fn name(&self) -> String {
+        let d = self.display_name.trim();
+        if !d.is_empty() {
+            return d.to_string();
+        }
+        let full = format!("{} {}", self.first_name.trim(), self.last_name.trim()).trim().to_string();
+        if !full.is_empty() {
+            return full;
+        }
+        if !self.company.trim().is_empty() {
+            return self.company.trim().to_string();
+        }
+        self.emails.first().cloned().unwrap_or_default()
+    }
+
+    /// Ordine alfabetico per cognome, come la rubrica di Outlook.
+    pub fn sort_key(&self) -> String {
+        let k = if self.last_name.trim().is_empty() { self.name() } else { format!("{} {}", self.last_name.trim(), self.first_name.trim()) };
+        k.to_lowercase()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.name().trim().is_empty()
+    }
+}
+
+/// Esito di un'importazione di contatti.
+#[derive(Debug, Clone, Serialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContactImport {
+    /// Contatti nuovi.
+    pub added: u32,
+    /// Contatti già presenti, completati con i dati nuovi.
+    pub updated: u32,
+    /// Già presenti e uguali.
+    pub unchanged: u32,
+}
+
 /// Spazio occupato da una cartella (Pulizia cassetta postale).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -484,6 +566,8 @@ pub enum Event {
     NewMail { account_id: String, count: u32, messages: Vec<MessageSummary> },
     /// Le regole sono cambiate.
     Rules,
+    /// La rubrica è cambiata.
+    Contacts,
 }
 
 pub fn now_secs() -> i64 {

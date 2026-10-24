@@ -28,6 +28,30 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   }
   if (overlay) return;
 
+  // Posta, Calendario, Contatti, come in Outlook.
+  if (ctrl && !e.shiftKey && !e.altKey && (e.key === '1' || e.key === '2' || e.key === '3')) {
+    e.preventDefault();
+    store.setModule(e.key === '1' ? 'posta' : e.key === '2' ? 'calendario' : 'contatti');
+    return;
+  }
+  if (ctrl && e.shiftKey && key === 'c') {
+    e.preventDefault();
+    store.newContact();
+    return;
+  }
+  if (store.module === 'contatti') {
+    if (ctrl && !e.shiftKey && key === 'n') {
+      e.preventDefault();
+      store.newContact();
+    } else if (ctrl && key === 'e') {
+      e.preventDefault();
+      ui.focusSearch();
+    } else if (!typing && e.key === 'Delete' && store.contactSel && !store.contactEdit) {
+      void store.deleteContacts([store.contactSel]);
+    }
+    return;
+  }
+
   if (e.key === 'F9') {
     e.preventDefault();
     store.syncNow();

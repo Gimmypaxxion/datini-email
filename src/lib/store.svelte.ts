@@ -21,12 +21,14 @@ import {
   whenText,
 } from './format';
 import { emptyRule } from './rules';
+import { contactName } from './contacts';
 import {
   errorKind,
   errorMessage,
   type Account,
   type AutoReply,
   type Category,
+  type Contact,
   type Rule,
   type Draft,
   type EngineEvent,
@@ -50,6 +52,8 @@ export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inseris
 export type WinTab = 'messaggio' | 'inserisci' | 'formato';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
+/** Parte del programma mostrata: posta, calendario, contatti (Ctrl+1, 2, 3). */
+export type AppModule = 'posta' | 'calendario' | 'contatti';
 export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'categorie' | 'regole' | 'risposte' | 'pulizia' | 'info';
 
 export interface Prefs {
@@ -185,6 +189,13 @@ export class MailStore {
   remoteOk = $state<Record<number, boolean>>({});
   collapsed = $state<Record<string, boolean>>({});
   categories = $state<Category[]>([]);
+  module = $state<AppModule>('posta');
+  // Rubrica
+  book = $state<Contact[]>([]);
+  contactSel = $state<string | null>(null);
+  /** Contatto aperto nel modulo di modifica (nuovo se senza id). */
+  contactEdit = $state<Contact | null>(null);
+  contactQuery = $state('');
   // Regole e avvisi
   rules = $state<Rule[]>([]);
   /** Regola aperta nell'editor delle impostazioni (nuova o da modificare). */
@@ -377,6 +388,9 @@ export class MailStore {
       case 'rules':
         void this.reloadRules();
         break;
+      case 'contacts':
+        void this.reloadContacts();
+        break;
       case 'newMail':
         if (this.mode === 'principale' && this.notifyDesktop) void this.alertNewMail(e.count, e.messages);
         break;
@@ -415,6 +429,126 @@ export class MailStore {
       const s = this.list.find((m) => m.id === this.sel);
       if (s) Object.assign(this.detail, { unread: s.unread, flagged: s.flagged, answered: s.answered });
     }
+  }
+
+  // ---------- Moduli e rubrica ----------
+
+  setModule(m: AppModule) {
+    if (this.module === m) return;
+    this.module = m;
+    this.backstage = false;
+    if (m === 'contatti') void this.reloadContacts();
+  }
+
+  async reloadContacts() {
+    try {
+      this.book = await this.backend.addressBook();
+      if (this.contactSel && !this.book.some((c) => c.id === this.contactSel)) this.contactSel = null;
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Contatti che corrispondono alla ricerca (nome, azienda, email, telefono). */
+  get filteredContacts(): Contact[] {
+    const q = this.contactQuery.trim().toLowerCase();
+    if (!q) return this.book;
+    const digits = q.replace(/\D/g, '');
+    return this.book.filter(
+      (c) =>
+        contactName(c).toLowerCase().includes(q) ||
+        c.company.toLowerCase().includes(q) ||
+        c.emails.some((e) => e.toLowerCase().includes(q)) ||
+        (digits.length >= 3 && c.phones.some((p) => p.number.replace(/\D/g, '').includes(digits))),
+    );
+  }
+
+  get selectedContact(): Contact | null {
+    return this.book.find((c) => c.id === this.contactSel) ?? null;
+  }
+
+  newContact(prefill: Partial<Contact> = {}) {
+    this.setModule('contatti');
+    this.contactEdit = { id: '', firstName: '', lastName: '', displayName: '', emails: [], phones: [], company: '', jobTitle: '', address: '', website: '', birthday: '', notes: '', ...prefill };
+  }
+
+  editContact(c: Contact | null = this.selectedContact) {
+    if (c) this.contactEdit = JSON.parse(JSON.stringify(c)) as Contact;
+  }
+
+  /** Salva il contatto in modifica. Restituisce l'errore da mostrare, o null. */
+  async saveContactEdit(): Promise<string | null> {
+    const c = this.contactEdit;
+    if (!c) return null;
+    try {
+      const saved = await this.backend.saveContact(c);
+      this.contactEdit = null;
+      await this.reloadContacts();
+      this.contactSel = saved.id;
+      return null;
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  async deleteContacts(ids: string[]) {
+    if (!ids.length) return;
+    const one = this.book.find((c) => c.id === ids[0]);
+    const ok = await this.ask({
+      title: ids.length === 1 && one ? `Eliminare “${contactName(one)}”?` : `Eliminare ${ids.length} contatti?`,
+      text: 'Il contatto sparisce dalla rubrica. I messaggi restano.',
+      ok: 'Elimina',
+      danger: true,
+    });
+    if (!ok) return;
+    await this.act(async () => {
+      await this.backend.deleteContacts(ids);
+      this.contactSel = null;
+      this.contactEdit = null;
+      await this.reloadContacts();
+    });
+  }
+
+  async importContacts() {
+    try {
+      const r = await this.backend.importContacts();
+      if (!r) return;
+      await this.reloadContacts();
+      const parts = [r.added && `${r.added} ${r.added === 1 ? 'nuovo' : 'nuovi'}`, r.updated && `${r.updated} ${r.updated === 1 ? 'completato' : 'completati'}`, r.unchanged && `${r.unchanged} già presenti`].filter(Boolean);
+      this.flash({ kind: 'info', text: `Contatti importati: ${parts.join(', ') || 'nessuno'}.` }, 7000);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) }, 9000);
+    }
+  }
+
+  async exportContacts(ids: string[] | null = null) {
+    try {
+      const n = await this.backend.exportContacts(ids);
+      if (n !== null) this.flash({ kind: 'info', text: n === 1 ? '1 contatto esportato in vCard.' : `${n} contatti esportati in vCard.` }, 5000);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Posta scambiata con un indirizzo (dalla scheda del contatto). */
+  async showMailFrom(email: string, id: number | null = null) {
+    this.setModule('posta');
+    await this.search(email);
+    if (id !== null && this.list.some((m) => m.id === id)) await this.pickMsg(id);
+  }
+
+  /** "Aggiungi ai contatti" da un messaggio: nuovo contatto con nome e indirizzo. */
+  async addToContacts(p: Person) {
+    await this.reloadContacts();
+    const found = this.book.find((c) => c.emails.some((e) => e.toLowerCase() === p.email.toLowerCase()));
+    if (found) {
+      this.setModule('contatti');
+      this.contactSel = found.id;
+      return;
+    }
+    const name = p.name.trim() && p.name.trim() !== p.email ? p.name.trim() : '';
+    const sp = name.lastIndexOf(' ');
+    this.newContact({ firstName: sp > 0 ? name.slice(0, sp) : name, lastName: sp > 0 ? name.slice(sp + 1) : '', emails: [p.email] });
   }
 
   // ---------- Regole, risposte automatiche e avvisi ----------
@@ -616,6 +750,7 @@ export class MailStore {
   }
 
   get ribbonTabs(): RibbonTab[] {
+    if (this.module !== 'posta') return ['home', 'aiuto'];
     return this.paneCompose ? ['home', 'visualizza', 'aiuto', 'messaggio', 'inserisci', 'formato'] : ['home', 'visualizza', 'aiuto'];
   }
   get activeRibbon(): RibbonTab {
@@ -1251,11 +1386,13 @@ export class MailStore {
   }
 
   /** Scrivere a un indirizzo cliccato nel testo di un messaggio (mailto:). */
-  async composeTo(email: string) {
+  async composeTo(email: string, name = '') {
     const acct = this.composeAccount();
     if (!acct) return;
     const d = this.emptyDraft(acct.id);
-    d.to = [{ name: '', email }];
+    d.to = [{ name, email }];
+    // Il nuovo messaggio nel riquadro di lettura si vede solo nella posta.
+    if (this.prefs.compose !== 'finestra') this.setModule('posta');
     await this.stashDraft();
     await this.present(d, this.prefs.compose === 'finestra');
   }
@@ -1949,6 +2086,12 @@ ${m.text}`.slice(0, 20_000);
       this.openSettings('account');
     } else if (v === 'informazioni') {
       this.openSettings('info');
+    } else if (v === 'contatti') {
+      this.setModule('contatti');
+      await this.reloadContacts();
+      this.contactSel = this.book[0]?.id ?? null;
+    } else if (v === 'calendario') {
+      this.setModule('calendario');
     } else if (v === 'aggiungi') {
       this.openWizard(false);
     } else if (v === 'newsletter') {

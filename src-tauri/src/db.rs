@@ -1097,6 +1097,60 @@ impl Db {
         Ok(out)
     }
 
+    // ---------------- Rubrica ----------------
+
+    /// Tutti i contatti, in ordine alfabetico per cognome.
+    pub fn all_contacts(&self) -> Result<Vec<Contact>> {
+        let c = self.conn();
+        let mut st = c.prepare("SELECT data FROM contacts ORDER BY sort, name")?;
+        let rows = st.query_map([], |r| r.get::<_, String>(0))?;
+        let mut out = Vec::new();
+        for json in rows {
+            if let Ok(contact) = serde_json::from_str::<Contact>(&json?) {
+                out.push(contact);
+            }
+        }
+        Ok(out)
+    }
+
+    pub fn save_contact(&self, contact: &Contact) -> Result<()> {
+        let emails = contact.emails.iter().map(|e| e.to_lowercase()).collect::<Vec<_>>().join(" ");
+        self.conn().execute(
+            "INSERT OR REPLACE INTO contacts(id, name, sort, emails, data, updated) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![contact.id, contact.name(), contact.sort_key(), emails, serde_json::to_string(contact)?, now_secs()],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_contacts(&self, ids: &[String]) -> Result<()> {
+        let c = self.conn();
+        for id in ids {
+            c.execute("DELETE FROM contacts WHERE id = ?1", [id])?;
+        }
+        Ok(())
+    }
+
+    /// Indirizzi della rubrica che iniziano o contengono il testo scritto.
+    pub fn contact_people(&self, prefix: &str, limit: i64) -> Result<Vec<Person>> {
+        let like = format!("%{}%", prefix.to_lowercase().replace(['%', '_'], ""));
+        let c = self.conn();
+        let mut st = c.prepare("SELECT data FROM contacts WHERE lower(name) LIKE ?1 OR emails LIKE ?1 ORDER BY sort LIMIT ?2")?;
+        let rows = st.query_map(params![like, limit], |r| r.get::<_, String>(0))?;
+        let low = prefix.to_lowercase();
+        let mut out = Vec::new();
+        for json in rows {
+            let Ok(contact) = serde_json::from_str::<Contact>(&json?) else { continue };
+            let name = contact.name();
+            let by_name = name.to_lowercase().contains(&low);
+            for e in &contact.emails {
+                if by_name || e.to_lowercase().contains(&low) {
+                    out.push(Person { name: name.clone(), email: e.clone() });
+                }
+            }
+        }
+        Ok(out)
+    }
+
     // ---------------- Operazioni in attesa ----------------
 
     pub fn push_op(&self, account_id: &str, op: &Op) -> Result<i64> {

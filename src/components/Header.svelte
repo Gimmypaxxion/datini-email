@@ -9,6 +9,17 @@
   const me = $derived(store.currentAccount?.kind === 'local' ? (store.accounts.find((a) => a.kind !== 'local') ?? store.currentAccount) : store.currentAccount);
 
   let searchEl: HTMLInputElement | undefined = $state();
+  // Nei contatti la ricerca filtra la rubrica, come nel nuovo Outlook.
+  const people = $derived(store.module === 'contatti');
+  const value = $derived(people ? store.contactQuery : store.q);
+  function type(v: string) {
+    if (people) store.contactQuery = v;
+    else void store.search(v);
+  }
+  function clear() {
+    if (people) store.contactQuery = '';
+    else void store.clearSearch();
+  }
 
   export function focusSearch() {
     searchEl?.focus();
@@ -20,25 +31,25 @@
   <div class="side" aria-hidden="true"></div>
   <div class="search-wrap">
     <label class="search">
-      <span class="sr">Cerca nella posta</span>
+      <span class="sr">{people ? 'Cerca nei contatti' : 'Cerca nella posta'}</span>
       <Icon name="search" class="lens" />
       <input
         bind:this={searchEl}
         class="ph"
         type="search"
-        value={store.q}
-        oninput={(e) => void store.search(e.currentTarget.value)}
+        {value}
+        oninput={(e) => type(e.currentTarget.value)}
         onkeydown={(e) => {
-          if (e.key === 'Escape' && store.q) {
+          if (e.key === 'Escape' && value) {
             e.stopPropagation();
-            void store.clearSearch();
+            clear();
           }
         }}
-        placeholder="Cerca"
+        placeholder={people ? 'Cerca contatti' : 'Cerca'}
         title="Cerca (Ctrl+E)"
       />
-      {#if store.q}
-        <button class="ibtn btn clear" onclick={() => void store.clearSearch()} aria-label="Cancella ricerca"><Icon name="x" size={16} /></button>
+      {#if value}
+        <button class="ibtn btn clear" onclick={clear} aria-label="Cancella ricerca"><Icon name="x" size={16} /></button>
       {/if}
     </label>
   </div>

@@ -201,6 +201,32 @@ pub async fn older_messages(e: E<'_>, folder_id: i64, before: i64, archive: bool
 }
 
 #[tauri::command]
+pub async fn address_book(e: E<'_>) -> Result<Vec<Contact>> {
+    e.address_book()
+}
+
+#[tauri::command]
+pub async fn save_contact(e: E<'_>, contact: Contact) -> Result<Contact> {
+    e.save_contact(contact)
+}
+
+#[tauri::command]
+pub async fn delete_contacts(e: E<'_>, ids: Vec<String>) -> Result<()> {
+    e.delete_contacts(&ids)
+}
+
+#[tauri::command]
+pub async fn import_contacts(e: E<'_>, path: PathBuf) -> Result<ContactImport> {
+    let eng = e.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || eng.import_contacts(&path)).await.map_err(|err| Error::user(err.to_string()))?
+}
+
+#[tauri::command]
+pub async fn export_contacts(e: E<'_>, path: PathBuf, ids: Option<Vec<String>>) -> Result<usize> {
+    e.export_contacts(&path, ids.as_deref())
+}
+
+#[tauri::command]
 pub async fn rules(e: E<'_>) -> Result<Vec<Rule>> {
     e.rules()
 }

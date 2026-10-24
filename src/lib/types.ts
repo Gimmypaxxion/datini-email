@@ -56,6 +56,46 @@ export interface AutoReply {
   since?: number;
 }
 
+export type PhoneKind = 'cellulare' | 'lavoro' | 'casa' | 'fax' | 'altro';
+
+export const PHONE_KINDS: [PhoneKind, string][] = [
+  ['cellulare', 'Cellulare'],
+  ['lavoro', 'Lavoro'],
+  ['casa', 'Casa'],
+  ['fax', 'Fax'],
+  ['altro', 'Altro'],
+];
+
+export interface Phone {
+  kind: PhoneKind;
+  number: string;
+}
+
+/** Contatto della rubrica. */
+export interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  /** Nome da mostrare; se vuoto si compone da nome e cognome. */
+  displayName: string;
+  emails: string[];
+  phones: Phone[];
+  company: string;
+  jobTitle: string;
+  /** Su più righe. */
+  address: string;
+  website: string;
+  /** "AAAA-MM-GG", oppure "--MM-GG" senza anno. */
+  birthday: string;
+  notes: string;
+}
+
+export interface ContactImport {
+  added: number;
+  updated: number;
+  unchanged: number;
+}
+
 /** Spazio occupato da una cartella. */
 export interface FolderUsage {
   folderId: number;
@@ -257,7 +297,8 @@ export type EngineEvent =
   | { type: 'signatures' }
   | { type: 'categories' }
   | { type: 'newMail'; accountId: string; count: number; messages: MessageSummary[] }
-  | { type: 'rules' };
+  | { type: 'rules' }
+  | { type: 'contacts' };
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {

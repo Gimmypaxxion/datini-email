@@ -11,6 +11,7 @@
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AccountWizard from './components/AccountWizard.svelte';
   import StatusBar from './components/StatusBar.svelte';
+  import ContactsView from './components/ContactsView.svelte';
   import Icon from './lib/Icon.svelte';
   import { store } from './lib/store.svelte';
   import { setWindowTitle } from './lib/platform';
@@ -28,15 +29,15 @@
 
   // Titolo della finestra del sistema, come in Outlook: "Posta in arrivo - Better-Look".
   $effect(() => {
-    const where = store.c && store.cWin ? store.c.subject || 'Nuovo messaggio' : store.listTitle || 'Posta';
+    const where = store.module === 'contatti' ? 'Contatti' : store.module === 'calendario' ? 'Calendario' : store.c && store.cWin ? store.c.subject || 'Nuovo messaggio' : store.listTitle || 'Posta';
     setWindowTitle(`${where} - Better-Look`);
   });
 
   const apps = [
-    { label: 'Posta', icon: 'mail', key: 'Ctrl+1', current: true },
-    { label: 'Calendario', icon: 'calendar', key: 'Ctrl+2', current: false },
-    { label: 'Contatti', icon: 'users', key: 'Ctrl+3', current: false },
-    { label: 'Attività', icon: 'checkbox', key: 'Ctrl+4', current: false },
+    { label: 'Posta', icon: 'mail', key: 'Ctrl+1', module: 'posta' },
+    { label: 'Calendario', icon: 'calendar', key: 'Ctrl+2', module: 'calendario' },
+    { label: 'Contatti', icon: 'users', key: 'Ctrl+3', module: 'contatti' },
+    { label: 'Attività', icon: 'checkbox', key: 'Ctrl+4', module: null },
   ] as const;
 </script>
 
@@ -48,21 +49,26 @@
   <div class="panes">
     <nav class="apps" aria-label="App">
       {#each apps as a (a.label)}
+        {@const current = a.module === store.module}
         <button
           class="app btn"
-          class:current={a.current}
+          class:current
           aria-label={a.label}
-          aria-current={a.current ? 'page' : undefined}
+          aria-current={current ? 'page' : undefined}
           title="{a.label} ({a.key})"
-          onclick={() => !a.current && store.soon(a.label)}
+          onclick={() => (a.module ? store.setModule(a.module) : store.soon(a.label))}
         >
-          <Icon name={a.icon} size={20} stroke={a.current ? 1.7 : 1.6} />
+          <Icon name={a.icon} size={20} stroke={current ? 1.7 : 1.6} />
         </button>
       {/each}
     </nav>
-    {#if store.showFolders}<FolderPane />{/if}
-    <MessageList />
-    <ReadingPane />
+    {#if store.module === 'contatti'}
+      <ContactsView />
+    {:else}
+      {#if store.showFolders}<FolderPane />{/if}
+      <MessageList />
+      <ReadingPane />
+    {/if}
   </div>
   <StatusBar />
   <ComposeWindow />

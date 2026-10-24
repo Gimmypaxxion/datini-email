@@ -76,6 +76,7 @@ export function messageItems(m: MessageSummary, sub: (kind: 'categorie' | 'spost
     { kind: 'sep', label: '' },
     { label: 'Sposta in…', icon: 'folder-symlink', keys: 'Ctrl+Maiusc+V', onclick: () => sub('sposta') },
     { label: 'Crea regola…', icon: 'list-check', disabled: draft, onclick: () => store.newRuleFrom(m.id) },
+    { label: 'Aggiungi ai contatti', icon: 'user-plus', disabled: draft || !m.from.email, onclick: () => store.addToContacts(m.from) },
     { label: 'Archivia', icon: 'archive', keys: 'Backspace', onclick: () => store.moveMsg(m.id, 'archive') },
     { label: 'Elimina', icon: 'trash', keys: 'Canc', onclick: () => store.deleteMsg(m.id) },
     { label: 'Stampa', icon: 'printer', keys: 'Ctrl+P', onclick: () => store.printMsg(m.id) },

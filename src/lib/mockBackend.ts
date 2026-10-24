@@ -5,10 +5,13 @@ import type { Backend, Tab } from './backend';
 import { mockData, type MockMessage } from './mock';
 import { textToHtml } from './compose-html';
 import { hasActions, ruleMatches } from './rules';
+import { contactName } from './contacts';
 import type {
   Account,
   AutoReply,
   Category,
+  Contact,
+  ContactImport,
   FolderUsage,
   Rule,
   Draft,
@@ -62,6 +65,17 @@ function summary(m: MockMessage): MessageSummary {
   };
 }
 
+const EMPTY_CONTACT: Contact = { id: '', firstName: '', lastName: '', displayName: '', emails: [], phones: [], company: '', jobTitle: '', address: '', website: '', birthday: '', notes: '' };
+
+const SAMPLE_CONTACTS: Contact[] = [
+  { ...EMPTY_CONTACT, id: 'k1', firstName: 'Davide', lastName: 'Orlandi', emails: ['d.orlandi@studiorlandi.it'], phones: [{ kind: 'lavoro', number: '0444 123 456' }, { kind: 'cellulare', number: '333 123 4567' }], company: 'Studio Orlandi Architetti', jobTitle: 'Architetto', address: 'Contrà Porti 12\n36100 Vicenza (VI)', website: 'https://studiorlandi.example' },
+  { ...EMPTY_CONTACT, id: 'k2', firstName: 'Lucia', lastName: 'Marchetti', emails: ['lucia@marchettitessuti.it'], phones: [{ kind: 'cellulare', number: '347 765 4321' }], company: 'Marchetti Tessuti', jobTitle: 'Commerciale', birthday: '1985-03-09' },
+  { ...EMPTY_CONTACT, id: 'k3', firstName: 'Marco', lastName: 'Ventura', emails: ['m.ventura@valliarredi.it'], phones: [{ kind: 'lavoro', number: '0574 152 600' }], company: 'Valli Arredi', jobTitle: 'Responsabile commerciale' },
+  { ...EMPTY_CONTACT, id: 'k4', firstName: 'Giorgio', lastName: 'Valli', emails: ['giorgio@valliarredi.it'], company: 'Valli Arredi', jobTitle: 'Titolare', notes: 'Preferisce essere chiamato la mattina.' },
+  { ...EMPTY_CONTACT, id: 'k5', firstName: 'Elena', lastName: 'Fabbri', emails: ['amministrazione@fabbrilegnami.it'], phones: [{ kind: 'lavoro', number: '0574 222 333' }], company: 'Fabbri Legnami', jobTitle: 'Amministrazione', address: 'Via dei Pini 4\n59100 Prato (PO)' },
+  { ...EMPTY_CONTACT, id: 'k6', displayName: 'Trasporti Ferri', emails: ['consegne@trasportiferri.it'], phones: [{ kind: 'lavoro', number: '0574 900 100' }], company: 'Trasporti Ferri' },
+];
+
 const REMOTE_IMG = /<img\b[^>]*\bsrc="https?:[^"]*"[^>]*>/gi;
 
 export class MockBackend implements Backend {
@@ -87,6 +101,7 @@ export class MockBackend implements Backend {
     { id: 'c5', name: 'Fiera di gennaio', color: 'arancione' },
   ];
   private ruleList: Rule[] = [];
+  private book: Contact[] = SAMPLE_CONTACTS.map((c) => ({ ...c, emails: [...c.emails], phones: c.phones.map((p) => ({ ...p })) }));
   /** Avvisi sul desktop mandati (per i test). */
   notified: { title: string; body: string }[] = [];
   /** Ritardo simulato per la ricerca dei server. */
@@ -585,6 +600,49 @@ export class MockBackend implements Backend {
     return ms.length;
   }
 
+  async addressBook() {
+    const key = (c: Contact) => (c.lastName ? `${c.lastName} ${c.firstName}` : contactName(c)).toLowerCase();
+    return [...this.book].sort((a, b) => key(a).localeCompare(key(b), 'it')).map((c) => JSON.parse(JSON.stringify(c)) as Contact);
+  }
+
+  async saveContact(c: Contact) {
+    const emails = c.emails.map((e) => e.trim()).filter(Boolean);
+    const bad = emails.find((e) => !/^[^@\s]+@[^@\s]+$/.test(e));
+    if (bad) throw err('utente', `L'indirizzo "${bad}" non è valido.`);
+    const saved: Contact = { ...JSON.parse(JSON.stringify(c)), emails, phones: c.phones.filter((p) => p.number.trim()), id: c.id || `k${this.nextId++}` };
+    if (!contactName(saved).trim()) throw err('utente', 'Scrivi almeno un nome o un indirizzo email.');
+    const i = this.book.findIndex((x) => x.id === saved.id);
+    if (i >= 0) this.book[i] = saved;
+    else this.book.push(saved);
+    this.emit({ type: 'contacts' });
+    return JSON.parse(JSON.stringify(saved)) as Contact;
+  }
+
+  async deleteContacts(ids: string[]) {
+    this.book = this.book.filter((c) => !ids.includes(c.id));
+    this.emit({ type: 'contacts' });
+  }
+
+  async importContacts(): Promise<ContactImport> {
+    // Nel browser non si leggono file: si aggiungono due contatti di esempio.
+    const extra = [
+      { firstName: 'Paolo', lastName: 'Rossi', company: 'Rossi Srl', emails: ['paolo@rossi.example'] },
+      { firstName: 'Anna', lastName: 'Neri', company: 'Studio Neri', emails: ['anna@neri.example'] },
+    ];
+    let added = 0;
+    for (const e of extra) {
+      if (this.book.some((c) => c.emails.includes(e.emails[0]))) continue;
+      this.book.push({ ...EMPTY_CONTACT, ...e, id: `k${this.nextId++}` });
+      added++;
+    }
+    this.emit({ type: 'contacts' });
+    return { added, updated: 0, unchanged: extra.length - added };
+  }
+
+  async exportContacts(ids: string[] | null) {
+    return ids ? ids.length : this.book.length;
+  }
+
   async notify(title: string, body: string) {
     this.notified.push({ title, body });
     return true;
@@ -635,6 +693,13 @@ export class MockBackend implements Backend {
   async contacts(prefix: string): Promise<Person[]> {
     const p = prefix.toLowerCase();
     const seen = new Map<string, Person>();
+    // Prima la rubrica, poi chi ha scritto o ricevuto posta.
+    for (const c of this.book) {
+      const name = contactName(c);
+      for (const e of c.emails) {
+        if ((e.toLowerCase().includes(p) || name.toLowerCase().includes(p)) && !seen.has(e.toLowerCase())) seen.set(e.toLowerCase(), { name, email: e });
+      }
+    }
     for (const m of this.msgs) {
       for (const x of [m.from, ...m.to, ...m.cc]) {
         if (x.email && (x.email.toLowerCase().includes(p) || x.name.toLowerCase().includes(p)) && !seen.has(x.email.toLowerCase())) {

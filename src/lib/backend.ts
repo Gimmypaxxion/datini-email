@@ -16,6 +16,8 @@ import type {
   Person,
   Role,
   AutoReply,
+  Contact,
+  ContactImport,
   FolderUsage,
   Rule,
   SavedDraft,
@@ -79,6 +81,13 @@ export interface Backend {
   largeMessages(accountId: string, minSize: number): Promise<MessageSummary[]>;
   /** Pulizia: quanti messaggi della cartella sono più vecchi di `before` (ms); con `archive` li sposta in Archivio. */
   olderMessages(folderId: number, before: number, archive: boolean): Promise<number>;
+  addressBook(): Promise<Contact[]>;
+  saveContact(c: Contact): Promise<Contact>;
+  deleteContacts(ids: string[]): Promise<void>;
+  /** Chiede il file (vCard, CSV, LDIF) e importa. Null se l'utente annulla. */
+  importContacts(): Promise<ContactImport | null>;
+  /** Chiede dove salvare e scrive un file vCard. Null se l'utente annulla. */
+  exportContacts(ids: string[] | null): Promise<number | null>;
   /** Avviso sul desktop. Falso se il sistema non lo permette. */
   notify(title: string, body: string): Promise<boolean>;
   cancelSend(outboxId: number): Promise<Draft | null>;
@@ -240,6 +249,35 @@ export class TauriBackend implements Backend {
   }
   mailboxUsage(accountId: string) {
     return this.call<FolderUsage[]>('mailbox_usage', { accountId });
+  }
+  addressBook() {
+    return this.call<Contact[]>('address_book');
+  }
+  saveContact(contact: Contact) {
+    return this.call<Contact>('save_contact', { contact });
+  }
+  deleteContacts(ids: string[]) {
+    return this.call<void>('delete_contacts', { ids });
+  }
+  async importContacts() {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const path = await open({
+      multiple: false,
+      directory: false,
+      title: 'Importa contatti',
+      filters: [
+        { name: 'Contatti (vCard, CSV, LDIF)', extensions: ['vcf', 'vcard', 'csv', 'ldif', 'ldi', 'txt'] },
+        { name: 'Tutti i file', extensions: ['*'] },
+      ],
+    });
+    if (!path || Array.isArray(path)) return null;
+    return this.call<ContactImport>('import_contacts', { path });
+  }
+  async exportContacts(ids: string[] | null) {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const path = await save({ title: 'Esporta contatti', defaultPath: 'Contatti.vcf', filters: [{ name: 'vCard', extensions: ['vcf'] }] });
+    if (!path) return null;
+    return this.call<number>('export_contacts', { path, ids });
   }
   largeMessages(accountId: string, minSize: number) {
     return this.call<MessageSummary[]>('large_messages', { accountId, minSize });

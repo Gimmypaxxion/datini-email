@@ -58,10 +58,10 @@ describe('regole', () => {
     const ev = (count: number) => (backend as unknown as { emit(e: unknown): void }).emit({ type: 'newMail', accountId: m.accountId, count, messages: [m, s.list[1]] });
     ev(1);
     await Promise.resolve();
-    expect(backend.notified.at(-1)).toEqual({ title: m.from.name, body: m.subject });
+    expect(backend.notified[backend.notified.length - 1]).toEqual({ title: m.from.name, body: m.subject });
     ev(2);
     await Promise.resolve();
-    expect(backend.notified.at(-1)!.title).toBe('2 nuovi messaggi');
+    expect(backend.notified[backend.notified.length - 1]!.title).toBe('2 nuovi messaggi');
     s.setNotify(false);
     ev(1);
     await Promise.resolve();

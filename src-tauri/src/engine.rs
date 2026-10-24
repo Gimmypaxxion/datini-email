@@ -715,8 +715,97 @@ impl Engine {
             .collect())
     }
 
+    /// Suggerimenti per i destinatari: prima la rubrica, poi chi ha scritto
+    /// o ricevuto posta.
     pub fn contacts(&self, prefix: &str) -> Result<Vec<Person>> {
-        self.db.contacts(prefix, 8)
+        let mut out = self.db.contact_people(prefix, 8)?;
+        for p in self.db.contacts(prefix, 8)? {
+            if !out.iter().any(|o| o.email.eq_ignore_ascii_case(&p.email)) {
+                out.push(p);
+            }
+        }
+        out.truncate(8);
+        Ok(out)
+    }
+
+    // ------------------------------------------------------------------
+    // Rubrica
+    // ------------------------------------------------------------------
+
+    pub fn address_book(&self) -> Result<Vec<Contact>> {
+        self.db.all_contacts()
+    }
+
+    /// Salva un contatto (nuovo se non ha identificativo).
+    pub fn save_contact(&self, mut c: Contact) -> Result<Contact> {
+        c.emails = c.emails.iter().map(|e| e.trim().to_string()).filter(|e| !e.is_empty()).collect();
+        c.phones.retain(|p| !p.number.trim().is_empty());
+        if let Some(bad) = c.emails.iter().find(|e| !e.contains('@') || e.contains(' ') || e.starts_with('@') || e.ends_with('@')) {
+            return Err(Error::user(format!("L'indirizzo \"{bad}\" non è valido.")));
+        }
+        if c.is_empty() {
+            return Err(Error::user("Scrivi almeno un nome o un indirizzo email."));
+        }
+        if c.id.is_empty() {
+            c.id = mime::random_id()[..12].to_string();
+        }
+        self.db.save_contact(&c)?;
+        self.emit(Event::Contacts);
+        Ok(c)
+    }
+
+    pub fn delete_contacts(&self, ids: &[String]) -> Result<()> {
+        self.db.delete_contacts(ids)?;
+        self.emit(Event::Contacts);
+        Ok(())
+    }
+
+    /// Importa un file vCard, CSV o LDIF. Chi c'è già (stesso indirizzo, o
+    /// stesso nome se manca l'indirizzo) viene completato, non duplicato.
+    pub fn import_contacts(&self, path: &Path) -> Result<ContactImport> {
+        let bytes = std::fs::read(path).map_err(|e| Error::user(format!("Impossibile leggere il file: {e}")))?;
+        let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let list = crate::contacts::parse_file(&bytes, &name);
+        if list.is_empty() {
+            return Err(Error::user("Nel file non ho trovato contatti. Usa un file vCard (.vcf), CSV o LDIF esportato dal programma di posta."));
+        }
+        let mut book = self.db.all_contacts()?;
+        let mut res = ContactImport::default();
+        for c in list {
+            let found = book.iter().position(|b| c.emails.iter().any(|e| b.emails.iter().any(|x| x.eq_ignore_ascii_case(e)))).or_else(|| {
+                if c.emails.is_empty() {
+                    book.iter().position(|b| b.name().eq_ignore_ascii_case(&c.name()))
+                } else {
+                    None
+                }
+            });
+            match found {
+                Some(i) => {
+                    if crate::contacts::merge(&mut book[i], &c) {
+                        self.db.save_contact(&book[i])?;
+                        res.updated += 1;
+                    } else {
+                        res.unchanged += 1;
+                    }
+                }
+                None => {
+                    let mut c = c;
+                    c.id = mime::random_id()[..12].to_string();
+                    self.db.save_contact(&c)?;
+                    book.push(c);
+                    res.added += 1;
+                }
+            }
+        }
+        self.emit(Event::Contacts);
+        Ok(res)
+    }
+
+    /// Esporta in vCard tutti i contatti, o solo quelli indicati.
+    pub fn export_contacts(&self, path: &Path, ids: Option<&[String]>) -> Result<usize> {
+        let list: Vec<Contact> = self.db.all_contacts()?.into_iter().filter(|c| ids.map_or(true, |ids| ids.contains(&c.id))).collect();
+        std::fs::write(path, crate::contacts::to_vcard(&list)).map_err(|e| Error::user(format!("Impossibile salvare il file: {e}")))?;
+        Ok(list.len())
     }
 
     /// Testo completo di un messaggio, scaricandolo se serve.
@@ -1988,6 +2077,47 @@ mod tests {
         assert_eq!(s.eng.older_messages(s.inbox, before, false).await.unwrap(), 0);
         let archive = s.eng.db.folder_by_role("a1", "archive").unwrap().unwrap();
         assert_eq!(s.eng.db.folder_message_ids(archive.id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn contacts_import_merge_export_and_suggest() {
+        let s = setup();
+        let dir = std::env::temp_dir().join(format!("better-look-rubrica-{}", mime::random_id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let csv = dir.join("outlook.csv");
+        std::fs::write(&csv, "First Name,Last Name,Company,E-mail Address,Mobile Phone\nDavide,Orlandi,Studio Orlandi,d.orlandi@studiorlandi.it,333 1234567\nLucia,Marchetti,,l.marchetti@tessuti.example,\n").unwrap();
+        let r = s.eng.import_contacts(&csv).unwrap();
+        assert_eq!((r.added, r.updated, r.unchanged), (2, 0, 0));
+        // Lo stesso contatto da un'altra rubrica: si completa, non si duplica.
+        let vcf = dir.join("apple.vcf");
+        std::fs::write(&vcf, "BEGIN:VCARD\nVERSION:3.0\nN:Orlandi;Davide;;;\nEMAIL:D.Orlandi@studiorlandi.it\nTITLE:Architetto\nEND:VCARD\nBEGIN:VCARD\nVERSION:3.0\nFN:Lucia Marchetti\nEMAIL:l.marchetti@tessuti.example\nEND:VCARD\n").unwrap();
+        let r = s.eng.import_contacts(&vcf).unwrap();
+        assert_eq!((r.added, r.updated, r.unchanged), (0, 1, 1));
+        let book = s.eng.address_book().unwrap();
+        assert_eq!(book.iter().map(|c| c.name()).collect::<Vec<_>>(), vec!["Lucia Marchetti".to_string(), "Davide Orlandi".to_string()]);
+        let davide = book.iter().find(|c| c.last_name == "Orlandi").unwrap();
+        assert_eq!(davide.job_title, "Architetto");
+        assert_eq!(davide.emails.len(), 1);
+        // Un file senza contatti dà un errore chiaro.
+        let bad = dir.join("vuoto.csv");
+        std::fs::write(&bad, "x,y\n").unwrap();
+        assert!(s.eng.import_contacts(&bad).is_err());
+        // Suggerimenti nei destinatari: la rubrica viene prima.
+        let sugg = s.eng.contacts("orla").unwrap();
+        assert_eq!(sugg[0].email, "d.orlandi@studiorlandi.it");
+        assert_eq!(sugg[0].name, "Davide Orlandi");
+        // Esportazione in vCard.
+        let out = dir.join("rubrica.vcf");
+        assert_eq!(s.eng.export_contacts(&out, None).unwrap(), 2);
+        assert_eq!(crate::contacts::parse_vcard(&std::fs::read_to_string(&out).unwrap()).len(), 2);
+        // Modifica ed eliminazione.
+        let mut c = davide.clone();
+        c.emails.push("non valido".into());
+        assert!(s.eng.save_contact(c).is_err());
+        assert!(s.eng.save_contact(Contact::default()).is_err());
+        s.eng.delete_contacts(std::slice::from_ref(&davide.id)).unwrap();
+        assert_eq!(s.eng.address_book().unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

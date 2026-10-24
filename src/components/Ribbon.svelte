@@ -53,7 +53,23 @@
 
   <div class="rib" data-mode={store.prefs.ribbon} role="toolbar" aria-label="Comandi">
     <div class="rib-groups">
-    {#if rib === 'home'}
+    {#if store.module === 'contatti' && rib === 'home'}
+      {@const ct = store.selectedContact}
+      <div class="rg"><div class="rgb">
+        <RB big alwaysLabel cls="pri" icon="user-plus" label="Nuovo contatto" title="Nuovo contatto (Ctrl+N)" onclick={() => store.newContact()} />
+      </div><span class="rgl">Nuovo</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="pencil" tone="c-brand" label="Modifica" disabled={!ct || !!store.contactEdit} onclick={() => store.editContact()} />
+        <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={!ct} onclick={() => ct && store.deleteContacts([ct.id])} />
+      </div><span class="rgl">Azioni</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="mail" tone="c-brand" label="Invia un messaggio" disabled={!ct?.emails.length} onclick={() => ct && store.composeTo(ct.emails[0], ct.displayName || `${ct.firstName} ${ct.lastName}`.trim())} />
+      </div><span class="rgl">Comunica</span></div>
+      <div class="rg"><div class="rgb">
+        <RB big icon="file-import" tone="c-brand" label="Importa" title="Importa contatti da vCard, CSV o LDIF" onclick={() => store.importContacts()} />
+        <RB big icon="file-export" label="Esporta" title="Esporta la rubrica in vCard" disabled={!store.book.length} onclick={() => store.exportContacts()} />
+      </div><span class="rgl">Gestisci</span></div>
+    {:else if rib === 'home'}
       <div class="rg"><div class="rgb">
         <RB big alwaysLabel cls="pri split" icon="mail-plus" label="Nuovo messaggio" title="Nuovo messaggio (Ctrl+N)" onclick={() => store.openCompose('new')} />
         <button class="rb pri pri-x only-c" aria-label="Altri elementi nuovi" title="Nuovo evento, contatto o attività"><Icon name="chevron-down" size={16} class="chev" /></button>

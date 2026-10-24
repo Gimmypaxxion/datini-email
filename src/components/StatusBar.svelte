@@ -11,7 +11,11 @@
 
 <footer class="status" aria-label="Stato">
   <span class="left">
-    {#if store.q.trim()}
+    {#if store.module === 'contatti'}
+      Contatti: {store.contactQuery.trim() ? `${store.filteredContacts.length} di ${store.book.length}` : store.book.length}
+    {:else if store.module === 'calendario'}
+      {''}
+    {:else if store.q.trim()}
       Risultati: {store.list.length}
     {:else if store.view === 'uscita'}
       In uscita: {store.outbox.length}

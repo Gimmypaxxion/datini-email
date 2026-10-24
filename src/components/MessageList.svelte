@@ -5,6 +5,7 @@
   // in una riga sola, che si apre con la freccia. Clic destro: menu del messaggio.
   import Icon from '../lib/Icon.svelte';
   import Menu from './Menu.svelte';
+  import Toast from './Toast.svelte';
   import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
   import { categoryItems, messageItems, moveItems, type MenuItem } from '../lib/menus';
   import { GROUP_ORDER, groupLabel, initials, listTime, peopleText, personLabel, tint, whenText } from '../lib/format';
@@ -333,19 +334,7 @@
     <Menu anchor={ctx.el} at={{ x: ctx.x, y: ctx.y }} items={ctx.items} label={ctx.label} onclose={() => (ctx = null)} />
   {/if}
 
-  {#if store.toast}
-    {@const t = store.toast}
-    <div role={t.kind === 'error' ? 'alert' : 'status'} class="toast rise" data-kind={t.kind}>
-      <Icon name={t.kind === 'sent' ? 'send' : t.kind === 'draft' ? 'file-pencil' : t.kind === 'error' ? 'alert-circle' : 'circle-check'} />
-      <span class="msg">{t.text}</span>
-      {#if t.kind === 'sent' && t.outboxId}
-        <button class="undo" onclick={() => store.undoSend()}>Annulla</button>
-      {:else if t.kind === 'error' && t.outboxId}
-        <button class="undo" onclick={() => store.openOutboxItem(t.outboxId!)}>Apri</button>
-      {/if}
-      <button class="close" onclick={() => store.dismissToast()} aria-label="Chiudi avviso"><Icon name="x" size={16} /></button>
-    </div>
-  {/if}
+  <Toast />
 </section>
 
 <style>
@@ -385,12 +374,5 @@
   .ghost { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 12px 18px 12px 20px; }
   .lines { display: flex; flex-direction: column; gap: 7px; padding-top: 2px; }
   .more { padding: 14px 20px; }
-  .toast { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 5; display: flex; align-items: center; gap: 12px; min-height: 44px; box-sizing: border-box; padding: 6px 6px 6px 14px; border-radius: 4px; background: var(--ink); color: var(--sheet); box-shadow: var(--lift); font-size: 14px; }
-  .toast[data-kind="error"] { background: #A4262C; color: #fff; }
-  .toast .msg { flex: 1; min-width: 0; }
-  .undo { height: 32px; padding: 0 12px; border: 0; border-radius: 4px; background: transparent; color: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
-  .close { width: 30px; height: 30px; flex: none; border: 0; border-radius: 4px; background: transparent; color: inherit; display: grid; place-items: center; opacity: .8; }
-  .close:hover { opacity: 1; }
-  .undo:focus-visible, .close:focus-visible { outline-color: currentColor; }
   @media (max-width: 760px) { .pane-list { width: auto; flex: 1 1 auto; margin-right: 10px; } }
 </style>
