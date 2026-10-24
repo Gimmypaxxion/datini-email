@@ -6,7 +6,7 @@
   import RibbonCompose from './RibbonCompose.svelte';
   import Icon from '../lib/Icon.svelte';
   import Menu from './Menu.svelte';
-  import { store, TRANSLATE_LANGS, type RibbonTab } from '../lib/store.svelte';
+  import { store, type RibbonTab } from '../lib/store.svelte';
   import { categoryItems, moveItems } from '../lib/menus';
   import { REPO_URL } from '../lib/platform';
 
@@ -26,8 +26,6 @@
 
   let moveAnchor = $state<HTMLElement | null>(null);
   let catAnchor = $state<HTMLElement | null>(null);
-  let trAnchor = $state<HTMLElement | null>(null);
-  const trItems = TRANSLATE_LANGS.map(([code, name]) => ({ label: `Traduci in ${name}`, icon: 'language' as const, onclick: () => store.translate(code) }));
 
   function openMove(e: MouseEvent) {
     moveAnchor = moveAnchor ? null : (e.currentTarget as HTMLElement);
@@ -107,7 +105,7 @@
       </div><span class="rgl">Comandi vocali</span></div>
 
       <div class="rg only-e p1"><div class="rgb">
-        <RB big menu icon="language" tone="c-brand" label="Traduci" title="Traduci il messaggio" disabled={noSel} pressed={!!trAnchor} onclick={(e) => (trAnchor = trAnchor ? null : (e.currentTarget as HTMLElement))} />
+        <RB big icon="language" tone="c-brand" label="Traduci" title="Traduci il messaggio" onclick={() => store.soon('Traduci')} />
       </div><span class="rgl">Lingua</span></div>
 
       <div class="rg only-e p2"><div class="rgb">
@@ -143,9 +141,6 @@
 
     {#if moveAnchor && store.selected}
       <Menu anchor={moveAnchor} items={moveItems(store.selected)} label="Sposta in" onclose={() => (moveAnchor = null)} />
-    {/if}
-    {#if trAnchor}
-      <Menu anchor={trAnchor} items={trItems} label="Traduci" onclose={() => (trAnchor = null)} />
     {/if}
     {#if catAnchor && store.selected}
       <Menu anchor={catAnchor} items={categoryItems(store.selected)} label="Categorizza" onclose={() => (catAnchor = null)} />

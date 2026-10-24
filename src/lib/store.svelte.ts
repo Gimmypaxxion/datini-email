@@ -108,15 +108,6 @@ export interface Confirm {
   resolve: (yes: boolean) => void;
 }
 
-/** Lingue proposte da Traduci (codice per il traduttore, nome). */
-export const TRANSLATE_LANGS: [string, string][] = [
-  ['it', 'italiano'],
-  ['en', 'inglese'],
-  ['fr', 'francese'],
-  ['de', 'tedesco'],
-  ['es', 'spagnolo'],
-];
-
 /** Nome di una cartella che si sta scrivendo nel riquadro (nuova o da rinominare). */
 export interface FolderEdit {
   kind: 'new' | 'rename';
@@ -144,8 +135,6 @@ interface Saved {
   font?: { family: string; size: number };
   /** Vista per conversazioni. */
   conversations?: boolean;
-  /** Traduci: l'utente ha già accettato di mandare il testo al traduttore. */
-  translateOk?: boolean;
 }
 
 const STORAGE_KEY = 'better-look.interfaccia.v1';
@@ -197,7 +186,6 @@ export class MailStore {
   speech = $state<'off' | 'playing' | 'paused'>('off');
   private speechPoll: ReturnType<typeof setInterval> | undefined;
   private speechNative = false;
-  private translateOk = false;
 
   // Aspetto
   prefs = $state<Prefs>({ ...PRESETS.classico });
@@ -272,7 +260,6 @@ export class MailStore {
         if (saved.collapsed) this.collapsed = saved.collapsed;
         if (saved.font?.family && saved.font.size) this.font = { ...saved.font };
         this.conversations = !!saved.conversations;
-        this.translateOk = !!saved.translateOk;
       }
     }
     if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
@@ -311,7 +298,6 @@ export class MailStore {
       collapsed: { ...this.collapsed },
       font: { ...this.font },
       conversations: this.conversations,
-      translateOk: this.translateOk,
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1513,7 +1499,7 @@ export class MailStore {
     }
   }
 
-  // ---------- Stampa, lettura ad alta voce, traduzione ----------
+  // ---------- Stampa e lettura ad alta voce ----------
 
   /** Stampa il messaggio aperto in una finestra pronta per la stampa (Ctrl+P). */
   async printMsg(id: number | null = this.sel) {
@@ -1616,37 +1602,6 @@ ${m.text}`.slice(0, 20_000);
     if (this.speechNative) void this.backend.stopSpeaking().catch(() => {});
     else globalThis.speechSynthesis?.cancel();
     this.speech = 'off';
-  }
-
-  /**
-   * Traduci: il testo va a Google Traduttore, nel browser. Prima volta: si
-   * chiede il permesso, perché il messaggio esce dal computer.
-   */
-  async translate(lang: string) {
-    const m = this.detail;
-    if (!m) return;
-    if (!this.translateOk) {
-      const check = { label: 'Non chiedere più', value: false };
-      const ok = await this.ask({
-        title: 'Tradurre con Google Traduttore?',
-        text: 'Per la traduzione il testo del messaggio viene mandato a Google Traduttore e si apre nel browser.',
-        ok: 'Traduci',
-        check,
-      });
-      if (!ok) return;
-      if (check.value) {
-        this.translateOk = true;
-        this.save();
-      }
-    }
-    const full = `${m.subject}
-
-${m.text}`.trim();
-    const MAX = 4500;
-    const text = full.length > MAX ? full.slice(0, MAX) : full;
-    const url = `https://translate.google.com/?sl=auto&tl=${encodeURIComponent(lang)}&text=${encodeURIComponent(text)}&op=translate`;
-    await this.act(() => this.backend.openLink(url));
-    if (full.length > MAX) this.hint('Il messaggio è lungo: nel traduttore arriva solo la prima parte.');
   }
 
   // ---------- Allegati ed esportazione ----------
