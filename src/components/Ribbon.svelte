@@ -26,6 +26,11 @@
 
   let moveAnchor = $state<HTMLElement | null>(null);
   let catAnchor = $state<HTMLElement | null>(null);
+  let rulesAnchor = $state<HTMLElement | null>(null);
+  const rulesItems = $derived([
+    { label: 'Crea regola…', icon: 'list-check' as const, disabled: noSel, onclick: () => store.newRuleFrom() },
+    { label: 'Gestisci regole e avvisi', icon: 'settings' as const, onclick: () => { store.ruleDraft = null; store.openSettings('regole'); } },
+  ]);
 
   function openMove(e: MouseEvent) {
     moveAnchor = moveAnchor ? null : (e.currentTarget as HTMLElement);
@@ -88,6 +93,7 @@
 
       <div class="rg"><div class="rgb">
         <RB big menu icon="folder-symlink" tone="c-brand" label="Sposta in" title="Sposta in (Ctrl+Maiusc+V)" disabled={noSel} pressed={!!moveAnchor} onclick={openMove} />
+        <RB big menu cls="only-e" icon="list-check" tone="c-brand" label="Regole" title="Regole: sposta in automatico i messaggi" pressed={!!rulesAnchor} onclick={(e) => (rulesAnchor = rulesAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Sposta</span></div>
 
       <div class="rg"><div class="rgb"><div class="rs">
@@ -141,6 +147,9 @@
 
     {#if moveAnchor && store.selected}
       <Menu anchor={moveAnchor} items={moveItems(store.selected)} label="Sposta in" onclose={() => (moveAnchor = null)} />
+    {/if}
+    {#if rulesAnchor}
+      <Menu anchor={rulesAnchor} items={rulesItems} label="Regole" onclose={() => (rulesAnchor = null)} />
     {/if}
     {#if catAnchor && store.selected}
       <Menu anchor={catAnchor} items={categoryItems(store.selected)} label="Categorizza" onclose={() => (catAnchor = null)} />

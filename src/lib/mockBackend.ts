@@ -4,9 +4,13 @@
 import type { Backend, Tab } from './backend';
 import { mockData, type MockMessage } from './mock';
 import { textToHtml } from './compose-html';
+import { hasActions, ruleMatches } from './rules';
 import type {
   Account,
+  AutoReply,
   Category,
+  FolderUsage,
+  Rule,
   Draft,
   DraftAttachment,
   EngineEvent,
@@ -82,6 +86,9 @@ export class MockBackend implements Backend {
     { id: 'c4', name: 'Urgente', color: 'rosso' },
     { id: 'c5', name: 'Fiera di gennaio', color: 'arancione' },
   ];
+  private ruleList: Rule[] = [];
+  /** Avvisi sul desktop mandati (per i test). */
+  notified: { title: string; body: string }[] = [];
   /** Ritardo simulato per la ricerca dei server. */
   addDelay = 0;
 
@@ -484,17 +491,103 @@ export class MockBackend implements Backend {
   }
 
   async send(d: Draft) {
+    return this.enqueue(d, null);
+  }
+
+  async sendLater(d: Draft, at: number) {
+    if (at <= Date.now() + 30_000) throw err('utente', 'Scegli un’ora futura per l’invio.');
+    return this.enqueue(d, at);
+  }
+
+  private enqueue(d: Draft, at: number | null) {
     if (!d.to.length && !d.cc.length && !d.bcc.length) throw err('utente', 'Aggiungi almeno un destinatario.');
     const acct = this.accountsList.find((a) => a.id === d.accountId);
     if (!acct || acct.kind === 'local') throw err('utente', 'Da questo account non si può inviare posta.');
     const id = this.nextId++;
-    const item: OutboxItem = { id, accountId: acct.id, subject: d.subject, to: d.to, state: 'attesa', error: null, sendAfter: Date.now() + UNDO_MS };
-    const timer = setTimeout(() => this.deliver(id), UNDO_MS);
+    const when = at ?? Date.now() + UNDO_MS;
+    const item: OutboxItem = { id, accountId: acct.id, subject: d.subject, to: d.to, state: 'attesa', error: null, sendAfter: when };
+    // I timer del browser non arrivano oltre i 24 giorni: basta per un'anteprima.
+    const timer = setTimeout(() => this.deliver(id), Math.min(when - Date.now(), 2 ** 31 - 1));
     this.outgoing.set(id, { item, draft: JSON.parse(JSON.stringify(d)) as Draft, timer });
     for (const m of this.draftsByKey(d.key)) m.folderId = -1;
-    this.emit({ type: 'outbox', accountId: acct.id, outboxId: id, state: 'attesa', error: null });
+    this.emit({ type: 'outbox', accountId: acct.id, outboxId: id, state: at ? 'programmato' : 'attesa', error: null });
     this.changed(acct.id, []);
     return id;
+  }
+
+  async rules() {
+    return JSON.parse(JSON.stringify(this.ruleList)) as Rule[];
+  }
+
+  async saveRules(list: Rule[]) {
+    const out: Rule[] = [];
+    for (const r of list) {
+      const name = r.name.trim();
+      if (!name) throw err('utente', 'Dai un nome a ogni regola.');
+      if (!hasActions(r)) throw err('utente', `Scegli cosa deve fare la regola "${name}".`);
+      out.push({ ...JSON.parse(JSON.stringify(r)), name, id: r.id || `r${this.nextId++}` });
+    }
+    this.ruleList = out;
+    this.emit({ type: 'rules' });
+    return this.rules();
+  }
+
+  async runRules(ids: string[], folderId: number) {
+    let n = 0;
+    for (const m of this.msgs.filter((x) => x.folderId === folderId && !x.draft)) {
+      const hits = this.ruleList.filter((r) => ids.includes(r.id) && ruleMatches(r, summary(m), m.text));
+      if (!hits.length) continue;
+      n++;
+      for (const r of hits) {
+        const a = r.then;
+        if (a.markRead) m.unread = false;
+        if (a.flag) m.flagged = true;
+        if (a.category && !m.categories.includes(a.category)) m.categories = [...m.categories, a.category];
+        if (a.delete) m.folderId = this.roleFolder(m.accountId, 'deleted').id;
+        else if (a.moveTo !== null) m.folderId = a.moveTo;
+        if (a.stop) break;
+      }
+    }
+    if (n) this.changed('', []);
+    return n;
+  }
+
+  async setAutoReply(accountId: string, reply: AutoReply) {
+    const a = this.accountsList.find((x) => x.id === accountId);
+    if (!a) throw err('non-trovato', 'Account non trovato.');
+    if (a.kind === 'local') throw err('utente', 'I file di dati non ricevono posta.');
+    if (reply.start !== null && reply.end !== null && reply.end <= reply.start) throw err('utente', 'La fine del periodo deve venire dopo l’inizio.');
+    if (reply.enabled && !reply.text.trim()) throw err('utente', 'Scrivi il messaggio della risposta automatica.');
+    a.autoReply = { ...reply, since: reply.enabled ? Date.now() : (a.autoReply?.since ?? 0) };
+    this.emit({ type: 'accounts' });
+  }
+
+  async mailboxUsage(accountId: string) {
+    const out: FolderUsage[] = this.folderList
+      .filter((f) => f.accountId === accountId)
+      .map((f) => {
+        const ms = this.msgs.filter((m) => m.folderId === f.id);
+        return { folderId: f.id, count: ms.length, size: ms.reduce((t, m) => t + m.size, 0) };
+      });
+    return out.sort((a, b) => b.size - a.size || b.count - a.count);
+  }
+
+  async largeMessages(accountId: string, minSize: number) {
+    return this.msgs
+      .filter((m) => m.accountId === accountId && m.size >= minSize && !m.draft && m.folderId > 0)
+      .sort((a, b) => b.size - a.size)
+      .map((m) => ({ ...summary(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
+  }
+
+  async olderMessages(folderId: number, before: number, archive: boolean) {
+    const ms = this.msgs.filter((m) => m.folderId === folderId && m.date < before && !m.draft);
+    if (archive && ms.length) await this.moveToRole(ms.map((m) => m.id), 'archive');
+    return ms.length;
+  }
+
+  async notify(title: string, body: string) {
+    this.notified.push({ title, body });
+    return true;
   }
 
   private deliver(id: number) {

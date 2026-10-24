@@ -15,14 +15,19 @@ import {
   cleanSubject,
   parseRecipient,
   randomKey,
+  personLabel,
   sameAddress,
   validEmail,
+  whenText,
 } from './format';
+import { emptyRule } from './rules';
 import {
   errorKind,
   errorMessage,
   type Account,
+  type AutoReply,
   type Category,
+  type Rule,
   type Draft,
   type EngineEvent,
   type Folder,
@@ -45,7 +50,7 @@ export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inseris
 export type WinTab = 'messaggio' | 'inserisci' | 'formato';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
-export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'categorie' | 'info';
+export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'categorie' | 'regole' | 'risposte' | 'pulizia' | 'info';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -135,6 +140,8 @@ interface Saved {
   font?: { family: string; size: number };
   /** Vista per conversazioni. */
   conversations?: boolean;
+  /** Avviso sul desktop all'arrivo di nuovi messaggi. */
+  notify?: boolean;
 }
 
 const STORAGE_KEY = 'better-look.interfaccia.v1';
@@ -178,6 +185,12 @@ export class MailStore {
   remoteOk = $state<Record<number, boolean>>({});
   collapsed = $state<Record<string, boolean>>({});
   categories = $state<Category[]>([]);
+  // Regole e avvisi
+  rules = $state<Rule[]>([]);
+  /** Regola aperta nell'editor delle impostazioni (nuova o da modificare). */
+  ruleDraft = $state<Rule | null>(null);
+  /** Avviso sul desktop all'arrivo di nuovi messaggi. */
+  notifyDesktop = $state(true);
   /** Vista per conversazioni (Visualizza › Conversazioni). */
   conversations = $state(false);
   /** Conversazioni aperte nell'elenco: chiave → messaggi di tutte le cartelle, dal più recente. */
@@ -260,6 +273,7 @@ export class MailStore {
         if (saved.collapsed) this.collapsed = saved.collapsed;
         if (saved.font?.family && saved.font.size) this.font = { ...saved.font };
         this.conversations = !!saved.conversations;
+        if (typeof saved.notify === 'boolean') this.notifyDesktop = saved.notify;
       }
     }
     if (typeof navigator !== 'undefined' && typeof window !== 'undefined') {
@@ -298,6 +312,7 @@ export class MailStore {
       collapsed: { ...this.collapsed },
       font: { ...this.font },
       conversations: this.conversations,
+      notify: this.notifyDesktop,
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -311,7 +326,7 @@ export class MailStore {
   async init() {
     this.unsubscribe?.();
     this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
-    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories()]);
+    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules()]);
     if (this.mode === 'principale') {
       const inbox = this.defaultInbox();
       if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
@@ -359,11 +374,22 @@ export class MailStore {
       case 'categories':
         void this.reloadCategories();
         break;
+      case 'rules':
+        void this.reloadRules();
+        break;
+      case 'newMail':
+        if (this.mode === 'principale' && this.notifyDesktop) void this.alertNewMail(e.count, e.messages);
+        break;
       case 'outbox':
         void this.reloadOutbox();
         if (this.mode !== 'principale') break;
         if (e.state === 'attesa') {
           this.flash({ kind: 'sent', text: 'Messaggio inviato', outboxId: e.outboxId }, 7000);
+        } else if (e.state === 'programmato') {
+          void this.reloadOutbox().then(() => {
+            const it = this.outbox.find((o) => o.id === e.outboxId);
+            this.flash({ kind: 'sent', text: it ? `Invio programmato per ${whenText(it.sendAfter)}` : 'Invio programmato', outboxId: e.outboxId }, 9000);
+          });
         } else if (e.state === 'annullato' && this.toast?.outboxId === e.outboxId) {
           this.toast = null;
         } else if (e.state === 'errore') {
@@ -389,6 +415,92 @@ export class MailStore {
       const s = this.list.find((m) => m.id === this.sel);
       if (s) Object.assign(this.detail, { unread: s.unread, flagged: s.flagged, answered: s.answered });
     }
+  }
+
+  // ---------- Regole, risposte automatiche e avvisi ----------
+
+  async reloadRules() {
+    if (this.mode !== 'principale') return;
+    try {
+      this.rules = await this.backend.rules();
+    } catch {
+      /* senza regole la posta arriva lo stesso */
+    }
+  }
+
+  /** Salva l'elenco delle regole. Restituisce l'errore da mostrare, o null. */
+  async saveRules(list: Rule[]): Promise<string | null> {
+    try {
+      this.rules = await this.backend.saveRules(list);
+      return null;
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  /** Esegui ora: le regole indicate sui messaggi già presenti nella cartella. Restituisce l'esito da mostrare. */
+  async runRulesNow(ids: string[], folderId: number): Promise<string> {
+    try {
+      const n = await this.backend.runRules(ids, folderId);
+      const where = folderLabel(this.folders.find((f) => f.id === folderId));
+      return n === 0 ? `Nessun messaggio in ${where} corrisponde alla regola.` : n === 1 ? `Regola applicata a 1 messaggio in ${where}.` : `Regola applicata a ${n} messaggi in ${where}.`;
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  /** "Crea regola" da un messaggio: mittente già compilato, come in Outlook. */
+  newRuleFrom(id: number | null = this.sel) {
+    const m = this.list.find((x) => x.id === id) ?? (this.detail?.id === id ? this.detail : null);
+    const r = emptyRule();
+    if (m) {
+      r.name = `Messaggi da ${personLabel(m.from)}`;
+      r.when.from = [m.from.email || m.from.name];
+      r.accountId = m.accountId;
+    }
+    this.ruleDraft = r;
+    this.backstage = false;
+    this.openSettings('regole');
+  }
+
+  setNotify(on: boolean) {
+    this.notifyDesktop = on;
+    this.save();
+  }
+
+  private async alertNewMail(count: number, messages: MessageSummary[]) {
+    const first = messages[0];
+    if (!first) return;
+    const title = count === 1 ? personLabel(first.from) : `${count} nuovi messaggi`;
+    const body = count === 1 ? first.subject || '(nessun oggetto)' : messages.slice(0, 3).map((m) => `${personLabel(m.from)}: ${m.subject || '(nessun oggetto)'}`).join('\n');
+    await this.backend.notify(title, body);
+  }
+
+  /** Salva la risposta automatica di un account. Restituisce l'errore da mostrare, o null. */
+  async saveAutoReply(accountId: string, reply: AutoReply): Promise<string | null> {
+    try {
+      await this.backend.setAutoReply(accountId, reply);
+      await this.reloadAccounts();
+      return null;
+    } catch (e) {
+      return errorMessage(e);
+    }
+  }
+
+  /** Account con la risposta automatica attiva adesso (per l'avviso in alto). */
+  get autoReplyOn(): Account[] {
+    const now = Date.now();
+    return this.accounts.filter((a) => {
+      const r = a.autoReply;
+      return !!r?.enabled && (r.start === null || now >= r.start) && (r.end === null || now < r.end);
+    });
+  }
+
+  async turnOffAutoReply(accountId: string) {
+    const a = this.accounts.find((x) => x.id === accountId);
+    if (!a?.autoReply) return;
+    const err = await this.saveAutoReply(accountId, { ...a.autoReply, enabled: false });
+    this.flash(err ? { kind: 'error', text: err } : { kind: 'info', text: 'Risposte automatiche disattivate.' }, 4000);
   }
 
   async reloadCategories() {
@@ -1392,8 +1504,16 @@ export class MailStore {
     this.touch();
   }
 
-  async send(confirmed = false): Promise<boolean> {
+  /** Ora scelta con Pianifica invio (millisecondi), in attesa di partire. */
+  private sendAt: number | null = null;
+
+  /**
+   * Invia il messaggio aperto, subito o all'ora `at` (Invio programmato).
+   * `confirmed` arriva dalla domanda sull'oggetto vuoto e tiene l'ora già scelta.
+   */
+  async send(confirmed = false, at: number | null = null): Promise<boolean> {
     if (!this.c || this.sending) return false;
+    if (!confirmed) this.sendAt = at;
     this.commitInputs();
     const d = this.snapshot()!;
     const all = [...d.to, ...d.cc, ...d.bcc];
@@ -1415,7 +1535,9 @@ export class MailStore {
     this.sending = true;
     try {
       const win = this.cWin;
-      await this.backend.send(d);
+      if (this.sendAt !== null) await this.backend.sendLater(d, this.sendAt);
+      else await this.backend.send(d);
+      this.sendAt = null;
       this.lastSent = { key: d.key, win };
       this.closeCompose();
       this.err = '';

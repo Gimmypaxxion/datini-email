@@ -117,6 +117,8 @@ pub async fn sync(db: &Db, acct: &AccountConfig, password: &str, progress: &(dyn
     let mut p = Pop3::connect(cfg, password).await?;
     let list = p.uidl().await?;
     let seen: HashMap<String, i64> = db.pop_seen(&acct.id)?.into_iter().collect();
+    // Alla prima volta si scarica la posta già presente: non conta come arrivata.
+    let first = inbox.last_sync.is_none();
     let mut changed = false;
     let mut count = 0;
     for (n, uidl) in &list {
@@ -129,6 +131,7 @@ pub async fn sync(db: &Db, acct: &AccountConfig, password: &str, progress: &(dyn
             None => NewMessage::default(),
         };
         nm.pop_uidl = Some(uidl.clone());
+        nm.arrival = !first;
         nm.unread = true;
         nm.raw = Some(raw);
         db.insert_message(&acct.id, inbox.id, &nm)?;
@@ -155,6 +158,7 @@ pub async fn sync(db: &Db, acct: &AccountConfig, password: &str, progress: &(dyn
         }
     }
     p.quit().await?;
+    db.touch_folder(inbox.id)?;
     // Dimentica i messaggi che non sono più sul server.
     let on_server: HashSet<&String> = list.iter().map(|(_, u)| u).collect();
     for uidl in downloaded.keys() {

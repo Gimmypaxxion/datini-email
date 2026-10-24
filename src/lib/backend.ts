@@ -15,6 +15,9 @@ import type {
   OutboxItem,
   Person,
   Role,
+  AutoReply,
+  FolderUsage,
+  Rule,
   SavedDraft,
   Signature,
 } from './types';
@@ -63,6 +66,21 @@ export interface Backend {
   discardDraft(accountId: string, key: string): Promise<void>;
   openDraft(id: number): Promise<Draft>;
   send(d: Draft): Promise<number>;
+  /** Invio programmato all'ora indicata (millisecondi). */
+  sendLater(d: Draft, at: number): Promise<number>;
+  rules(): Promise<Rule[]>;
+  saveRules(list: Rule[]): Promise<Rule[]>;
+  /** Esegui ora: applica le regole indicate ai messaggi della cartella. Restituisce quanti ne ha toccati. */
+  runRules(ids: string[], folderId: number): Promise<number>;
+  setAutoReply(accountId: string, reply: AutoReply): Promise<void>;
+  /** Pulizia: messaggi e spazio per cartella, dalla più grande. */
+  mailboxUsage(accountId: string): Promise<FolderUsage[]>;
+  /** Pulizia: messaggi più grandi di `minSize` byte. */
+  largeMessages(accountId: string, minSize: number): Promise<MessageSummary[]>;
+  /** Pulizia: quanti messaggi della cartella sono più vecchi di `before` (ms); con `archive` li sposta in Archivio. */
+  olderMessages(folderId: number, before: number, archive: boolean): Promise<number>;
+  /** Avviso sul desktop. Falso se il sistema non lo permette. */
+  notify(title: string, body: string): Promise<boolean>;
   cancelSend(outboxId: number): Promise<Draft | null>;
   outbox(): Promise<OutboxItem[]>;
   outboxTake(outboxId: number): Promise<Draft | null>;
@@ -204,6 +222,41 @@ export class TauriBackend implements Backend {
   }
   send(draft: Draft) {
     return this.call<number>('send', { draft });
+  }
+  sendLater(draft: Draft, at: number) {
+    return this.call<number>('send_later', { draft, at });
+  }
+  rules() {
+    return this.call<Rule[]>('rules');
+  }
+  saveRules(list: Rule[]) {
+    return this.call<Rule[]>('save_rules', { list });
+  }
+  runRules(ids: string[], folderId: number) {
+    return this.call<number>('run_rules', { ids, folderId });
+  }
+  setAutoReply(accountId: string, reply: AutoReply) {
+    return this.call<void>('set_auto_reply', { accountId, reply });
+  }
+  mailboxUsage(accountId: string) {
+    return this.call<FolderUsage[]>('mailbox_usage', { accountId });
+  }
+  largeMessages(accountId: string, minSize: number) {
+    return this.call<MessageSummary[]>('large_messages', { accountId, minSize });
+  }
+  olderMessages(folderId: number, before: number, archive: boolean) {
+    return this.call<number>('older_messages', { folderId, before, archive });
+  }
+  async notify(title: string, body: string) {
+    try {
+      const n = await import('@tauri-apps/plugin-notification');
+      let ok = await n.isPermissionGranted();
+      if (!ok) ok = (await n.requestPermission()) === 'granted';
+      if (ok) n.sendNotification({ title, body });
+      return ok;
+    } catch {
+      return false;
+    }
   }
   cancelSend(id: number) {
     return this.call<Draft | null>('cancel_send', { id });

@@ -266,6 +266,9 @@ pub async fn sync_folder(s: &mut Session, db: &Db, acct: &AccountConfig, folder:
     new.sort_unstable_by(|a, b| b.cmp(a));
     let is_inbox = folder.role.as_deref() == Some("inbox");
     let is_drafts = folder.role.as_deref() == Some("drafts");
+    // Appena arrivati: nella posta in arrivo, oltre l'ultimo UID già visto.
+    // Alla prima sincronizzazione nessun messaggio conta come arrivato.
+    let arrivals_from = if is_inbox && folder.uidvalidity.is_some() && folder.uidvalidity == mb.uid_validity { folder.uidnext } else { None };
     for chunk in new.chunks(HEADER_BATCH) {
         let set = uid_set(chunk);
         let mut batch: Vec<NewMessage> = Vec::new();
@@ -283,6 +286,7 @@ pub async fn sync_folder(s: &mut Session, db: &Db, acct: &AccountConfig, folder:
                     None => NewMessage { date: internal, size, ..Default::default() },
                 };
                 nm.uid = Some(uid);
+                nm.arrival = arrivals_from.is_some_and(|n| uid >= n);
                 nm.unread = !seen;
                 nm.flagged = flagged;
                 nm.answered = answered;

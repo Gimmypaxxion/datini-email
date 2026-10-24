@@ -366,3 +366,134 @@ async fn account_pop3() {
     assert!(eng.detail(m.id, false).await.unwrap().text.contains("Prova POP"));
     eng.remove_account(&a).unwrap();
 }
+
+/// Regole e risposta automatica con posta vera: un messaggio da "altro"
+/// arriva a "prova", la regola lo sposta in Clienti e "altro" riceve la
+/// risposta automatica, una sola volta.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn regole_e_risposta_automatica() {
+    if !enabled() {
+        return;
+    }
+    reseed();
+    let (eng, events) = engine();
+    let prova = eng
+        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@better-look.test".into(), password: "prova-123".into(), kind: None, incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    wait_for("prima sincronizzazione", 60, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        async move { eng.status(&prova).state == "pronto" && eng.folders().unwrap().iter().any(|f| f.account_id == prova && f.role.as_deref() == Some("inbox") && f.total == 48) }
+    })
+    .await;
+    let clienti = eng.folders().unwrap().into_iter().find(|f| f.account_id == prova && f.path == "Clienti").unwrap();
+    let tag = better_look_lib::mime::random_id()[..8].to_string();
+    eng.save_rules(vec![Rule {
+        id: String::new(),
+        name: "Preventivi in Clienti".into(),
+        enabled: true,
+        account_id: Some(prova.clone()),
+        when: RuleConditions { subject: vec![format!("Regola-{tag}")], ..Default::default() },
+        then: RuleActions { move_to: Some(clienti.id), flag: true, ..Default::default() },
+    }])
+    .unwrap();
+    eng.set_auto_reply(&prova, AutoReply { enabled: true, html: "<div>Sono in ferie.</div>".into(), text: "Sono in ferie.".into(), ..Default::default() }).unwrap();
+
+    let altro = eng
+        .add_account(NewAccount { name: "Altro".into(), email: "altro@better-look.test".into(), password: "altro-456".into(), kind: Some(AccountKind::Pop3), incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    let send = |subject: String| {
+        let eng = eng.clone();
+        let altro = altro.clone();
+        async move {
+            eng.send(&Draft {
+                key: better_look_lib::mime::random_id(),
+                account_id: altro,
+                to: vec![Person::new("Chiara Valli", "prova@better-look.test")],
+                cc: vec![],
+                bcc: vec![],
+                subject,
+                body: "Buongiorno, mi mandate il preventivo?".into(),
+                html: None,
+                plain: false,
+                attachments: vec![],
+                in_reply_to: None,
+                references: vec![],
+                reply_to_message: None,
+            })
+            .await
+            .unwrap();
+        }
+    };
+    let subject = format!("Regola-{tag} preventivo");
+    send(subject.clone()).await;
+
+    // La regola sposta il messaggio in Clienti, sul computer e sul server.
+    wait_for("messaggio spostato dalla regola", 90, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        let subject = subject.clone();
+        async move {
+            eng.sync_now(Some(&prova));
+            find(&eng, clienti.id, &subject).is_some_and(|m| m.flagged)
+        }
+    })
+    .await;
+    wait_for("spostato anche sul server", 60, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        let subject = subject.clone();
+        async move {
+            eng.sync_now(Some(&prova));
+            server_count("Clienti", &format!("SUBJECT \"{subject}\"")).await == 1
+        }
+    })
+    .await;
+    assert_eq!(server_count("INBOX", &format!("SUBJECT \"{subject}\"")).await, 0);
+
+    // Risposta automatica ad "altro", con le intestazioni giuste.
+    let reply_subject = format!("Risposta automatica: {subject}");
+    let altro_inbox = folder(&eng, &altro, "inbox");
+    wait_for("risposta automatica arrivata", 90, || {
+        let eng = eng.clone();
+        let altro = altro.clone();
+        let reply_subject = reply_subject.clone();
+        async move {
+            eng.sync_now(Some(&altro));
+            find(&eng, altro_inbox.id, &reply_subject).is_some()
+        }
+    })
+    .await;
+    let r = find(&eng, altro_inbox.id, &reply_subject).unwrap();
+    assert!(eng.detail(r.id, false).await.unwrap().text.contains("Sono in ferie."));
+
+    // Un secondo messaggio dallo stesso mittente: nessuna seconda risposta.
+    let second = format!("Regola-{tag} di nuovo");
+    send(second.clone()).await;
+    wait_for("secondo messaggio spostato", 90, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        let second = second.clone();
+        async move {
+            eng.sync_now(Some(&prova));
+            find(&eng, clienti.id, &second).is_some()
+        }
+    })
+    .await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    eng.sync_now(Some(&altro));
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    let replies = eng.messages(altro_inbox.id, None, 0, 1000).unwrap().into_iter().filter(|m| m.subject.starts_with("Risposta automatica:")).count();
+    assert_eq!(replies, 1);
+    // Il messaggio spostato dalla regola non fa scattare l'avviso.
+    assert!(!events.lock().unwrap().iter().any(|e| matches!(e, Event::NewMail { messages, .. } if messages.iter().any(|m| m.subject.starts_with("Regola-")))));
+
+    eng.remove_account(&altro).unwrap();
+    eng.remove_account(&prova).unwrap();
+}

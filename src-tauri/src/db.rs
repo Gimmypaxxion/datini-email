@@ -128,6 +128,13 @@ CREATE TABLE IF NOT EXISTS events(
   updated INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ev_range ON events(start, until);
+CREATE TABLE IF NOT EXISTS autoreplied(
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  period INTEGER NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY(account_id, email, period)
+);
 CREATE INDEX IF NOT EXISTS ev_uid ON events(uid);
 "#;
 
@@ -211,6 +218,8 @@ pub struct FolderRow {
     pub uidvalidity: Option<u32>,
     pub highest_uid: u32,
     pub uidnext: Option<u32>,
+    /// Ultima sincronizzazione riuscita (secondi).
+    pub last_sync: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -304,6 +313,9 @@ pub struct NewMessage {
     pub raw: Option<Vec<u8>>,
     /// Testo per la ricerca.
     pub body_text: String,
+    /// Appena arrivato nella posta in arrivo: deve passare dalle regole, dalla
+    /// risposta automatica e dall'avviso sul desktop.
+    pub arrival: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -378,10 +390,11 @@ fn folder_from_row(r: &Row) -> rusqlite::Result<FolderRow> {
         uidvalidity: r.get::<_, Option<i64>>(7)?.map(|v| v as u32),
         highest_uid: r.get::<_, i64>(8)? as u32,
         uidnext: r.get::<_, Option<i64>>(9)?.map(|v| v as u32),
+        last_sync: r.get(10)?,
     })
 }
 
-const FOLDER_COLS: &str = "id, account_id, path, name, role, delim, selectable, uidvalidity, highest_uid, uidnext";
+const FOLDER_COLS: &str = "id, account_id, path, name, role, delim, selectable, uidvalidity, highest_uid, uidnext, last_sync";
 
 /// Trasforma ciò che l'utente scrive nella ricerca in una query FTS5:
 /// ogni parola deve comparire, anche come inizio di parola più lunga.
@@ -683,6 +696,24 @@ impl Db {
         Ok(())
     }
 
+    /// Una casella POP è già stata scaricata almeno una volta.
+    pub fn touch_folder(&self, id: i64) -> Result<()> {
+        self.conn().execute("UPDATE folders SET last_sync = ?2 WHERE id = ?1", params![id, now_secs()])?;
+        Ok(())
+    }
+
+    // ---------------- Risposte automatiche ----------------
+
+    /// Segna che il mittente ha già ricevuto la risposta automatica in questa
+    /// attivazione. Falso se l'aveva già ricevuta.
+    pub fn autoreply_once(&self, account_id: &str, email: &str, period: i64) -> Result<bool> {
+        let n = self.conn().execute(
+            "INSERT OR IGNORE INTO autoreplied(account_id, email, period, at) VALUES (?1, ?2, ?3, ?4)",
+            params![account_id, email.trim().to_lowercase(), period, now_secs()],
+        )?;
+        Ok(n > 0)
+    }
+
     pub fn set_folder_state(&self, id: i64, uidvalidity: Option<u32>, highest_uid: u32, uidnext: Option<u32>) -> Result<()> {
         self.conn().execute(
             "UPDATE folders SET uidvalidity = ?2, highest_uid = ?3, uidnext = ?4, last_sync = ?5 WHERE id = ?1",
@@ -773,7 +804,7 @@ impl Db {
             "INSERT INTO messages(account_id, folder_id, uid, message_id, draft_key, pop_uidl, date, from_name, from_email,
                recipients, subject, preview, unread, flagged, answered, draft, has_atts, focused, size, has_body, refs,
                in_reply_to, pending, added_at, thread, ruled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, 0)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
             params![
                 account_id,
                 folder_id,
@@ -799,7 +830,8 @@ impl Db {
                 m.in_reply_to,
                 m.pending,
                 now_secs(),
-                thread
+                thread,
+                !m.arrival
             ],
         )?;
         let id = c.last_insert_rowid();
@@ -1272,6 +1304,7 @@ mod tests {
             source_file: None,
             signature_new: None,
             signature_reply: None,
+            auto_reply: None,
         };
         db.save_account(&cfg).unwrap();
         cfg.id
@@ -1393,8 +1426,8 @@ mod tests {
         let g = db.upsert_folder(&a, "Clienti", "Clienti", None, Some("/"), true).unwrap();
         let id = db.insert_message(&a, f, &msg(Some(1), "c@x", "Fattura")).unwrap().unwrap();
         let key = db.message(id).unwrap().category_key();
-        db.set_category(&[key.clone()], "rosso", true).unwrap();
-        db.set_category(&[key.clone()], "blu", true).unwrap();
+        db.set_category(std::slice::from_ref(&key), "rosso", true).unwrap();
+        db.set_category(std::slice::from_ref(&key), "blu", true).unwrap();
         assert_eq!(db.message(id).unwrap().categories.len(), 2);
         // Lo stesso messaggio ricomparso in un'altra cartella (spostato da un altro programma).
         let again = db.insert_message(&a, g, &msg(Some(9), "c@x", "Fattura")).unwrap().unwrap();
@@ -1425,7 +1458,9 @@ mod tests {
         let db = Db::memory().unwrap();
         let a = account(&db);
         let f = db.upsert_folder(&a, "INBOX", "Posta in arrivo", Some("inbox"), Some("/"), true).unwrap();
-        let id = db.insert_message(&a, f, &msg(Some(1), "n@x", "Nuovo")).unwrap().unwrap();
+        let id = db.insert_message(&a, f, &NewMessage { arrival: true, ..msg(Some(1), "n@x", "Nuovo") }).unwrap().unwrap();
+        // I messaggi già presenti (prima sincronizzazione, importazioni) no.
+        db.insert_message(&a, f, &msg(Some(2), "v@x", "Vecchio")).unwrap().unwrap();
         assert_eq!(db.unruled(f).unwrap().len(), 1);
         db.mark_ruled(&[id]).unwrap();
         assert!(db.unruled(f).unwrap().is_empty());

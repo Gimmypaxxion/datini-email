@@ -201,6 +201,44 @@ impl Parsed<'_> {
         text_list(self.msg.in_reply_to())
     }
 
+    /// Si può mandare una risposta automatica a questo messaggio? No alle
+    /// newsletter, alle notifiche, alle altre risposte automatiche, ai messaggi
+    /// di errore dei server e a quelli mandati da sé stessi. Restituisce
+    /// l'indirizzo a cui rispondere.
+    pub fn auto_reply_to(&self, own: &str) -> Option<Person> {
+        if !is_focused(&self.msg) {
+            return None;
+        }
+        if let Some(s) = self.msg.header_raw("X-Auto-Response-Suppress") {
+            let s = s.to_ascii_lowercase();
+            if s.contains("all") || s.contains("oof") || s.contains("autoreply") {
+                return None;
+            }
+        }
+        if self.msg.header_raw("Return-Path").is_some_and(|r| r.trim().trim_matches(|c| c == '<' || c == '>').is_empty()) {
+            return None;
+        }
+        let from = persons(self.msg.from()).into_iter().next()?;
+        let target = persons(self.msg.reply_to()).into_iter().next().unwrap_or_else(|| from.clone());
+        let addr = target.email.trim().to_ascii_lowercase();
+        let local = addr.split('@').next().unwrap_or("");
+        if addr.is_empty() || !addr.contains('@') || addr == own.trim().to_ascii_lowercase() || from.email.trim().eq_ignore_ascii_case(own.trim()) {
+            return None;
+        }
+        if ["mailer-daemon", "postmaster", "bounce", "bounces"].iter().any(|b| local == *b || local.starts_with(&format!("{b}+")) || local.starts_with(&format!("{b}-"))) {
+            return None;
+        }
+        Some(target)
+    }
+
+    pub fn subject(&self) -> String {
+        self.msg.subject().map(clean_ws).unwrap_or_default()
+    }
+
+    pub fn message_id(&self) -> Option<String> {
+        self.msg.message_id().map(|m| m.to_string())
+    }
+
     pub fn draft_key(&self) -> Option<String> {
         self.msg.header_raw(DRAFT_HEADER).map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
     }
@@ -322,6 +360,30 @@ impl lettre::message::header::Header for PendingHeader {
         HeaderValue::new(Self::name(), self.0.clone())
     }
 }
+
+/// Intestazioni delle risposte automatiche, ognuna con il suo tipo: lettre
+/// riconosce le intestazioni dal tipo.
+macro_rules! fixed_header {
+    ($t:ident, $name:literal, $value:literal) => {
+        #[derive(Clone)]
+        struct $t;
+
+        impl lettre::message::header::Header for $t {
+            fn name() -> HeaderName {
+                HeaderName::new_from_ascii_str($name)
+            }
+            fn parse(_: &str) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                Ok($t)
+            }
+            fn display(&self) -> HeaderValue {
+                HeaderValue::new(Self::name(), $value.to_string())
+            }
+        }
+    };
+}
+
+fixed_header!(AutoSubmitted, "Auto-Submitted", "auto-replied");
+fixed_header!(AutoResponseSuppress, "X-Auto-Response-Suppress", "All");
 
 #[derive(Clone)]
 struct XMailer;
@@ -476,6 +538,16 @@ pub struct AttachmentData {
 }
 
 pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_draft: bool) -> Result<BuiltMessage> {
+    build_message(account, d, atts, as_draft, false)
+}
+
+/// Risposta automatica: un messaggio come gli altri, con le intestazioni che
+/// dicono agli altri programmi di non rispondere a loro volta (RFC 3834).
+pub fn build_auto_reply(account: &AccountConfig, d: &Draft) -> Result<BuiltMessage> {
+    build_message(account, d, &[], false, true)
+}
+
+fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_draft: bool, auto_reply: bool) -> Result<BuiltMessage> {
     let from = mailbox(&Person::new(account.name.clone(), account.email.clone()))?;
     let domain = account.email.split('@').nth(1).unwrap_or("better-look.local").to_string();
     let message_id = format!("{}@{}", random_id(), domain);
@@ -542,6 +614,9 @@ pub fn build(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as_dra
         if keep_bcc {
             b = b.keep_bcc();
         }
+        if auto_reply {
+            b = b.header(AutoSubmitted).header(AutoResponseSuppress);
+        }
         let text = d.body.replace("\r\n", "\n");
         let with_atts = |mut mixed: MultiPart| {
             for a in atts {
@@ -604,6 +679,7 @@ mod tests {
             source_file: None,
             signature_new: None,
             signature_reply: None,
+            auto_reply: None,
         }
     }
 

@@ -40,7 +40,59 @@ export interface Account {
   signatureNew?: string | null;
   /** Firma aggiunta da sola a risposte e inoltri. */
   signatureReply?: string | null;
+  /** Risposta automatica (fuori ufficio). */
+  autoReply?: AutoReply | null;
   status: AccountStatus;
+}
+
+/** Risposta automatica di un account. Date in millisecondi. */
+export interface AutoReply {
+  enabled: boolean;
+  start: number | null;
+  end: number | null;
+  html: string;
+  text: string;
+  /** Quando è stata attivata (lo imposta il motore). */
+  since?: number;
+}
+
+/** Spazio occupato da una cartella. */
+export interface FolderUsage {
+  folderId: number;
+  count: number;
+  /** Byte. */
+  size: number;
+}
+
+/** Regola sui messaggi in arrivo, come "Regole e avvisi" di Outlook. */
+export interface Rule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  /** Solo per questo account; null per tutti. */
+  accountId: string | null;
+  when: RuleConditions;
+  then: RuleActions;
+}
+
+/** Tutte le condizioni indicate devono valere; dentro una basta una parola. */
+export interface RuleConditions {
+  from: string[];
+  to: string[];
+  subject: string[];
+  /** Oggetto o testo. */
+  words: string[];
+  hasAttachments: boolean;
+}
+
+export interface RuleActions {
+  moveTo: number | null;
+  delete: boolean;
+  markRead: boolean;
+  flag: boolean;
+  category: string | null;
+  alert: boolean;
+  stop: boolean;
 }
 
 /** Categoria colorata, come in Outlook. */
@@ -203,7 +255,9 @@ export type EngineEvent =
   | { type: 'accounts' }
   | { type: 'import'; name: string; done: number; total: number }
   | { type: 'signatures' }
-  | { type: 'categories' };
+  | { type: 'categories' }
+  | { type: 'newMail'; accountId: string; count: number; messages: MessageSummary[] }
+  | { type: 'rules' };
 
 /** Errore restituito dal motore: `kind` serve all'interfaccia per decidere cosa mostrare. */
 export interface EngineError {

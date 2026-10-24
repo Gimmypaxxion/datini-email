@@ -181,6 +181,46 @@ pub async fn send(e: E<'_>, draft: Draft) -> Result<i64> {
 }
 
 #[tauri::command]
+pub async fn send_later(e: E<'_>, draft: Draft, at: i64) -> Result<i64> {
+    e.send_later(&draft, at).await
+}
+
+#[tauri::command]
+pub async fn mailbox_usage(e: E<'_>, account_id: String) -> Result<Vec<FolderUsage>> {
+    e.mailbox_usage(&account_id)
+}
+
+#[tauri::command]
+pub async fn large_messages(e: E<'_>, account_id: String, min_size: i64) -> Result<Vec<MessageSummary>> {
+    e.large_messages(&account_id, min_size)
+}
+
+#[tauri::command]
+pub async fn older_messages(e: E<'_>, folder_id: i64, before: i64, archive: bool) -> Result<usize> {
+    e.older_messages(folder_id, before, archive).await
+}
+
+#[tauri::command]
+pub async fn rules(e: E<'_>) -> Result<Vec<Rule>> {
+    e.rules()
+}
+
+#[tauri::command]
+pub async fn save_rules(e: E<'_>, list: Vec<Rule>) -> Result<Vec<Rule>> {
+    e.save_rules(list)
+}
+
+#[tauri::command]
+pub async fn run_rules(e: E<'_>, ids: Vec<String>, folder_id: i64) -> Result<usize> {
+    e.run_rules(&ids, folder_id).await
+}
+
+#[tauri::command]
+pub async fn set_auto_reply(e: E<'_>, account_id: String, reply: AutoReply) -> Result<()> {
+    e.set_auto_reply(&account_id, reply)
+}
+
+#[tauri::command]
 pub async fn cancel_send(e: E<'_>, id: i64) -> Result<Option<Draft>> {
     e.cancel_send(id)
 }

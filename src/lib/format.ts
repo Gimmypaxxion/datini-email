@@ -54,6 +54,18 @@ function startOfWeek(d: Date): number {
   return startOfDay(d) - day * 86_400_000;
 }
 
+/** "oggi alle 17:30", "domani alle 08:00", "lun 26/10 alle 08:00". */
+export function whenText(ms: number, now = new Date()): string {
+  const d = new Date(ms);
+  const at = `alle ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const day = startOfDay(d);
+  const today = startOfDay(now);
+  if (day === today) return `oggi ${at}`;
+  if (day === new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime()) return `domani ${at}`;
+  const year = d.getFullYear() === now.getFullYear() ? '' : `/${d.getFullYear()}`;
+  return `${DAYS[d.getDay()]} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}${year} ${at}`;
+}
+
 /** Ora nell'elenco: 08:42 oggi, "gio 17:20" in settimana, "mer 14/10" quest'anno, poi la data completa. */
 export function listTime(ms: number, now = new Date()): string {
   const d = new Date(ms);

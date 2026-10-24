@@ -7,7 +7,7 @@
   import Menu from './Menu.svelte';
   import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
   import { categoryItems, messageItems, moveItems, type MenuItem } from '../lib/menus';
-  import { GROUP_ORDER, groupLabel, initials, listTime, peopleText, personLabel, tint } from '../lib/format';
+  import { GROUP_ORDER, groupLabel, initials, listTime, peopleText, personLabel, tint, whenText } from '../lib/format';
   import type { MessageSummary, Role } from '../lib/types';
 
   const EMPTY: Partial<Record<Role, [string, string]>> = {
@@ -74,6 +74,10 @@
         : (role && EMPTY[role]) || ['Cartella vuota', 'Usa Sposta in per mettere qui i messaggi.'],
   );
   const problem = $derived(store.accounts.find((a) => a.status.state === 'errore'));
+  /** Risposta automatica attiva: prima quella dell'account aperto. */
+  const away = $derived(store.autoReplyOn.find((a) => a.id === store.currentFolder?.accountId) ?? store.autoReplyOn[0]);
+  const outState = (o: (typeof store.outbox)[number]) =>
+    o.state === 'attesa' && o.sendAfter > Date.now() + 60_000 ? `Programmato per ${whenText(o.sendAfter)}` : (OUT_STATE[o.state] ?? o.state);
   const outbox = $derived(store.outbox.filter((o) => store.folderSel === `uscita-${o.accountId}` || store.folderSel === 'uscita'));
 
   function who(m: MessageSummary): string {
@@ -231,6 +235,13 @@
       <span class="t">{problem.email}: {problem.status.message}</span>
       <button class="act" onclick={() => { store.acctSel = problem.id; store.openSettings('account'); }}>Controlla</button>
     </div>
+  {:else if away}
+    <div role="status" class="note-bar info">
+      <Icon name="message-reply" style="color:var(--brand-ink)" />
+      <span class="t">Risposte automatiche attive{store.accounts.length > 1 ? ` per ${away.email}` : ''}.</span>
+      <button class="act" onclick={() => { store.acctSel = away.id; store.openSettings('risposte'); }}>Modifica</button>
+      <button class="act" onclick={() => store.turnOffAutoReply(away.id)}>Disattiva</button>
+    </div>
   {/if}
 
   <div class="head">
@@ -270,7 +281,7 @@
             <span class="txt">
               <span class="l1"><span class="from">{o.to.length ? peopleText(o.to) : 'Nessun destinatario'}</span></span>
               <span class="l2"><span class="subj">{o.subject || '(nessun oggetto)'}</span></span>
-              <span class="prev" class:err={o.state === 'errore'}>{OUT_STATE[o.state] ?? o.state}{o.error ? `: ${o.error}` : ''}</span>
+              <span class="prev" class:err={o.state === 'errore'}>{outState(o)}{o.error ? `: ${o.error}` : ''}</span>
               {#if o.state !== 'invio'}
                 <button class="lbtn open" onclick={() => store.openOutboxItem(o.id)}>Apri e modifica</button>
               {/if}

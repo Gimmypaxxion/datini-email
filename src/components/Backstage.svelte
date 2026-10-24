@@ -54,16 +54,16 @@
             <div><h2>Impostazioni account</h2><p>Server, posta offline e sincronizzazione di questo account. Da qui puoi anche aggiungerne altri o cambiare la password.</p></div>
           </div>
           <div class="bs-row">
-            <button class="btn bs-tile" onclick={() => store.soon('Risposte automatiche')}><Icon name="message-reply" size={30} stroke={1.5} />Risposte automatiche</button>
-            <div><h2>Risposte automatiche</h2><p>Avvisa chi ti scrive che sei fuori ufficio e quando rientri. Arriverà in una prossima versione.</p></div>
+            <button class="btn bs-tile" onclick={() => store.openSettings('risposte')}><Icon name="message-reply" size={30} stroke={1.5} />Risposte automatiche</button>
+            <div><h2>Risposte automatiche</h2><p>Avvisa chi ti scrive che sei fuori ufficio e quando rientri.</p></div>
           </div>
           <div class="bs-row">
-            <button class="btn bs-tile" onclick={() => store.soon('Pulizia cassetta postale')}><Icon name="trash-x" size={30} stroke={1.5} />Pulizia</button>
-            <div><h2>Pulizia cassetta postale</h2><p>Libera spazio archiviando i messaggi vecchi o svuotando la posta eliminata. Arriverà in una prossima versione.</p></div>
+            <button class="btn bs-tile" onclick={() => store.openSettings('pulizia')}><Icon name="trash-x" size={30} stroke={1.5} />Pulizia</button>
+            <div><h2>Pulizia cassetta postale</h2><p>Libera spazio archiviando i messaggi vecchi, togliendo quelli grandi o svuotando la posta eliminata.</p></div>
           </div>
           <div class="bs-row">
-            <button class="btn bs-tile" onclick={() => store.soon('Regole e avvisi')}><Icon name="list-check" size={30} stroke={1.5} />Regole e avvisi</button>
-            <div><h2>Regole e avvisi</h2><p>Sposta in automatico i messaggi nelle cartelle giuste. Arriverà in una prossima versione.</p></div>
+            <button class="btn bs-tile" onclick={() => store.openSettings('regole')}><Icon name="list-check" size={30} stroke={1.5} />Regole e avvisi</button>
+            <div><h2>Regole e avvisi</h2><p>Sposta in automatico i messaggi nelle cartelle giuste e scegli quando avvisarti dei nuovi messaggi.</p></div>
           </div>
         </div>
       {:else if store.bsPage === 'apri'}

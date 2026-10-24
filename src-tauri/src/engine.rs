@@ -2,7 +2,7 @@
 //! lavoratore che sincronizza in sottofondo; un altro lavoratore spedisce la
 //! posta in uscita. L'interfaccia riceve notifiche quando qualcosa cambia.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -18,6 +18,7 @@ use crate::imap;
 use crate::mime::{self, AttachmentData};
 use crate::model::*;
 use crate::pop3;
+use crate::rules::{self, Candidate};
 use crate::sanitize;
 use crate::secrets::Secrets;
 use crate::smtp;
@@ -38,6 +39,10 @@ struct Worker {
 const SIGNATURES_KEY: &str = "firme";
 /// Chiave dell'archivio in cui stanno le categorie colorate.
 const CATEGORIES_KEY: &str = "categorie";
+/// Chiave dell'archivio in cui stanno le regole.
+const RULES_KEY: &str = "regole";
+/// Messaggi mostrati al massimo in un avviso sul desktop.
+const ALERT_MAX: usize = 5;
 /// Immagini incollate da una pagina web: oltre questa dimensione restano un collegamento.
 const MAX_PASTED_IMAGE: u64 = 5 * 1024 * 1024;
 
@@ -110,6 +115,21 @@ pub fn guess_mime(name: &str) -> String {
         _ => "application/octet-stream",
     }
     .to_string()
+}
+
+/// Risultato delle regole su un gruppo di messaggi.
+#[derive(Default)]
+struct RulesOutcome {
+    /// Messaggi su cui almeno una regola ha agito.
+    matched: usize,
+    /// Spostati in un'altra cartella o eliminati.
+    gone: HashSet<i64>,
+    /// Eliminati: niente risposta automatica.
+    deleted: HashSet<i64>,
+    /// Segnati come letti.
+    read: HashSet<i64>,
+    /// Da segnalare con l'avviso anche fuori dalla posta in arrivo.
+    alert: HashSet<i64>,
 }
 
 fn is_server_backed(m: &MsgRow) -> bool {
@@ -255,6 +275,7 @@ impl Engine {
                 let delay = match res {
                     Ok(()) => {
                         eng.set_status(&id, "pronto", None);
+                        eng.process_arrivals(&acct).await;
                         SYNC_EVERY
                     }
                     Err(e) if e.is_network() => {
@@ -568,6 +589,7 @@ impl Engine {
             source_file: None,
             signature_new: None,
             signature_reply: None,
+            auto_reply: None,
         };
         self.secrets.set(&id, &input.password)?;
         lock(&self.passwords).insert(id.clone(), input.password.clone());
@@ -609,6 +631,7 @@ impl Engine {
             source_file: source,
             signature_new: None,
             signature_reply: None,
+            auto_reply: None,
         };
         self.db.save_account(&cfg)?;
         self.emit(Event::Accounts);
@@ -1091,6 +1114,238 @@ impl Engine {
     }
 
     // ------------------------------------------------------------------
+    // Regole, risposte automatiche e avvisi
+    // ------------------------------------------------------------------
+
+    pub fn rules(&self) -> Result<Vec<Rule>> {
+        Ok(self.db.meta(RULES_KEY)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default())
+    }
+
+    /// Salva l'elenco delle regole, nell'ordine in cui si applicano.
+    pub fn save_rules(&self, list: Vec<Rule>) -> Result<Vec<Rule>> {
+        let clean = |v: Vec<String>| v.into_iter().map(|w| w.trim().to_string()).filter(|w| !w.is_empty()).collect::<Vec<_>>();
+        let mut out = Vec::new();
+        for mut r in list {
+            r.name = r.name.trim().chars().take(80).collect();
+            if r.name.is_empty() {
+                return Err(Error::user("Dai un nome a ogni regola."));
+            }
+            r.when.from = clean(r.when.from);
+            r.when.to = clean(r.when.to);
+            r.when.subject = clean(r.when.subject);
+            r.when.words = clean(r.when.words);
+            r.then.category = r.then.category.filter(|c| !c.is_empty());
+            let a = &r.then;
+            if a.move_to.is_none() && !a.delete && !a.mark_read && !a.flag && a.category.is_none() && !a.alert {
+                return Err(Error::user(format!("Scegli cosa deve fare la regola \"{}\".", r.name)));
+            }
+            if r.id.is_empty() {
+                r.id = mime::random_id()[..10].to_string();
+            }
+            out.push(r);
+        }
+        self.db.set_meta(RULES_KEY, &serde_json::to_string(&out)?)?;
+        self.emit(Event::Rules);
+        Ok(out)
+    }
+
+    /// Dati del messaggio per le condizioni. Il testo serve solo se una
+    /// regola lo guarda; se il messaggio non è ancora scaricato vale l'anteprima.
+    fn candidate(&self, m: &MsgRow, with_body: bool) -> Candidate {
+        let body = if with_body {
+            self.db.body(m.id).ok().flatten().and_then(|raw| mime::parse(&raw).map(|p| p.text())).unwrap_or_else(|| m.preview.clone())
+        } else {
+            String::new()
+        };
+        let to: Vec<(String, String)> = m.recipients.to.iter().chain(m.recipients.cc.iter()).map(|p| (p.name.clone(), p.email.clone())).collect();
+        Candidate::new(&m.account_id, (&m.from.name, &m.from.email), &to, &m.subject, &body, m.has_atts)
+    }
+
+    /// Applica le regole ai messaggi. Restituisce i messaggi toccati e,
+    /// separati, quelli usciti dalla cartella, letti e da segnalare.
+    async fn apply_rules(&self, rows: &[MsgRow], rules: &[Rule], only: Option<&[String]>) -> Result<RulesOutcome> {
+        let with_body = rules.iter().any(|r| !r.when.words.is_empty());
+        let mut out = RulesOutcome::default();
+        let mut moves: HashMap<i64, Vec<i64>> = HashMap::new();
+        let mut deletes = Vec::new();
+        let mut read = Vec::new();
+        let mut flag = Vec::new();
+        let mut cats: HashMap<String, Vec<i64>> = HashMap::new();
+        let folders: HashSet<i64> = self.db.folder_infos()?.into_iter().map(|f| f.id).collect();
+        for m in rows {
+            let p = rules::plan(rules, &self.candidate(m, with_body), only);
+            if p.is_empty() {
+                continue;
+            }
+            out.matched += 1;
+            if p.mark_read && m.unread {
+                read.push(m.id);
+            }
+            if p.mark_read {
+                out.read.insert(m.id);
+            }
+            if p.flag && !m.flagged {
+                flag.push(m.id);
+            }
+            for c in p.categories {
+                cats.entry(c).or_default().push(m.id);
+            }
+            if p.alert {
+                out.alert.insert(m.id);
+            }
+            if p.delete {
+                deletes.push(m.id);
+                out.gone.insert(m.id);
+                out.deleted.insert(m.id);
+            } else if let Some(dest) = p.move_to.filter(|d| *d != m.folder_id && folders.contains(d)) {
+                moves.entry(dest).or_default().push(m.id);
+                out.gone.insert(m.id);
+            }
+        }
+        if !read.is_empty() {
+            self.set_flags(&read, Some(true), None, None)?;
+        }
+        if !flag.is_empty() {
+            self.set_flags(&flag, None, Some(true), None)?;
+        }
+        for (c, ids) in cats {
+            self.set_category(&ids, &c, true)?;
+        }
+        for (dest, ids) in moves {
+            if let Err(e) = self.move_messages(&ids, dest).await {
+                log::warn!("regola, spostamento: {e}");
+            }
+        }
+        if !deletes.is_empty() {
+            if let Err(e) = self.move_to_role(&deletes, "deleted").await {
+                log::warn!("regola, eliminazione: {e}");
+            }
+        }
+        Ok(out)
+    }
+
+    /// "Esegui ora": applica alcune regole ai messaggi già presenti in una
+    /// cartella. Restituisce quanti messaggi sono stati toccati.
+    pub async fn run_rules(&self, rule_ids: &[String], folder_id: i64) -> Result<usize> {
+        let rules: Vec<Rule> = self.rules()?.into_iter().map(|mut r| {
+            // Qui nessun avviso: i messaggi non sono nuovi.
+            r.then.alert = false;
+            r
+        }).collect();
+        let ids = self.db.folder_message_ids(folder_id)?;
+        let rows: Vec<MsgRow> = self.db.messages_by_ids(&ids)?.into_iter().filter(|m| !m.draft).collect();
+        Ok(self.apply_rules(&rows, &rules, Some(rule_ids)).await?.matched)
+    }
+
+    /// Messaggi appena arrivati nella posta in arrivo: regole, risposta
+    /// automatica e avviso sul desktop. Ognuno passa di qui una volta sola.
+    async fn process_arrivals(&self, acct: &AccountConfig) {
+        if let Err(e) = self.process_arrivals_inner(acct).await {
+            log::warn!("nuovi messaggi di {}: {e}", acct.email);
+        }
+    }
+
+    async fn process_arrivals_inner(&self, acct: &AccountConfig) -> Result<()> {
+        let Some(inbox) = self.db.folder_by_role(&acct.id, "inbox")? else { return Ok(()) };
+        let rows = self.db.unruled(inbox.id)?;
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let ids: Vec<i64> = rows.iter().map(|m| m.id).collect();
+        self.db.mark_ruled(&ids)?;
+        let outcome = self.apply_rules(&rows, &self.rules()?, None).await?;
+
+        // La configurazione può essere cambiata mentre si sincronizzava.
+        let acct = self.db.account(&acct.id)?;
+        if let Some(ar) = acct.auto_reply.as_ref().filter(|a| a.active_at(now_secs() * 1000)) {
+            if acct.outgoing.is_some() {
+                for m in rows.iter().filter(|m| !outcome.deleted.contains(&m.id)) {
+                    if let Err(e) = self.send_auto_reply(&acct, ar, m).await {
+                        log::warn!("risposta automatica: {e}");
+                    }
+                }
+            }
+        }
+
+        // Avviso: i messaggi rimasti da leggere in Prioritaria, più quelli
+        // per cui una regola chiede l'avviso.
+        let mut alert: Vec<&MsgRow> = rows
+            .iter()
+            .filter(|m| outcome.alert.contains(&m.id) || (m.focused && m.unread && !outcome.gone.contains(&m.id) && !outcome.read.contains(&m.id)))
+            .collect();
+        if !alert.is_empty() {
+            alert.sort_by_key(|m| std::cmp::Reverse(m.date));
+            self.emit(Event::NewMail {
+                account_id: acct.id.clone(),
+                count: alert.len() as u32,
+                messages: alert.iter().take(ALERT_MAX).map(|m| m.summary()).collect(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Risposta automatica a un messaggio, una volta sola per mittente.
+    async fn send_auto_reply(&self, acct: &AccountConfig, ar: &AutoReply, m: &MsgRow) -> Result<()> {
+        let raw = match self.db.body(m.id)? {
+            Some(r) => r,
+            None => self.raw(m).await?,
+        };
+        let Some(p) = mime::parse(&raw) else { return Ok(()) };
+        let Some(to) = p.auto_reply_to(&acct.email) else { return Ok(()) };
+        if !self.db.autoreply_once(&acct.id, &to.email, ar.since)? {
+            return Ok(());
+        }
+        let subject = p.subject();
+        let mid = p.message_id();
+        let mut references = p.references();
+        if let Some(id) = &mid {
+            references.push(id.clone());
+        }
+        let d = Draft {
+            key: mime::random_id(),
+            account_id: acct.id.clone(),
+            to: vec![to],
+            cc: vec![],
+            bcc: vec![],
+            subject: if subject.is_empty() { "Risposta automatica".into() } else { format!("Risposta automatica: {subject}") },
+            body: ar.text.clone(),
+            html: Some(ar.html.clone()).filter(|h| !h.trim().is_empty()),
+            plain: false,
+            attachments: vec![],
+            in_reply_to: mid,
+            references,
+            reply_to_message: None,
+        };
+        let built = mime::build_auto_reply(acct, &d)?;
+        self.db.outbox_add(&acct.id, &built.wire, &built.copy, &built.envelope, &d, now_secs())?;
+        self.outbox_wake.notify_one();
+        Ok(())
+    }
+
+    /// Salva la risposta automatica di un account. Ogni nuova attivazione
+    /// riparte da zero: chi aveva già ricevuto la risposta la riceve di nuovo.
+    pub fn set_auto_reply(&self, account_id: &str, mut ar: AutoReply) -> Result<()> {
+        let mut cfg = self.db.account(account_id)?;
+        if cfg.kind == AccountKind::Local {
+            return Err(Error::user("I file di dati non ricevono posta."));
+        }
+        if let (Some(s), Some(e)) = (ar.start, ar.end) {
+            if e <= s {
+                return Err(Error::user("La fine del periodo deve venire dopo l'inizio."));
+            }
+        }
+        if ar.enabled && ar.text.trim().is_empty() {
+            return Err(Error::user("Scrivi il messaggio della risposta automatica."));
+        }
+        let prev = cfg.auto_reply.clone().unwrap_or_default();
+        ar.since = if ar.enabled && (!prev.enabled || prev.start != ar.start || prev.since == 0) { now_secs() * 1000 } else { prev.since };
+        cfg.auto_reply = Some(ar);
+        self.db.save_account(&cfg)?;
+        self.emit(Event::Accounts);
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
     // Conversazioni
     // ------------------------------------------------------------------
 
@@ -1274,6 +1529,43 @@ impl Engine {
     }
 
     // ------------------------------------------------------------------
+    // Pulizia cassetta postale
+    // ------------------------------------------------------------------
+
+    /// Messaggi e spazio di ogni cartella dell'account, dalla più grande.
+    pub fn mailbox_usage(&self, account_id: &str) -> Result<Vec<FolderUsage>> {
+        let mut v: Vec<FolderUsage> = self.db.folder_sizes(account_id)?.into_iter().map(|(folder_id, count, size)| FolderUsage { folder_id, count, size }).collect();
+        v.sort_by(|a, b| b.size.cmp(&a.size).then(b.count.cmp(&a.count)));
+        Ok(v)
+    }
+
+    /// Messaggi più grandi di `min_size` byte, con il nome della cartella.
+    pub fn large_messages(&self, account_id: &str, min_size: i64) -> Result<Vec<MessageSummary>> {
+        let names: HashMap<i64, String> = self.db.folders(account_id)?.into_iter().map(|f| (f.id, f.name)).collect();
+        Ok(self
+            .db
+            .large_messages(account_id, min_size, 200)?
+            .into_iter()
+            .filter(|m| !m.draft)
+            .map(|m| {
+                let mut s = m.summary();
+                s.folder_name = names.get(&m.folder_id).cloned();
+                s
+            })
+            .collect())
+    }
+
+    /// Messaggi della cartella più vecchi della data (millisecondi). Con
+    /// `archive` li sposta in Archivio; restituisce quanti sono.
+    pub async fn older_messages(&self, folder_id: i64, before_ms: i64, archive: bool) -> Result<usize> {
+        let ids = self.db.older_than(folder_id, before_ms / 1000)?;
+        if archive && !ids.is_empty() {
+            self.move_to_role(&ids, "archive").await?;
+        }
+        Ok(ids.len())
+    }
+
+    // ------------------------------------------------------------------
     // Bozze e invio
     // ------------------------------------------------------------------
 
@@ -1422,6 +1714,20 @@ impl Engine {
     /// Mette il messaggio nella posta in uscita. Parte dopo qualche secondo,
     /// per lasciare il tempo di annullare.
     pub async fn send(&self, d: &Draft) -> Result<i64> {
+        self.enqueue(d, None).await
+    }
+
+    /// Invio programmato: il messaggio aspetta nella posta in uscita fino
+    /// all'ora indicata (millisecondi). Parte solo se il programma è aperto;
+    /// altrimenti appena si riapre.
+    pub async fn send_later(&self, d: &Draft, at_ms: i64) -> Result<i64> {
+        if at_ms <= now_secs() * 1000 + 30_000 {
+            return Err(Error::user("Scegli un'ora futura per l'invio."));
+        }
+        self.enqueue(d, Some(at_ms / 1000)).await
+    }
+
+    async fn enqueue(&self, d: &Draft, at: Option<i64>) -> Result<i64> {
         if d.to.is_empty() && d.cc.is_empty() && d.bcc.is_empty() {
             return Err(Error::user("Aggiungi almeno un destinatario."));
         }
@@ -1431,14 +1737,15 @@ impl Engine {
         }
         let atts = self.load_attachments(&d.attachments).await?;
         let built = mime::build(&acct, d, &atts, false)?;
-        let id = self.db.outbox_add(&acct.id, &built.wire, &built.copy, &built.envelope, d, now_secs() + self.undo_secs)?;
+        let id = self.db.outbox_add(&acct.id, &built.wire, &built.copy, &built.envelope, d, at.unwrap_or(now_secs() + self.undo_secs))?;
         let rows = self.db.local_drafts_by_key(&acct.id, &d.key)?;
         self.db.set_pending(&rows, Some("sending"))?;
         if !rows.is_empty() {
             let drafts = self.db.folder_by_role(&acct.id, "drafts")?.map(|f| f.id);
             self.changed(&acct.id, drafts.into_iter().collect());
         }
-        self.emit(Event::Outbox { account_id: acct.id.clone(), outbox_id: id, state: "attesa".into(), error: None });
+        let state = if at.is_some() { "programmato" } else { "attesa" };
+        self.emit(Event::Outbox { account_id: acct.id.clone(), outbox_id: id, state: state.into(), error: None });
         Ok(id)
     }
 
@@ -1510,5 +1817,202 @@ impl Engine {
         }
         tokio::fs::write(path, out).await?;
         Ok(n)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::NewMessage;
+    use crate::secrets::Memory;
+
+    struct Setup {
+        eng: Arc<Engine>,
+        events: Arc<Mutex<Vec<Event>>>,
+        inbox: i64,
+        suppliers: i64,
+    }
+
+    fn setup() -> Setup {
+        let db = Db::memory().unwrap();
+        let srv = |host: &str, port: u16| ServerConfig { host: host.into(), port, security: Security::Ssl, username: "chiara.valli@valliarredi.it".into() };
+        let acct = AccountConfig {
+            id: "a1".into(),
+            name: "Chiara Valli".into(),
+            email: "chiara.valli@valliarredi.it".into(),
+            kind: AccountKind::Imap,
+            incoming: Some(srv("imap.example.test", 993)),
+            outgoing: Some(srv("smtp.example.test", 465)),
+            sync: SyncOptions::default(),
+            server_saves_sent: false,
+            source_file: None,
+            signature_new: None,
+            signature_reply: None,
+            auto_reply: None,
+        };
+        db.save_account(&acct).unwrap();
+        let inbox = db.upsert_folder("a1", "INBOX", "Posta in arrivo", Some("inbox"), Some("/"), true).unwrap();
+        db.upsert_folder("a1", "Trash", "Posta eliminata", Some("deleted"), Some("/"), true).unwrap();
+        let suppliers = db.upsert_folder("a1", "Fornitori", "Fornitori", None, Some("/"), true).unwrap();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let ev = events.clone();
+        let eng = Engine::new(db, Arc::new(Memory::default()), std::env::temp_dir(), Arc::new(move |e| ev.lock().unwrap().push(e)));
+        Setup { eng, events, inbox, suppliers }
+    }
+
+    fn arrive(s: &Setup, uid: u32, from: &str, subject: &str, extra: &str) -> i64 {
+        let raw = format!(
+            "From: {from}\r\nTo: Chiara Valli <chiara.valli@valliarredi.it>\r\nSubject: {subject}\r\nMessage-ID: <m{uid}@example.test>\r\nDate: Mon, 19 Oct 2026 09:00:00 +0200\r\n{extra}Content-Type: text/plain; charset=utf-8\r\n\r\nTesto del messaggio {uid}.\r\n"
+        );
+        let mut nm = mime::parse(raw.as_bytes()).unwrap().to_new_message(now_secs(), true, raw.len() as i64);
+        nm.uid = Some(uid);
+        nm.unread = true;
+        nm.arrival = true;
+        nm.raw = Some(raw.into_bytes());
+        s.eng.db.insert_message("a1", s.inbox, &nm).unwrap().unwrap()
+    }
+
+    fn new_mail(s: &Setup) -> Vec<(u32, Vec<String>)> {
+        s.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|e| match e {
+                Event::NewMail { count, messages, .. } => Some((*count, messages.iter().map(|m| m.subject.clone()).collect())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn arrivals_go_through_rules_auto_reply_and_alerts() {
+        let s = setup();
+        s.eng
+            .save_rules(vec![Rule {
+                id: String::new(),
+                name: "Fatture dei fornitori".into(),
+                enabled: true,
+                account_id: None,
+                when: RuleConditions { from: vec!["studiobassi.it".into()], ..Default::default() },
+                then: RuleActions { move_to: Some(s.suppliers), category: Some("verde".into()), ..Default::default() },
+            }])
+            .unwrap();
+        s.eng.set_auto_reply("a1", AutoReply { enabled: true, html: "<div>Sono in ferie fino al 2 novembre.</div>".into(), text: "Sono in ferie fino al 2 novembre.".into(), ..Default::default() }).unwrap();
+
+        let invoice = arrive(&s, 10, "Studio Bassi <amministrazione@studiobassi.it>", "Fattura n. 418", "");
+        let news = arrive(&s, 11, "Arredo e Contract <news@arredoecontract.example>", "Le novità di ottobre", "List-Unsubscribe: <mailto:off@arredoecontract.example>\r\n");
+        let person = arrive(&s, 12, "Davide Orlandi <d.orlandi@studiorlandi.it>", "Preventivo uffici", "");
+        // Un messaggio già presente prima (non arrivato adesso) non si tocca.
+        let old = s.eng.db.insert_message("a1", s.inbox, &NewMessage { uid: Some(1), subject: "Vecchio".into(), date: 1, ..Default::default() }).unwrap().unwrap();
+
+        let acct = s.eng.db.account("a1").unwrap();
+        s.eng.process_arrivals(&acct).await;
+
+        // La regola sposta la fattura e le dà la categoria.
+        let m = s.eng.db.message(invoice).unwrap();
+        assert_eq!(m.folder_id, s.suppliers);
+        assert_eq!(m.categories, vec!["verde".to_string()]);
+        assert_eq!(s.eng.db.message(person).unwrap().folder_id, s.inbox);
+        assert_eq!(s.eng.db.message(old).unwrap().folder_id, s.inbox);
+
+        // Avviso solo per il messaggio personale rimasto in Prioritaria.
+        assert_eq!(new_mail(&s), vec![(1, vec!["Preventivo uffici".to_string()])]);
+
+        // Risposta automatica alla fattura e al messaggio personale, non alla newsletter.
+        let out = s.eng.db.outbox_due(now_secs() + 1).unwrap();
+        let mut to: Vec<String> = out.iter().map(|o| o.envelope.to.join(",")).collect();
+        to.sort();
+        assert_eq!(to, vec!["amministrazione@studiobassi.it".to_string(), "d.orlandi@studiorlandi.it".to_string()]);
+        let wire = String::from_utf8_lossy(&out[0].raw).to_string();
+        assert!(wire.contains("Auto-Submitted: auto-replied"), "{wire}");
+        assert!(wire.contains("Subject: Risposta automatica:"), "{wire}");
+        assert!(s.eng.db.message(news).unwrap().unread);
+
+        // Una seconda volta non succede nulla; lo stesso mittente non riceve una seconda risposta.
+        s.eng.process_arrivals(&acct).await;
+        arrive(&s, 13, "Davide Orlandi <d.orlandi@studiorlandi.it>", "Re: Preventivo uffici", "");
+        s.eng.process_arrivals(&acct).await;
+        assert_eq!(s.eng.db.outbox_due(now_secs() + 1).unwrap().len(), 2);
+        assert_eq!(new_mail(&s).len(), 2);
+    }
+
+    #[tokio::test]
+    async fn run_now_applies_rules_to_existing_mail_without_alerts() {
+        let s = setup();
+        let rules = s
+            .eng
+            .save_rules(vec![Rule {
+                id: String::new(),
+                name: "Contrassegna i preventivi".into(),
+                enabled: true,
+                account_id: Some("a1".into()),
+                when: RuleConditions { subject: vec!["preventivo".into()], ..Default::default() },
+                then: RuleActions { flag: true, mark_read: true, alert: true, ..Default::default() },
+            }])
+            .unwrap();
+        let a = arrive(&s, 20, "Davide Orlandi <d.orlandi@studiorlandi.it>", "Preventivo uffici", "");
+        let b = arrive(&s, 21, "Lucia Marchetti <l.marchetti@tessuti.example>", "Campionario", "");
+        s.eng.db.mark_ruled(&[a, b]).unwrap();
+        let n = s.eng.run_rules(&[rules[0].id.clone()], s.inbox).await.unwrap();
+        assert_eq!(n, 1);
+        let m = s.eng.db.message(a).unwrap();
+        assert!(m.flagged && !m.unread);
+        assert!(s.eng.db.message(b).unwrap().unread);
+        assert!(new_mail(&s).is_empty());
+    }
+
+    #[tokio::test]
+    async fn mailbox_cleanup_finds_big_and_old_mail() {
+        let s = setup();
+        let day = 86_400;
+        let put = |uid: u32, size: i64, age_days: i64| {
+            s.eng
+                .db
+                .insert_message("a1", s.inbox, &NewMessage { uid: Some(uid), subject: format!("M{uid}"), size, date: now_secs() - age_days * day, ..Default::default() })
+                .unwrap()
+                .unwrap()
+        };
+        let big = put(1, 9_000_000, 3);
+        put(2, 20_000, 400);
+        put(3, 30_000, 10);
+        let usage = s.eng.mailbox_usage("a1").unwrap();
+        assert_eq!(usage[0].folder_id, s.inbox);
+        assert_eq!((usage[0].count, usage[0].size), (3, 9_050_000));
+        let large = s.eng.large_messages("a1", 5_000_000).unwrap();
+        assert_eq!(large.iter().map(|m| m.id).collect::<Vec<_>>(), vec![big]);
+        assert_eq!(large[0].folder_name.as_deref(), Some("Posta in arrivo"));
+        // Prima si contano, poi si archiviano.
+        let before = (now_secs() - 180 * day) * 1000;
+        assert_eq!(s.eng.older_messages(s.inbox, before, false).await.unwrap(), 1);
+        assert_eq!(s.eng.older_messages(s.inbox, before, true).await.unwrap(), 1);
+        assert_eq!(s.eng.older_messages(s.inbox, before, false).await.unwrap(), 0);
+        let archive = s.eng.db.folder_by_role("a1", "archive").unwrap().unwrap();
+        assert_eq!(s.eng.db.folder_message_ids(archive.id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn rules_need_a_name_and_an_action() {
+        let s = setup();
+        let r = |name: &str, then: RuleActions| Rule { id: String::new(), name: name.into(), enabled: true, account_id: None, when: RuleConditions::default(), then };
+        assert!(s.eng.save_rules(vec![r(" ", RuleActions { flag: true, ..Default::default() })]).is_err());
+        assert!(s.eng.save_rules(vec![r("Niente", RuleActions::default())]).is_err());
+        let saved = s.eng.save_rules(vec![r("Tutto letto", RuleActions { mark_read: true, ..Default::default() })]).unwrap();
+        assert!(!saved[0].id.is_empty());
+        assert_eq!(s.eng.rules().unwrap(), saved);
+    }
+
+    #[test]
+    fn auto_reply_periods() {
+        let s = setup();
+        let ar = |start: Option<i64>, end: Option<i64>| AutoReply { enabled: true, start, end, text: "Fuori ufficio".into(), ..Default::default() };
+        assert!(s.eng.set_auto_reply("a1", ar(Some(2_000), Some(1_000))).is_err());
+        assert!(s.eng.set_auto_reply("a1", AutoReply { enabled: true, ..Default::default() }).is_err());
+        s.eng.set_auto_reply("a1", ar(Some(1_000), Some(5_000))).unwrap();
+        let saved = s.eng.db.account("a1").unwrap().auto_reply.unwrap();
+        assert!(saved.since > 0);
+        assert!(saved.active_at(3_000) && !saved.active_at(500) && !saved.active_at(5_000));
+        // Salvare di nuovo senza cambiare periodo non ricomincia da capo.
+        s.eng.set_auto_reply("a1", ar(Some(1_000), Some(9_000))).unwrap();
+        assert_eq!(s.eng.db.account("a1").unwrap().auto_reply.unwrap().since, saved.since);
     }
 }

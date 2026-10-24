@@ -115,6 +115,110 @@ pub struct AccountConfig {
     /// Firma aggiunta da sola a risposte e inoltri.
     #[serde(default)]
     pub signature_reply: Option<String>,
+    /// Risposta automatica (fuori ufficio).
+    #[serde(default)]
+    pub auto_reply: Option<AutoReply>,
+}
+
+/// Risposta automatica di un account, come "Risposte automatiche" di Outlook.
+/// Le date sono in millisecondi, come Date in JavaScript.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoReply {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Inizio e fine del periodo; senza, vale finché resta attiva.
+    #[serde(default)]
+    pub start: Option<i64>,
+    #[serde(default)]
+    pub end: Option<i64>,
+    /// Testo formattato (frammento HTML) e testo semplice.
+    #[serde(default)]
+    pub html: String,
+    #[serde(default)]
+    pub text: String,
+    /// Quando è stata attivata: ogni mittente riceve una sola risposta per
+    /// attivazione. Lo imposta il motore.
+    #[serde(default)]
+    pub since: i64,
+}
+
+impl AutoReply {
+    /// Attiva adesso (now in millisecondi)?
+    pub fn active_at(&self, now: i64) -> bool {
+        self.enabled && self.start.map_or(true, |s| now >= s) && self.end.map_or(true, |e| now < e)
+    }
+}
+
+/// Condizioni di una regola: tutte quelle indicate devono valere. Dentro una
+/// condizione basta una delle parole (come "oppure" in Outlook).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RuleConditions {
+    /// Nome o indirizzo del mittente.
+    #[serde(default)]
+    pub from: Vec<String>,
+    /// Nome o indirizzo di un destinatario (A o Cc).
+    #[serde(default)]
+    pub to: Vec<String>,
+    #[serde(default)]
+    pub subject: Vec<String>,
+    /// Oggetto o testo del messaggio.
+    #[serde(default)]
+    pub words: Vec<String>,
+    #[serde(default)]
+    pub has_attachments: bool,
+}
+
+impl RuleConditions {
+    pub fn is_empty(&self) -> bool {
+        let none = |v: &Vec<String>| v.iter().all(|w| w.trim().is_empty());
+        none(&self.from) && none(&self.to) && none(&self.subject) && none(&self.words) && !self.has_attachments
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RuleActions {
+    /// Cartella in cui spostare il messaggio.
+    #[serde(default)]
+    pub move_to: Option<i64>,
+    #[serde(default)]
+    pub delete: bool,
+    #[serde(default)]
+    pub mark_read: bool,
+    #[serde(default)]
+    pub flag: bool,
+    #[serde(default)]
+    pub category: Option<String>,
+    /// Avviso sul desktop anche se il messaggio finisce fuori dalla posta in arrivo.
+    #[serde(default)]
+    pub alert: bool,
+    /// Non applicare le regole successive.
+    #[serde(default)]
+    pub stop: bool,
+}
+
+/// Regola sui messaggi in arrivo, come "Regole e avvisi" di Outlook.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Rule {
+    #[serde(default)]
+    pub id: String,
+    pub name: String,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    /// Solo per questo account; senza, per tutti.
+    #[serde(default)]
+    pub account_id: Option<String>,
+    #[serde(default)]
+    pub when: RuleConditions,
+    #[serde(default)]
+    pub then: RuleActions,
+}
+
+fn yes() -> bool {
+    true
 }
 
 /// Firma da mettere in fondo ai messaggi. Le firme valgono per tutti gli
@@ -346,6 +450,16 @@ pub struct OutboxItem {
     pub send_after: i64,
 }
 
+/// Spazio occupato da una cartella (Pulizia cassetta postale).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderUsage {
+    pub folder_id: i64,
+    pub count: i64,
+    /// Byte.
+    pub size: i64,
+}
+
 /// Notifiche dal motore all'interfaccia.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -365,6 +479,11 @@ pub enum Event {
     Signatures,
     /// Le categorie sono cambiate.
     Categories,
+    /// Messaggi appena arrivati, per l'avviso sul desktop (al massimo 5).
+    #[serde(rename_all = "camelCase")]
+    NewMail { account_id: String, count: u32, messages: Vec<MessageSummary> },
+    /// Le regole sono cambiate.
+    Rules,
 }
 
 pub fn now_secs() -> i64 {

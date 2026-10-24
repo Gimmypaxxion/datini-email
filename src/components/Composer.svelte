@@ -6,6 +6,7 @@
   import Icon from '../lib/Icon.svelte';
   import RichEditor from './RichEditor.svelte';
   import LinkDialog from './LinkDialog.svelte';
+  import SchedulePicker from './SchedulePicker.svelte';
   import { store, type RecipientField } from '../lib/store.svelte';
   import { composeEditor, fontStack } from '../lib/editor.svelte';
   import { textToHtml } from '../lib/compose-html';
@@ -16,6 +17,8 @@
 
   const c = $derived(store.c!);
   const sendPos = $derived(store.prefs.ribbon === 'estesa' ? 'sinistra' : 'alto');
+  let schedBtn: HTMLButtonElement | undefined = $state();
+  let schedOpen = $state(false);
   const senders = $derived(store.accounts.filter((a) => store.canSend(a)));
   const uid = Math.random().toString(36).slice(2, 8);
 
@@ -133,7 +136,15 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="composer" onkeydown={onKey}>
   <div class="cmp-h" data-send={sendPos} style:padding-right={inset ? `${inset}px` : undefined}>
-    <button class="primary cmp-send" onclick={() => store.send()} disabled={store.sending} title="Invia (Ctrl+Invio)"><Icon name="send" size={20} />Invia</button>
+    {#if sendPos === 'alto'}
+      <div class="cmp-split">
+        <button class="primary cmp-send" onclick={() => store.send()} disabled={store.sending} title="Invia (Ctrl+Invio)"><Icon name="send" size={20} />Invia</button>
+        <button class="primary cmp-send-x" bind:this={schedBtn} onclick={() => (schedOpen = !schedOpen)} disabled={store.sending} aria-label="Pianifica invio" title="Pianifica invio" aria-haspopup="dialog" aria-expanded={schedOpen}><Icon name="chevron-down" size={16} /></button>
+      </div>
+      {#if schedOpen && schedBtn}<SchedulePicker anchor={schedBtn} onclose={() => (schedOpen = false)} />{/if}
+    {:else}
+      <button class="primary cmp-send" onclick={() => store.send()} disabled={store.sending} title="Invia (Ctrl+Invio)"><Icon name="send" size={20} />Invia</button>
+    {/if}
     <div style="min-width:0">
       {#if senders.length > 1}
         <div class="field">

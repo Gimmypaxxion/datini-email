@@ -9,15 +9,17 @@
   import Icon from '../lib/Icon.svelte';
   import Menu, { type MenuItem } from './Menu.svelte';
   import Popover from './Popover.svelte';
+  import SchedulePicker from './SchedulePicker.svelte';
   import type { IconName } from '../lib/icons';
   import { store } from '../lib/store.svelte';
   import { FONTS, HIGHLIGHTS, SIZES, STANDARD_COLORS, THEME_COLORS, composeEditor as ed, fontStack } from '../lib/editor.svelte';
 
   let { tab }: { tab: 'messaggio' | 'inserisci' | 'formato' } = $props();
-  const SOON = 'Arriverà in una prossima versione';
 
   type PopKind = 'font' | 'size' | 'color' | 'hl' | 'table' | 'sig' | 'case' | 'spacing';
   let pop = $state<{ kind: PopKind; anchor: HTMLElement } | null>(null);
+  let schedOpen = $state(false);
+  let schedEl = $state<HTMLElement | null>(null);
   let hover = $state({ r: 0, c: 0 });
   let imgInput: HTMLInputElement | undefined = $state();
   let colorInput: HTMLInputElement | undefined = $state();
@@ -158,7 +160,7 @@
   </div><span class="rgl">Includi</span></div>
 
   <div class="rg only-e"><div class="rgb">
-    <RB big icon="clock" tone="c-brand" label="Invio programmato" title={SOON} disabled />
+    <RB big menu icon="clock" tone="c-brand" label="Invio programmato" title="Ritarda il recapito: scegli quando inviare" disabled={!store.c} pressed={schedOpen} onclick={(e) => { schedEl = e.currentTarget as HTMLElement; schedOpen = !schedOpen; }} />
   </div><span class="rgl">Invio</span></div>
 {:else if tab === 'formato'}
   {@render clipboardGroup()}
@@ -301,6 +303,10 @@
       </div>
     {/if}
   </Popover>
+{/if}
+
+{#if schedOpen && schedEl}
+  <SchedulePicker anchor={schedEl} onclose={() => (schedOpen = false)} />
 {/if}
 
 <style>

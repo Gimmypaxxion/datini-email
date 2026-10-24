@@ -3,6 +3,9 @@
   // risposta (firme e carattere), Informazioni su Better-Look.
   import Icon from '../lib/Icon.svelte';
   import About from './About.svelte';
+  import RulesPage from './RulesPage.svelte';
+  import AutoReplyPage from './AutoReplyPage.svelte';
+  import CleanupPage from './CleanupPage.svelte';
   import RichEditor from './RichEditor.svelte';
   import LinkDialog from './LinkDialog.svelte';
   import Popover from './Popover.svelte';
@@ -78,6 +81,9 @@
     ['account', 'Account e sincronizzazione'],
     ['composizione', 'Composizione e risposta'],
     ['categorie', 'Categorie'],
+    ['regole', 'Regole e avvisi'],
+    ['risposte', 'Risposte automatiche'],
+    ['pulizia', 'Pulizia cassetta postale'],
     ['info', 'Informazioni su Better-Look'],
   ] as const;
 
@@ -584,6 +590,12 @@
               </div>
             </Popover>
           {/if}
+        {:else if store.setPage === 'regole'}
+          <RulesPage />
+        {:else if store.setPage === 'risposte'}
+          <AutoReplyPage />
+        {:else if store.setPage === 'pulizia'}
+          <CleanupPage />
         {:else}
           <h3>Informazioni su Better-Look</h3>
           <div style="margin-top:30px"><About /></div>

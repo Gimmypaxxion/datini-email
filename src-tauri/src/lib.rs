@@ -17,6 +17,7 @@ pub mod net;
 pub mod pop3;
 pub mod pst;
 pub mod rtf;
+pub mod rules;
 pub mod sanitize;
 pub mod secrets;
 pub mod smtp;
@@ -39,6 +40,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let dir = match std::env::var_os("BETTERLOOK_DATI") {
                 Some(d) => std::path::PathBuf::from(d),
@@ -105,6 +107,14 @@ pub fn run() {
             commands::open_draft,
             commands::send,
             commands::cancel_send,
+            commands::send_later,
+            commands::rules,
+            commands::save_rules,
+            commands::run_rules,
+            commands::set_auto_reply,
+            commands::mailbox_usage,
+            commands::large_messages,
+            commands::older_messages,
             commands::outbox,
             commands::outbox_take,
             commands::sync_now,
