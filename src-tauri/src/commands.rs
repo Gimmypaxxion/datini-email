@@ -94,6 +94,26 @@ pub async fn quote_html(e: E<'_>, id: i64) -> Result<String> {
     e.quote_html(id).await
 }
 
+#[tauri::command]
+pub fn search_folders(e: E<'_>) -> Result<Vec<SearchFolder>> {
+    e.search_folders()
+}
+
+#[tauri::command]
+pub fn save_search_folder(e: E<'_>, folder: SearchFolder) -> Result<SearchFolder> {
+    e.save_search_folder(folder)
+}
+
+#[tauri::command]
+pub fn delete_search_folder(e: E<'_>, id: String) -> Result<()> {
+    e.delete_search_folder(&id)
+}
+
+#[tauri::command]
+pub fn search_folder_messages(e: E<'_>, id: String) -> Result<Vec<MessageSummary>> {
+    e.search_folder_messages(&id)
+}
+
 /// Invia la conferma di lettura chiesta dal mittente.
 #[tauri::command]
 pub async fn send_read_receipt(e: E<'_>, id: i64, automatic: bool) -> Result<bool> {

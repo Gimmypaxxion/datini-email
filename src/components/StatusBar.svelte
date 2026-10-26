@@ -23,11 +23,13 @@
         {tk.query.trim() ? 'Risultati' : 'Da fare'}: {tk.shown.open.length}{#if tk.shown.done.length}<span class="gap"></span>Completate: {tk.shown.done.length}{/if}
       {/if}
     {:else if store.isMulti}
-      Selezionati: {store.multi.length} di {store.q.trim() ? store.list.length : (f?.total ?? store.list.length)}
+      Selezionati: {store.multi.length} di {store.crossFolder ? store.list.length : (f?.total ?? store.list.length)}
     {:else if store.q.trim()}
       Risultati: {store.list.length}
     {:else if store.view === 'uscita'}
       In uscita: {store.outbox.length}
+    {:else if store.view === 'ricerca'}
+      Elementi: {store.list.length}{#if store.currentSearchFolder?.unread}<span class="gap"></span>Da leggere: {store.currentSearchFolder.unread}{/if}
     {:else if f}
       Elementi: {f.total}{#if f.unread}<span class="gap"></span>Da leggere: {f.unread}{/if}
     {/if}

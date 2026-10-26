@@ -10,6 +10,7 @@
   import Onboarding from './components/Onboarding.svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
   import AccountWizard from './components/AccountWizard.svelte';
+  import SearchFolderDialog from './components/SearchFolderDialog.svelte';
   import StatusBar from './components/StatusBar.svelte';
   import ContactsView from './components/ContactsView.svelte';
   import CalendarView from './components/CalendarView.svelte';
@@ -92,6 +93,7 @@
   <Backstage />
   <Settings />
   <AccountWizard />
+  <SearchFolderDialog />
   <Onboarding />
   <EventEditor />
   <Reminders />

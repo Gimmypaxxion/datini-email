@@ -50,7 +50,10 @@ import {
   type MessageTemplate,
   type Importance,
   type ReceiptReply,
+  type SearchCriteria,
+  type SearchFolder,
 } from './types';
+import { emptyCriteria, presetOf, splitPeople, type SearchFolderKind } from './searchfolders';
 
 export type RibbonMode = 'estesa' | 'compatta';
 export type EntryMode = 'file' | 'ingranaggio';
@@ -116,6 +119,22 @@ interface LastSent {
 }
 
 /** Domanda di conferma prima di un'azione che non si può annullare. */
+/** La finestra Nuova cartella di ricerca, mentre la si compila. */
+export interface SearchFolderEdit {
+  /** Vuoto per una cartella nuova. */
+  id: string;
+  accountId: string;
+  kind: SearchFolderKind;
+  name: string;
+  /** L'utente ha scritto il nome: cambiando tipo non lo si tocca. */
+  nameTouched: boolean;
+  criteria: SearchCriteria;
+  /** Persone come le scrive l'utente, separate da punto e virgola. */
+  peopleText: string;
+  error: string;
+  busy: boolean;
+}
+
 export interface Confirm {
   title: string;
   text: string;
@@ -212,7 +231,12 @@ export class MailStore {
   // Navigazione
   folderId = $state<number | null>(null);
   folderSel = $state('');
-  view = $state<'cartella' | 'uscita'>('cartella');
+  view = $state<'cartella' | 'uscita' | 'ricerca'>('cartella');
+  /** Cartelle di ricerca e quella aperta (con la vista 'ricerca'). */
+  searchFolders = $state<SearchFolder[]>([]);
+  searchFolderId = $state<string | null>(null);
+  /** Finestra Nuova cartella di ricerca (o Modifica). */
+  sfEdit = $state<SearchFolderEdit | null>(null);
   tab = $state<Tab>('prio');
   q = $state('');
   list = $state<MessageSummary[]>([]);
@@ -428,7 +452,7 @@ export class MailStore {
       void this.backend.setBackground(this.background).catch(() => undefined);
       void this.backend.autostart(null).then((on) => (this.autoStart = on), () => undefined);
     }
-    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules(), this.reloadQuickSteps(), this.reloadTemplates()]);
+    await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules(), this.reloadQuickSteps(), this.reloadTemplates(), this.reloadSearchFolders()]);
     if (this.mode === 'principale') {
       if (this.persist) {
         this.cal.startReminders();
@@ -487,6 +511,9 @@ export class MailStore {
       case 'quickSteps':
         void this.reloadQuickSteps();
         break;
+      case 'searchFolders':
+        void this.reloadSearchFolders();
+        break;
       case 'templates':
         void this.reloadTemplates();
         break;
@@ -531,6 +558,7 @@ export class MailStore {
 
   async refresh() {
     await this.reloadFolders();
+    void this.reloadSearchFolders();
     await this.loadList(false);
     for (const key of Object.keys(this.threadOpen)) {
       const first = this.threadOpen[key][0];
@@ -556,7 +584,7 @@ export class MailStore {
   /** Da un altro modulo al messaggio, nella sua cartella. */
   async revealMessage(m: MessageSummary) {
     this.setModule('posta');
-    if (this.folderId !== m.folderId || this.q.trim()) await this.pickFolder(m.folderId, `acc-${m.folderId}`);
+    if (this.folderId !== m.folderId || this.crossFolder) await this.pickFolder(m.folderId, `acc-${m.folderId}`);
     if (this.findMsg(m.id)) await this.pickMsg(m.id);
   }
 
@@ -870,6 +898,127 @@ export class MailStore {
 
   // ---------- Modelli di messaggio ----------
 
+  async reloadSearchFolders() {
+    if (this.mode !== 'principale') return;
+    try {
+      this.searchFolders = await this.backend.searchFolders();
+    } catch {
+      return;
+    }
+    if (this.view === 'ricerca' && !this.currentSearchFolder) {
+      const inbox = this.defaultInbox();
+      if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
+    }
+  }
+
+  searchFoldersOf(accountId: string): SearchFolder[] {
+    return this.searchFolders.filter((f) => f.accountId === accountId).sort((a, b) => a.name.localeCompare(b.name, 'it'));
+  }
+
+  /**
+   * Nuova cartella di ricerca (Ctrl+Maiusc+P), oppure Modifica di una esistente.
+   * Con `text` parte dalla ricerca in corso: la ricerca salvata come cartella.
+   */
+  openSearchFolderDialog(opts: { accountId?: string; edit?: SearchFolder; text?: string } = {}) {
+    const mail = this.accounts.filter((a) => a.kind !== 'local');
+    const pickAcct = (id?: string) => (id && this.accounts.some((a) => a.id === id) ? id : (this.currentAccount?.kind !== 'local' && this.currentAccount?.id) || mail[0]?.id || this.accounts[0]?.id || '');
+    if (!this.accounts.length) {
+      this.openWizard(false);
+      return;
+    }
+    if (opts.edit) {
+      const f = opts.edit;
+      this.sfEdit = { id: f.id, accountId: f.accountId, kind: presetOf(f.kind).kind, name: f.name, nameTouched: true, criteria: { ...emptyCriteria(), ...$state.snapshot(f.criteria) }, peopleText: f.criteria.people.join('; '), error: '', busy: false };
+      return;
+    }
+    const text = opts.text?.trim();
+    const kind: SearchFolderKind = text ? 'parole' : 'da-leggere';
+    const p = presetOf(kind);
+    this.sfEdit = { id: '', accountId: pickAcct(opts.accountId), kind, name: text ? text.slice(0, 80) : p.name, nameTouched: !!text, criteria: { ...emptyCriteria(), ...p.criteria, text: text ?? '' }, peopleText: '', error: '', busy: false };
+  }
+
+  /** Nella finestra: un altro tipo di cartella di ricerca. */
+  pickSearchFolderKind(kind: SearchFolderKind) {
+    const e = this.sfEdit;
+    if (!e || e.kind === kind) return;
+    const p = presetOf(kind);
+    const keepText = kind === 'parole' || kind === 'personalizzata' ? e.criteria.text : '';
+    e.kind = kind;
+    e.criteria = { ...emptyCriteria(), ...p.criteria, text: keepText };
+    if (kind !== 'persone' && kind !== 'personalizzata') e.peopleText = '';
+    if (!e.nameTouched) e.name = p.name;
+    e.error = '';
+  }
+
+  /** Persone o parole scritte nella finestra: il nome proposto le segue finché non lo si cambia. */
+  setSearchFolderPeople(text: string) {
+    const e = this.sfEdit;
+    if (!e) return;
+    e.peopleText = text;
+    e.error = '';
+    if (!e.nameTouched && e.kind === 'persone') e.name = splitPeople(text).join(', ').slice(0, 80) || presetOf('persone').name;
+  }
+
+  setSearchFolderText(text: string) {
+    const e = this.sfEdit;
+    if (!e) return;
+    e.criteria.text = text;
+    e.error = '';
+    if (!e.nameTouched && e.kind === 'parole') e.name = text.trim().slice(0, 80) || presetOf('parole').name;
+  }
+
+  async saveSearchFolderDialog() {
+    const e = this.sfEdit;
+    if (!e || e.busy) return;
+    const people = splitPeople(e.peopleText);
+    e.busy = true;
+    e.error = '';
+    try {
+      const old = this.searchFolders.find((f) => f.id === e.id);
+      const saved = await this.backend.saveSearchFolder({ id: e.id, accountId: e.accountId, name: e.name, kind: e.kind, criteria: { ...$state.snapshot(e.criteria), people }, total: old?.total ?? 0, unread: old?.unread ?? 0 });
+      this.sfEdit = null;
+      const i = this.searchFolders.findIndex((f) => f.id === saved.id);
+      if (i >= 0) this.searchFolders[i] = saved;
+      else this.searchFolders = [...this.searchFolders, saved];
+      this.collapsed[`ricerca:${saved.accountId}`] = false;
+      this.collapsed[saved.accountId] = false;
+      this.save();
+      this.setModule('posta');
+      await this.pickSearchFolder(saved.id, `sf-${saved.id}`);
+    } catch (err) {
+      if (this.sfEdit === e) {
+        e.error = errorMessage(err);
+        e.busy = false;
+      }
+    }
+  }
+
+  async deleteSearchFolder(id: string) {
+    const f = this.searchFolders.find((x) => x.id === id);
+    if (!f) return;
+    const ok = await this.ask({ title: `Eliminare la cartella di ricerca “${f.name}”?`, text: 'I messaggi restano dove sono: si elimina solo la ricerca salvata.', ok: 'Elimina' });
+    if (!ok) return;
+    await this.act(async () => {
+      await this.backend.deleteSearchFolder(id);
+      this.searchFolders = this.searchFolders.filter((x) => x.id !== id);
+      if (this.searchFolderId === id && this.view === 'ricerca') {
+        const inbox = this.defaultInbox();
+        if (inbox) await this.pickFolder(inbox.id, `fav-${inbox.id}`);
+      }
+    });
+  }
+
+  /** Segna come letti i messaggi della cartella di ricerca. */
+  async markSearchFolderRead(id: string) {
+    await this.act(async () => {
+      const ids = (await this.backend.searchFolderMessages(id)).filter((m) => m.unread).map((m) => m.id);
+      if (!ids.length) return;
+      for (const m of this.list) if (ids.includes(m.id)) m.unread = false;
+      await this.backend.setFlags(ids, true, null);
+      this.scheduleRefresh();
+    });
+  }
+
   async reloadTemplates() {
     try {
       this.templates = await this.backend.templates();
@@ -1071,8 +1220,17 @@ export class MailStore {
   }
 
   get currentAccount(): Account | null {
-    const f = this.currentFolder;
-    return (f && this.accounts.find((a) => a.id === f.accountId)) || this.accounts[0] || null;
+    const id = this.view === 'ricerca' ? this.currentSearchFolder?.accountId : this.currentFolder?.accountId;
+    return (id && this.accounts.find((a) => a.id === id)) || this.accounts[0] || null;
+  }
+
+  get currentSearchFolder(): SearchFolder | null {
+    return this.searchFolders.find((f) => f.id === this.searchFolderId) ?? null;
+  }
+
+  /** L'elenco mostra messaggi di più cartelle: risultati della ricerca o cartella di ricerca. */
+  get crossFolder(): boolean {
+    return !!this.q.trim() || this.view === 'ricerca';
   }
 
   get isInbox(): boolean {
@@ -1150,6 +1308,7 @@ export class MailStore {
   get listTitle(): string {
     if (this.q.trim()) return 'Risultati della ricerca';
     if (this.view === 'uscita') return 'Posta in uscita';
+    if (this.view === 'ricerca') return this.currentSearchFolder?.name ?? 'Cartella di ricerca';
     return folderLabel(this.currentFolder);
   }
 
@@ -1187,6 +1346,22 @@ export class MailStore {
     this.detailError = '';
     await this.loadList(true);
     if (this.currentFolder?.role !== 'drafts' && this.list.length) await this.pickMsg(this.list[0].id);
+  }
+
+  async pickSearchFolder(id: string, selId: string) {
+    await this.stashPaneDraft();
+    this.multi = [];
+    this.fullRead = false;
+    this.view = 'ricerca';
+    this.searchFolderId = id;
+    this.folderSel = selId;
+    this.q = '';
+    this.err = '';
+    this.sel = null;
+    this.detail = null;
+    this.detailError = '';
+    await this.loadList(true);
+    if (this.list.length) await this.pickMsg(this.list[0].id);
   }
 
   async pickOutbox(selId: string) {
@@ -1257,11 +1432,19 @@ export class MailStore {
     try {
       let items: MessageSummary[];
       if (q) items = await this.backend.search(q, this.currentAccount?.id ?? null);
+      else if (this.view === 'ricerca') items = this.searchFolderId ? await this.backend.searchFolderMessages(this.searchFolderId) : [];
       else if (this.folderId === null) items = [];
       else items = await this.backend.messages(this.folderId, this.isInbox ? this.tab : null, 0, limit);
       if (token !== this.listToken) return;
+      // In una cartella di ricerca il messaggio aperto resta finché non se ne
+      // sceglie un altro, anche se non rispetta più le condizioni (per esempio
+      // appena letto in Posta da leggere), come in Outlook.
+      if (this.view === 'ricerca' && !q && !reset && this.sel !== null && !items.some((m) => m.id === this.sel)) {
+        const keep = this.list.find((m) => m.id === this.sel);
+        if (keep) items = [...items, keep].sort((a, b) => b.date - a.date || b.id - a.id);
+      }
       this.list = items;
-      this.listEnd = !!q || items.length < limit;
+      this.listEnd = this.crossFolder || items.length < limit;
       if (reset) this.multi = [];
       else if (this.multi.length) {
         const left = this.multi.filter((id) => items.some((m) => m.id === id));
@@ -1279,7 +1462,7 @@ export class MailStore {
   }
 
   async loadMore() {
-    if (this.listEnd || this.listLoading || this.q.trim() || this.folderId === null) return;
+    if (this.listEnd || this.listLoading || this.crossFolder || this.folderId === null) return;
     this.listLoading = true;
     const token = ++this.listToken;
     try {
@@ -1298,7 +1481,7 @@ export class MailStore {
     if (!m) return;
     if (this.multi.length) this.multi = [];
     if (this.speech !== 'off' && this.sel !== id) this.stopSpeech();
-    if (m.draft && this.currentFolder?.role === 'drafts' && !this.q.trim()) {
+    if (m.draft && this.currentFolder?.role === 'drafts' && !this.crossFolder) {
       await this.reopenDraft(m.id);
       return;
     }
@@ -1498,7 +1681,7 @@ export class MailStore {
 
   /** Archivia, posta indesiderata...: più messaggi insieme. */
   async moveMany(ids: number[], role: Role) {
-    if (!ids.length || (this.currentFolder?.role === role && !this.q.trim())) return;
+    if (!ids.length || (this.currentFolder?.role === role && !this.crossFolder)) return;
     this.dropFromList(ids);
     await this.act(() => this.backend.moveToRole(ids, role));
   }
@@ -1598,7 +1781,7 @@ export class MailStore {
   async moveMsg(id: number | null, role: Role) {
     if (id === null) return;
     const m = this.list.find((x) => x.id === id);
-    if (m && this.currentFolder?.role === role && !this.q.trim()) return;
+    if (m && this.currentFolder?.role === role && !this.crossFolder) return;
     this.dropFromList([id]);
     await this.act(() => this.backend.moveToRole([id], role));
   }
@@ -2874,6 +3057,24 @@ ${m.text}`.slice(0, 20_000);
       const o = this.cal.occs.find((x) => x.ev.id === 'ev3');
       if (v === 'riunione' && o) this.cal.edit = { ev: JSON.parse(JSON.stringify(o.ev)), meeting: true, series: false, original: o.ev, occ: o };
       else this.cal.newEvent({ start: this.cal.range.days[1] + 11 * 3_600_000 });
+    } else if (v === 'cartelle-ricerca' || v === 'cartella-ricerca-nuova' || v === 'cartella-ricerca-personalizzata') {
+      const base = { id: '', accountId: 'valli', total: 0, unread: 0 };
+      await this.backend.saveSearchFolder({ ...base, name: 'Posta da leggere', kind: 'da-leggere', criteria: { ...emptyCriteria(), unread: true } });
+      await this.backend.saveSearchFolder({ ...base, name: 'Posta contrassegnata', kind: 'contrassegnata', criteria: { ...emptyCriteria(), flagged: true } });
+      const p = await this.backend.saveSearchFolder({ ...base, name: 'Studio Orlandi', kind: 'persone', criteria: { ...emptyCriteria(), people: ['Davide Orlandi', 'Marco Ventura'] } });
+      await this.reloadSearchFolders();
+      await this.pickSearchFolder(p.id, `sf-${p.id}`);
+      if (v === 'cartella-ricerca-nuova') {
+        this.openSearchFolderDialog({ accountId: 'valli' });
+        this.pickSearchFolderKind('persone');
+        this.setSearchFolderPeople('Lucia Marchetti; tessuti');
+      } else if (v === 'cartella-ricerca-personalizzata') {
+        this.openSearchFolderDialog({ accountId: 'valli' });
+        this.pickSearchFolderKind('personalizzata');
+        Object.assign(this.sfEdit!.criteria, { unread: true, attachments: true, days: 30 });
+        this.sfEdit!.name = 'Allegati da leggere';
+        this.sfEdit!.nameTouched = true;
+      }
     } else if (v === 'priorita') {
       if (this.list.some((m) => m.id === 4)) await this.pickMsg(4);
     } else if (v === 'invito') {

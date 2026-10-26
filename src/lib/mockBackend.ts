@@ -9,6 +9,7 @@ import { addDays, isMine } from './calendar';
 import { textToHtml } from './compose-html';
 import { hasActions, ruleMatches } from './rules';
 import { contactName } from './contacts';
+import { matchesCriteria, presetOf } from './searchfolders';
 import type {
   Account,
   AutoReply,
@@ -37,6 +38,7 @@ import type {
   MessageTemplate,
   Task,
   TaskList,
+  SearchFolder,
 } from './types';
 
 export const UNDO_MS = 7000;
@@ -780,6 +782,53 @@ export class MockBackend implements Backend {
 
   async templates() {
     return clone(this.tpls);
+  }
+
+  // ---------- Cartelle di ricerca ----------
+
+  private sfolders: SearchFolder[] = [];
+
+  private sfHits(f: SearchFolder) {
+    const skip = new Set(this.folderList.filter((x) => x.accountId === f.accountId && (x.role === 'deleted' || x.role === 'junk' || x.role === 'drafts')).map((x) => x.id));
+    return this.msgs.filter((m) => m.accountId === f.accountId && !skip.has(m.folderId) && matchesCriteria({ ...summary(m), text: m.text, cc: m.cc }, f.criteria));
+  }
+
+  private sfCounted(f: SearchFolder): SearchFolder {
+    const hits = this.sfHits(f);
+    return { ...clone(f), total: hits.length, unread: hits.filter((m) => m.unread).length };
+  }
+
+  async searchFolders() {
+    return this.sfolders.filter((f) => this.accountsList.some((a) => a.id === f.accountId)).map((f) => this.sfCounted(f));
+  }
+
+  async saveSearchFolder(f: SearchFolder) {
+    const name = f.name.trim();
+    if (!name) throw err('utente', 'Dai un nome alla cartella di ricerca.');
+    if (!this.accountsList.some((a) => a.id === f.accountId)) throw err('utente', "Scegli l'account in cui cercare.");
+    const c = { ...clone(f.criteria), people: f.criteria.people.map((p) => p.trim()).filter(Boolean), text: f.criteria.text.trim() };
+    if (presetOf(f.kind).need === 'persone' && !c.people.length) throw err('utente', 'Scrivi almeno una persona: nome o indirizzo.');
+    if (presetOf(f.kind).need === 'parole' && !c.text) throw err('utente', 'Scrivi le parole da cercare.');
+    if (this.sfolders.some((x) => x.id !== f.id && x.accountId === f.accountId && x.name.toLowerCase() === name.toLowerCase())) throw err('utente', `Esiste già una cartella di ricerca «${name}».`);
+    const saved: SearchFolder = { ...clone(f), name, criteria: c, id: f.id || `cr-${this.nextId++}`, total: 0, unread: 0 };
+    const i = this.sfolders.findIndex((x) => x.id === saved.id);
+    if (i >= 0) this.sfolders[i] = saved;
+    else this.sfolders.push(saved);
+    this.emit({ type: 'searchFolders' });
+    return this.sfCounted(saved);
+  }
+
+  async deleteSearchFolder(id: string) {
+    this.sfolders = this.sfolders.filter((f) => f.id !== id);
+    this.emit({ type: 'searchFolders' });
+  }
+
+  async searchFolderMessages(id: string) {
+    const f = this.sfolders.find((x) => x.id === id);
+    if (!f) throw err('non-trovato', 'La cartella di ricerca non esiste più.');
+    return this.sfHits(f)
+      .sort((a, b) => b.date - a.date || b.id - a.id)
+      .map((m) => ({ ...this.withCount(m), folderName: this.folderList.find((x) => x.id === m.folderId)?.name ?? null }));
   }
 
   async saveTemplate(t: MessageTemplate) {

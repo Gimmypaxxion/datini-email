@@ -763,6 +763,49 @@ pub struct FolderUsage {
     pub size: i64,
 }
 
+/// Cartella di ricerca: una ricerca salvata che si apre come una cartella.
+/// Mostra i messaggi dell'account che rispettano tutte le condizioni, in
+/// tutte le cartelle tranne Bozze, Posta eliminata e Posta indesiderata.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchFolder {
+    #[serde(default)]
+    pub id: String,
+    pub account_id: String,
+    pub name: String,
+    /// Il tipo scelto alla creazione ("da-leggere", "persone"...), per l'interfaccia.
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub criteria: SearchCriteria,
+    /// Solo in uscita: messaggi trovati e quanti non letti.
+    #[serde(default)]
+    pub total: i64,
+    #[serde(default)]
+    pub unread: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SearchCriteria {
+    /// Parole da cercare nel testo, nell'oggetto e nelle persone (come la casella Cerca).
+    pub text: String,
+    /// Messaggi da o verso queste persone (nome o indirizzo, anche in parte).
+    pub people: Vec<String>,
+    pub unread: bool,
+    pub flagged: bool,
+    /// Priorità alta.
+    pub important: bool,
+    pub attachments: bool,
+    /// Con una categoria qualsiasi, o con quella indicata.
+    pub categorized: bool,
+    pub category: Option<String>,
+    /// Almeno questa dimensione, in KB.
+    pub min_kb: Option<i64>,
+    /// Arrivati negli ultimi giorni.
+    pub days: Option<i64>,
+}
+
 /// Notifiche dal motore all'interfaccia.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -796,6 +839,8 @@ pub enum Event {
     Templates,
     /// Le attività sono cambiate.
     Tasks,
+    /// Cartelle di ricerca aggiunte, cambiate o eliminate.
+    SearchFolders,
 }
 
 pub fn now_secs() -> i64 {

@@ -204,6 +204,8 @@ import ExclamationMark from '@tabler/icons-svelte/icons/exclamation-mark';
 import ArrowNarrowDown from '@tabler/icons-svelte/icons/arrow-narrow-down';
 import MailCheck from '@tabler/icons-svelte/icons/mail-check';
 import UserPlus from '@tabler/icons-svelte/icons/user-plus';
+import FolderSearch from '@tabler/icons-svelte/icons/folder-search';
+import Adjustments from '@tabler/icons-svelte/icons/adjustments';
 export const icons = {
   highlight: Highlight,
   palette: Palette,
@@ -407,6 +409,8 @@ export const icons = {
   'exclamation-mark': ExclamationMark,
   'arrow-narrow-down': ArrowNarrowDown,
   'mail-check': MailCheck,
+  'folder-search': FolderSearch,
+  adjustments: Adjustments,
 } as const;
 
 export type IconName = keyof typeof icons;

@@ -321,7 +321,42 @@ export type EngineEvent =
   | { type: 'calendar' }
   | { type: 'quickSteps' }
   | { type: 'templates' }
-  | { type: 'tasks' };
+  | { type: 'tasks' }
+  | { type: 'searchFolders' };
+
+// ---------- Cartelle di ricerca ----------
+
+export interface SearchCriteria {
+  /** Parole da cercare nel testo, nell'oggetto e nelle persone. */
+  text: string;
+  /** Messaggi da o verso queste persone (nome o indirizzo, anche in parte). */
+  people: string[];
+  unread: boolean;
+  flagged: boolean;
+  /** Priorità alta. */
+  important: boolean;
+  attachments: boolean;
+  /** Con una categoria qualsiasi, o con quella indicata. */
+  categorized: boolean;
+  category: string | null;
+  /** Almeno questa dimensione, in KB. */
+  minKb: number | null;
+  /** Arrivati negli ultimi giorni. */
+  days: number | null;
+}
+
+/** Ricerca salvata che si apre come una cartella. */
+export interface SearchFolder {
+  id: string;
+  accountId: string;
+  name: string;
+  /** Tipo scelto alla creazione: 'da-leggere', 'persone', 'personalizzata'... */
+  kind: string;
+  criteria: SearchCriteria;
+  /** Messaggi trovati e quanti non letti (calcolati dal motore). */
+  total: number;
+  unread: number;
+}
 
 // ---------- Azioni rapide e modelli ----------
 

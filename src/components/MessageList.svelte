@@ -29,8 +29,10 @@
   };
 
   const q = $derived(store.q.trim());
+  /** Messaggi di più cartelle: risultati della ricerca o cartella di ricerca. */
+  const cross = $derived(store.crossFolder);
   const role = $derived(store.currentFolder?.role ?? null);
-  const showRecipients = $derived(!q && (role === 'sent' || role === 'drafts'));
+  const showRecipients = $derived(!cross && (role === 'sent' || role === 'drafts'));
   const now = $derived(new Date(store.list.length ? Date.now() : 0));
   /** Una riga dell'elenco: un messaggio, o l'ultimo messaggio di una conversazione. */
   interface Row {
@@ -71,7 +73,9 @@
   const empty = $derived<[string, string]>(
     q
       ? ['Nessun risultato', `Nessun messaggio contiene “${q}”. Prova con un nome o con una parola dell’oggetto.`]
-      : !store.accounts.length
+      : store.view === 'ricerca'
+        ? ['Nessun messaggio', 'Per ora nessun messaggio rispetta le condizioni di questa cartella di ricerca. Si aggiorna da sola quando ne arrivano.']
+        : !store.accounts.length
         ? ['Nessun account', 'Aggiungi il tuo account di posta per vedere qui i messaggi.']
         : (role && EMPTY[role]) || ['Cartella vuota', 'Usa Sposta in per mettere qui i messaggi.'],
   );
@@ -194,7 +198,7 @@
         <span class="l3">
           {#if m.categories.length}{@render cats(m)}{/if}
           <span class="prev">
-            {#if q}<span class="in">{folderOf(m)}</span>{/if}
+            {#if cross}<span class="in">{folderOf(m)}</span>{/if}
             {#if m.draft}<span class="draft">[Bozza] </span>{/if}{m.preview}
           </span>
         </span>
@@ -277,7 +281,16 @@
       <button class="ibtn btn" style="margin-left:-6px" onclick={() => store.toggleFolders()} aria-label="Mostra riquadro cartelle" title="Mostra riquadro cartelle"><Icon name="menu-2" size={20} /></button>
     {/if}
     <h1>{store.listTitle}</h1>
-    {#if store.view === 'cartella'}
+    {#if q}
+      <button class="lbtn save-q" onclick={() => store.openSearchFolderDialog({ text: q })} title="Salva questa ricerca come cartella di ricerca, per ritrovarla nel riquadro delle cartelle">
+        <Icon name="folder-search" size={16} />Salva ricerca
+      </button>
+    {:else if store.view === 'ricerca' && store.currentSearchFolder}
+      {@const sf = store.currentSearchFolder}
+      <button class="ibtn btn" aria-label="Modifica cartella di ricerca" title="Modifica cartella di ricerca" onclick={() => store.openSearchFolderDialog({ edit: sf })}>
+        <Icon name="adjustments" />
+      </button>
+    {:else if store.view === 'cartella'}
       <button class="ibtn btn" aria-label="Aggiorna" title="Invia e ricevi (F9)" onclick={() => store.syncNow()}>
         <Icon name="refresh" class={store.syncing ? 'spin' : ''} />
       </button>
@@ -367,6 +380,8 @@
 <style>
   .pane-list { container: lista / inline-size; position: relative; width: var(--list-w, 420px); flex: none; min-height: 0; display: flex; flex-direction: column; margin: 0 0 10px; border-radius: 8px; background: var(--sheet); box-shadow: var(--sheet-shadow); overflow: hidden; }
   .head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 0 16px; }
+  .save-q { height: 30px; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 13.5px; font-weight: 600; }
+  .save-q:hover { background: var(--hover); }
   h1 { margin: 0; flex: 1; min-width: 0; font-size: 18px; font-weight: 600; line-height: 34px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .tabs { display: flex; gap: 18px; padding: 2px 16px 0; box-shadow: inset 0 -1px 0 var(--rule); }
   .tabs button { height: 34px; padding: 0 2px; border: 0; background: transparent; color: var(--ink-2); font-size: 14px; }

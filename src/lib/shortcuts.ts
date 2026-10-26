@@ -141,6 +141,12 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
     if (f) store.startNewFolder(f.accountId, f.id);
     return;
   }
+  if (ctrl && e.shiftKey && key === 'p') {
+    // Nuova cartella di ricerca, come in Outlook.
+    e.preventDefault();
+    store.openSearchFolderDialog();
+    return;
+  }
   if (ctrl && !e.shiftKey && key === 'p') {
     e.preventDefault();
     void store.printMsg();

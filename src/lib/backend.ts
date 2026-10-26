@@ -29,6 +29,7 @@ import type {
   MessageTemplate,
   Task,
   TaskList,
+  SearchFolder,
 } from './types';
 
 export type Tab = 'prio' | 'altre';
@@ -107,6 +108,12 @@ export interface Backend {
   quickSteps(): Promise<QuickStep[]>;
   saveQuickSteps(list: QuickStep[]): Promise<QuickStep[]>;
   templates(): Promise<MessageTemplate[]>;
+  /** Cartelle di ricerca, con i conteggi. */
+  searchFolders(): Promise<SearchFolder[]>;
+  /** Crea (senza id) o aggiorna una cartella di ricerca. */
+  saveSearchFolder(f: SearchFolder): Promise<SearchFolder>;
+  deleteSearchFolder(id: string): Promise<void>;
+  searchFolderMessages(id: string): Promise<MessageSummary[]>;
   saveTemplate(t: MessageTemplate): Promise<MessageTemplate>;
   deleteTemplate(id: string): Promise<void>;
   taskLists(): Promise<TaskList[]>;
@@ -353,6 +360,18 @@ export class TauriBackend implements Backend {
   }
   templates() {
     return this.call<MessageTemplate[]>('templates');
+  }
+  searchFolders() {
+    return this.call<SearchFolder[]>('search_folders');
+  }
+  saveSearchFolder(folder: SearchFolder) {
+    return this.call<SearchFolder>('save_search_folder', { folder });
+  }
+  deleteSearchFolder(id: string) {
+    return this.call<void>('delete_search_folder', { id });
+  }
+  searchFolderMessages(id: string) {
+    return this.call<MessageSummary[]>('search_folder_messages', { id });
   }
   saveTemplate(template: MessageTemplate) {
     return this.call<MessageTemplate>('save_template', { template });

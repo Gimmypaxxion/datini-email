@@ -964,6 +964,82 @@ impl Db {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Condizioni di una cartella di ricerca, in SQL con i loro parametri.
+    fn search_folder_where(account_id: &str, c: &SearchCriteria, now: i64) -> (String, Vec<rusqlite::types::Value>) {
+        use rusqlite::types::Value;
+        let mut w = String::from(
+            "account_id = ? AND draft = 0 AND (pending IS NULL OR pending != 'sending') \
+             AND folder_id IN (SELECT id FROM folders WHERE account_id = ? AND (role IS NULL OR role NOT IN ('deleted', 'junk', 'drafts')))",
+        );
+        let mut p: Vec<Value> = vec![Value::Text(account_id.into()), Value::Text(account_id.into())];
+        if c.unread {
+            w.push_str(" AND unread = 1");
+        }
+        if c.flagged {
+            w.push_str(" AND flagged = 1");
+        }
+        if c.important {
+            w.push_str(" AND importance = 1");
+        }
+        if c.attachments {
+            w.push_str(" AND has_atts = 1");
+        }
+        if let Some(kb) = c.min_kb.filter(|k| *k > 0) {
+            w.push_str(" AND size >= ?");
+            p.push(Value::Integer(kb * 1024));
+        }
+        if let Some(days) = c.days.filter(|d| *d > 0) {
+            w.push_str(" AND date >= ?");
+            p.push(Value::Integer(now - days * 86_400));
+        }
+        let category = c.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
+        if c.categorized || category.is_some() {
+            w.push_str(
+                " AND EXISTS (SELECT 1 FROM msg_categories WHERE mkey = CASE WHEN message_id IS NOT NULL AND message_id != '' \
+                 THEN 'm:' || message_id ELSE 'l:' || id END",
+            );
+            if let Some(cat) = category {
+                w.push_str(" AND category = ?");
+                p.push(Value::Text(cat.into()));
+            }
+            w.push(')');
+        }
+        let people: Vec<&str> = c.people.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        if !people.is_empty() {
+            let mut any = Vec::new();
+            for person in people {
+                let like = format!("%{}%", person.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
+                any.push("from_email LIKE ? ESCAPE '\\' OR from_name LIKE ? ESCAPE '\\' OR recipients LIKE ? ESCAPE '\\'");
+                for _ in 0..3 {
+                    p.push(Value::Text(like.clone()));
+                }
+            }
+            w.push_str(&format!(" AND ({})", any.join(" OR ")));
+        }
+        if let Some(q) = fts_query(&c.text) {
+            w.push_str(" AND id IN (SELECT rowid FROM search WHERE search MATCH ?)");
+            p.push(Value::Text(q));
+        }
+        (w, p)
+    }
+
+    /// Messaggi di una cartella di ricerca, dal più recente.
+    pub fn search_folder_messages(&self, account_id: &str, c: &SearchCriteria, now: i64, limit: i64) -> Result<Vec<MsgRow>> {
+        let (w, mut p) = Self::search_folder_where(account_id, c, now);
+        p.push(rusqlite::types::Value::Integer(limit));
+        let conn = self.conn();
+        let mut st = conn.prepare(&format!("SELECT {MSG_COLS} FROM messages WHERE {w} ORDER BY date DESC, id DESC LIMIT ?"))?;
+        let rows = st.query_map(rusqlite::params_from_iter(p), msg_from_row)?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Quanti messaggi ci sono in una cartella di ricerca, e quanti non letti.
+    pub fn search_folder_counts(&self, account_id: &str, c: &SearchCriteria, now: i64) -> Result<(i64, i64)> {
+        let (w, p) = Self::search_folder_where(account_id, c, now);
+        let conn = self.conn();
+        Ok(conn.query_row(&format!("SELECT COUNT(*), COALESCE(SUM(unread), 0) FROM messages WHERE {w}"), rusqlite::params_from_iter(p), |r| Ok((r.get(0)?, r.get(1)?)))?)
+    }
+
     /// UID dei messaggi del server presenti nella cartella.
     pub fn folder_uids(&self, folder_id: i64) -> Result<Vec<(i64, u32)>> {
         let c = self.conn();

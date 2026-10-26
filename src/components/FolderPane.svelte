@@ -2,12 +2,14 @@
   // Riquadro cartelle: Preferiti, poi le cartelle di ogni account e dei file
   // di dati, richiudibili, con i conteggi come in Outlook. Clic destro su una
   // cartella o sull'account: nuova cartella, rinomina, elimina, segna tutti
-  // come letti, svuota. I messaggi si trascinano sulle cartelle.
+  // come letti, svuota. I messaggi si trascinano sulle cartelle. Sotto ogni
+  // account le cartelle di ricerca, ricerche salvate che si aprono come cartelle.
   import Icon from '../lib/Icon.svelte';
   import type { IconName } from '../lib/icons';
   import Menu, { type MenuItem } from './Menu.svelte';
   import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
-  import type { Account, Folder, Role } from '../lib/types';
+  import type { Account, Folder, Role, SearchFolder } from '../lib/types';
+  import { describeCriteria, presetOf, searchFolderCount } from '../lib/searchfolders';
 
   const ICON: Record<Role, IconName> = {
     inbox: 'inbox',
@@ -53,6 +55,7 @@
   function folderMenu(f: Folder): MenuItem[] {
     const items: MenuItem[] = [
       { label: 'Nuova cartella', icon: 'folder-plus', onclick: () => store.startNewFolder(f.accountId, f.id) },
+      { label: 'Nuova cartella di ricerca…', icon: 'folder-search', keys: 'Ctrl+Maiusc+P', onclick: () => store.openSearchFolderDialog({ accountId: f.accountId }) },
       { label: 'Rinomina cartella', icon: 'pencil', keys: 'F2', disabled: !!f.role, onclick: () => store.startRenameFolder(f.id) },
       { label: 'Elimina cartella', icon: 'trash', disabled: !!f.role, onclick: () => store.deleteFolder(f.id) },
       { kind: 'sep', label: '' },
@@ -76,7 +79,47 @@
       x: e.clientX,
       y: e.clientY,
       label: `Account ${title(a)}`,
-      items: [{ label: 'Nuova cartella', icon: 'folder-plus', onclick: () => store.startNewFolder(a.id, null) }],
+      items: [
+        { label: 'Nuova cartella', icon: 'folder-plus', onclick: () => store.startNewFolder(a.id, null) },
+        ...(a.kind !== 'local' ? [{ label: 'Nuova cartella di ricerca…', icon: 'folder-search' as IconName, keys: 'Ctrl+Maiusc+P', onclick: () => store.openSearchFolderDialog({ accountId: a.id }) }] : []),
+      ],
+    };
+  }
+
+  function searchFolderMenu(f: SearchFolder): MenuItem[] {
+    return [
+      { label: 'Modifica cartella di ricerca…', icon: 'pencil', onclick: () => store.openSearchFolderDialog({ edit: f }) },
+      { label: 'Segna tutti come letti', icon: 'mail-opened', disabled: f.unread === 0, onclick: () => store.markSearchFolderRead(f.id) },
+      { kind: 'sep', label: '' },
+      { label: 'Nuova cartella di ricerca…', icon: 'folder-search', onclick: () => store.openSearchFolderDialog({ accountId: f.accountId }) },
+      { label: 'Elimina cartella di ricerca', icon: 'trash', onclick: () => store.deleteSearchFolder(f.id) },
+    ];
+  }
+
+  function openSearchFolderMenu(e: MouseEvent | KeyboardEvent, f: SearchFolder) {
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    const r = el.getBoundingClientRect();
+    const at = e instanceof MouseEvent ? { x: e.clientX, y: e.clientY } : { x: r.left + 24, y: r.bottom };
+    ctx = { el, ...at, items: searchFolderMenu(f), label: `Cartella di ricerca ${f.name}` };
+  }
+
+  function sfKey(e: KeyboardEvent, f: SearchFolder) {
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) openSearchFolderMenu(e, f);
+    else if (e.key === 'Delete') {
+      e.preventDefault();
+      void store.deleteSearchFolder(f.id);
+    }
+  }
+
+  function openSfNodeMenu(e: MouseEvent, a: Account) {
+    e.preventDefault();
+    ctx = {
+      el: e.currentTarget as HTMLElement,
+      x: e.clientX,
+      y: e.clientY,
+      label: 'Cartelle di ricerca',
+      items: [{ label: 'Nuova cartella di ricerca…', icon: 'folder-search', keys: 'Ctrl+Maiusc+P', onclick: () => store.openSearchFolderDialog({ accountId: a.id }) }],
     };
   }
 
@@ -229,6 +272,42 @@
           <span class="cnt" style:color="var(--brand-ink)">{out}</span>
         </button>
       {/if}
+      {#if a.kind !== 'local'}
+        {@const sfs = store.searchFoldersOf(a.id)}
+        {@const sfOpen = !store.collapsed[`ricerca:${a.id}`]}
+        <button class="btn fold sf-node" aria-expanded={sfOpen} onclick={() => store.toggleSection(`ricerca:${a.id}`)} oncontextmenu={(e) => openSfNodeMenu(e, a)} title="Ricerche salvate che si aprono come cartelle">
+          <Icon name={sfOpen ? 'chevron-down' : 'chevron-right'} size={14} stroke={1.8} />
+          <Icon name="folder-search" />
+          <span class="name">Cartelle di ricerca</span>
+        </button>
+        {#if sfOpen}
+          {#each sfs as f (f.id)}
+            {@const id = `sf-${f.id}`}
+            {@const on = store.folderSel === id}
+            {@const c = searchFolderCount(f)}
+            <button
+              class="btn fold"
+              data-sel={on ? 'si' : 'no'}
+              aria-current={on ? 'page' : undefined}
+              style:padding-left="44px"
+              title={describeCriteria(f.criteria, (cid) => store.category(cid)?.name ?? null)}
+              onclick={() => store.pickSearchFolder(f.id, id)}
+              oncontextmenu={(e) => openSearchFolderMenu(e, f)}
+              onkeydown={(e) => sfKey(e, f)}
+            >
+              <Icon name={presetOf(f.kind).icon} />
+              <span class="name" style:font-weight={on ? 600 : 400}>{f.name}</span>
+              {#if c.n}<span class="cnt" style:color={c.muted ? 'var(--ink-3)' : 'var(--brand-ink)'}>{c.n}</span>{/if}
+            </button>
+          {/each}
+          {#if !sfs.length}
+            <button class="btn fold sf-new" style:padding-left="44px" onclick={() => store.openSearchFolderDialog({ accountId: a.id })}>
+              <Icon name="plus" />
+              <span class="name">Nuova cartella di ricerca</span>
+            </button>
+          {/if}
+        {/if}
+      {/if}
     {/if}
   {/each}
 
@@ -257,5 +336,9 @@
   .edit input { flex: 1; min-width: 0; height: 28px; box-sizing: border-box; padding: 0 8px; border: 0; border-radius: 4px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--rule-2), inset 0 -2px 0 var(--brand); color: var(--ink); font: inherit; font-size: 14px; }
   .edit input:focus { outline: none; }
   .edit input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--danger), inset 0 -2px 0 var(--danger); }
+  .sf-node { padding-left: 8px; gap: 6px; color: var(--ink-2); }
+  .sf-node :global(svg.i + svg.i) { margin-right: 4px; }
+  .sf-new { color: var(--brand-ink); }
+  .sf-new :global(svg.i) { color: var(--brand-ink); }
   .err { margin: 2px 4px 6px; font-size: 12.5px; line-height: 1.4; color: var(--danger); }
 </style>

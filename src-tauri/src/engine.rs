@@ -27,6 +27,7 @@ use crate::utf7;
 mod agenda;
 mod conversations;
 mod quick;
+mod searchfolders;
 mod tasks;
 pub use agenda::InviteAction;
 
@@ -2076,6 +2077,52 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[tokio::test]
+    async fn search_folders_are_saved_searches() {
+        let s = setup();
+        let a = arrive(&s, 30, "Davide Orlandi <d.orlandi@studiorlandi.it>", "Preventivo urgente", "X-Priority: 1\r\n");
+        let b = arrive(&s, 31, "Studio Bassi <amministrazione@studiobassi.it>", "Fattura n. 418", "");
+        let c = arrive(&s, 32, "Lucia Marchetti <lucia@tessuti.example>", "Campionario", "");
+        s.eng.set_flags(&[b], Some(true), Some(true), None).unwrap();
+        s.eng.move_messages(&[c], s.suppliers).await.unwrap();
+
+        let unread = s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Posta da leggere".into(), kind: "da-leggere".into(), criteria: SearchCriteria { unread: true, ..Default::default() }, ..Default::default() }).unwrap();
+        assert!(unread.id.starts_with("cr-"));
+        assert_eq!((unread.total, unread.unread), (2, 2));
+        let ids: Vec<i64> = s.eng.search_folder_messages(&unread.id).unwrap().iter().map(|m| m.id).collect();
+        assert!(ids.contains(&a) && !ids.contains(&b), "{ids:?}");
+        let moved = s.eng.search_folder_messages(&unread.id).unwrap().into_iter().find(|m| m.subject == "Campionario").unwrap();
+        assert_eq!(moved.folder_name.as_deref(), Some("Fornitori"), "anche nelle altre cartelle, con il loro nome");
+
+        let people = s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Studio Orlandi".into(), kind: "persone".into(), criteria: SearchCriteria { people: vec!["  orlandi ".into()], ..Default::default() }, ..Default::default() }).unwrap();
+        assert_eq!(s.eng.search_folder_messages(&people.id).unwrap().iter().map(|m| m.id).collect::<Vec<_>>(), vec![a]);
+        let flagged = s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Contrassegnata".into(), criteria: SearchCriteria { flagged: true, ..Default::default() }, ..Default::default() }).unwrap();
+        assert_eq!((flagged.total, flagged.unread), (1, 0));
+        let words = s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Fatture".into(), kind: "parole".into(), criteria: SearchCriteria { text: "fattura".into(), ..Default::default() }, ..Default::default() }).unwrap();
+        assert_eq!(s.eng.search_folder_messages(&words.id).unwrap().iter().map(|m| m.id).collect::<Vec<_>>(), vec![b]);
+        let important = s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Importante".into(), criteria: SearchCriteria { important: true, unread: true, ..Default::default() }, ..Default::default() }).unwrap();
+        assert_eq!(important.total, 1);
+        // Un nome con caratteri speciali non rompe la ricerca.
+        let odd = s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Strano".into(), criteria: SearchCriteria { people: vec!["%_\\'".into()], ..Default::default() }, ..Default::default() }).unwrap();
+        assert_eq!(odd.total, 0);
+
+        // Controlli.
+        assert!(s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "posta da leggere".into(), ..Default::default() }).is_err());
+        assert!(s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: "Persone".into(), kind: "persone".into(), ..Default::default() }).is_err());
+        assert!(s.eng.save_search_folder(SearchFolder { account_id: "a1".into(), name: " ".into(), ..Default::default() }).is_err());
+        assert!(s.eng.save_search_folder(SearchFolder { account_id: "nessuno".into(), name: "X".into(), ..Default::default() }).is_err());
+
+        // Modifica e eliminazione.
+        let renamed = s.eng.save_search_folder(SearchFolder { name: "Da leggere".into(), ..unread.clone() }).unwrap();
+        assert_eq!(renamed.id, unread.id);
+        let list = s.eng.search_folders().unwrap();
+        assert_eq!(list.len(), 6);
+        assert_eq!(list[0].name, "Da leggere");
+        s.eng.delete_search_folder(&unread.id).unwrap();
+        assert_eq!(s.eng.search_folders().unwrap().len(), 5);
+        assert!(s.eng.search_folder_messages(&unread.id).is_err());
     }
 
     #[tokio::test]

@@ -419,3 +419,74 @@ describe('priorità e conferme', () => {
     expect(mock.receiptsSent.length).toBe(1);
   });
 });
+
+describe('cartelle di ricerca', () => {
+  it('crea, apre, modifica ed elimina una cartella di ricerca', async () => {
+    const s = await fresh();
+    s.openSearchFolderDialog({ accountId: 'valli' });
+    expect(s.sfEdit!.kind).toBe('da-leggere');
+    expect(s.sfEdit!.name).toBe('Posta da leggere');
+    s.pickSearchFolderKind('persone');
+    s.setSearchFolderPeople('Davide Orlandi; ventura');
+    expect(s.sfEdit!.name).toBe('Davide Orlandi, ventura');
+    await s.saveSearchFolderDialog();
+    expect(s.sfEdit).toBeNull();
+    expect(s.view).toBe('ricerca');
+    const sf = s.currentSearchFolder!;
+    expect(sf.criteria.people).toEqual(['Davide Orlandi', 'ventura']);
+    expect(s.listTitle).toBe('Davide Orlandi, ventura');
+    expect(s.list.length).toBeGreaterThan(1);
+    expect(s.list.every((m) => /Orlandi|Ventura/.test(`${m.from.name} ${m.to.map((p) => p.name).join(' ')}`))).toBe(true);
+    // Anche la posta inviata a quelle persone, con il nome della cartella.
+    expect(s.list.some((m) => m.folderName === 'Sent')).toBe(true);
+    expect(s.crossFolder).toBe(true);
+
+    // Persone mancanti: l'errore resta nella finestra.
+    s.openSearchFolderDialog({ accountId: 'valli' });
+    s.pickSearchFolderKind('persone');
+    await s.saveSearchFolderDialog();
+    expect(s.sfEdit?.error).toMatch(/almeno una persona/);
+    s.sfEdit = null;
+
+    // Modifica: diventa "da leggere".
+    s.openSearchFolderDialog({ edit: sf });
+    expect(s.sfEdit!.peopleText).toBe('Davide Orlandi; ventura');
+    s.sfEdit!.criteria.unread = true;
+    await s.saveSearchFolderDialog();
+    // Tutti da leggere, tranne quello appena aperto.
+    expect(s.list.filter((m) => m.id !== s.sel).every((m) => m.unread)).toBe(true);
+
+    s.ask = async () => true;
+    await s.deleteSearchFolder(sf.id);
+    expect(s.searchFolders).toEqual([]);
+    expect(s.view).toBe('cartella');
+  });
+
+  it('la ricerca in corso si salva come cartella', async () => {
+    const s = await fresh();
+    await s.search('preventivo');
+    s.openSearchFolderDialog({ text: s.q });
+    expect(s.sfEdit!.kind).toBe('parole');
+    expect(s.sfEdit!.criteria.text).toBe('preventivo');
+    expect(s.sfEdit!.name).toBe('preventivo');
+    await s.saveSearchFolderDialog();
+    expect(s.q).toBe('');
+    expect(s.list.length).toBeGreaterThan(0);
+    expect(s.list.every((m) => /preventiv/i.test(`${m.subject} ${m.preview}`))).toBe(true);
+  });
+
+  it('il messaggio aperto resta nella cartella Posta da leggere finché se ne sceglie un altro', async () => {
+    const s = await fresh();
+    s.openSearchFolderDialog({ accountId: 'valli' });
+    await s.saveSearchFolderDialog();
+    const first = s.sel!;
+    expect(first).not.toBeNull();
+    await s.refresh();
+    expect(s.list.some((m) => m.id === first)).toBe(true);
+    expect(s.list.find((m) => m.id === first)!.unread).toBe(false);
+    const next = s.list.find((m) => m.id !== first)!;
+    await s.pickMsg(next.id);
+    await s.refresh();
+    expect(s.list.some((m) => m.id === first)).toBe(false);
+  });
+});
