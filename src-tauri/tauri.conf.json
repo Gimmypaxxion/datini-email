@@ -19,6 +19,7 @@
         "minWidth": 960,
         "minHeight": 600,
         "center": true,
+        "visible": false,
         "dragDropEnabled": false
       }
     ],
@@ -51,6 +52,18 @@
           "English"
         ],
         "displayLanguageSelector": false
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libayatana-appindicator3-1"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "libayatana-appindicator-gtk3"
+        ]
       }
     }
   }

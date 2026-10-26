@@ -25,9 +25,14 @@ pub mod secrets;
 pub mod smtp;
 pub mod utf7;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use tauri::{Emitter, Manager};
+use tauri::image::Image;
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, WindowEvent};
+use tauri_plugin_autostart::MacosLauncher;
 
 use crate::db::Db;
 use crate::engine::Engine;
@@ -36,10 +41,101 @@ use crate::secrets::{Keyring, Memory, Secrets};
 /// Nome del file dell'archivio nella cartella dei dati.
 const DB_FILE: &str = "better-look.db";
 
+/// Argomento con cui il sistema avvia Better-Look all'accensione: parte in sottofondo, senza finestra.
+pub const BACKGROUND_ARG: &str = "--sottofondo";
+
+/// Identificativo dell'icona vicino all'orologio.
+pub const TRAY_ID: &str = "principale";
+
+/// Chiudendo la finestra principale Better-Look resta attivo in sottofondo
+/// (regole, risposte automatiche, invio programmato e promemoria continuano).
+pub struct Background(pub AtomicBool);
+
+/// L'icona vicino all'orologio c'è: senza, la finestra chiusa si riduce a icona invece di sparire.
+pub struct TrayReady(pub AtomicBool);
+
+/// Su Linux l'icona richiede la libreria AppIndicator: se manca, il sistema
+/// interromperebbe il programma, quindi prima si controlla che ci sia.
+fn tray_supported() -> bool {
+    if !cfg!(target_os = "linux") {
+        return true;
+    }
+    let names = ["libayatana-appindicator3.so.1", "libappindicator3.so.1"];
+    let mut dirs: Vec<std::path::PathBuf> = ["/usr/lib", "/usr/lib64", "/usr/lib/x86_64-linux-gnu", "/usr/lib/aarch64-linux-gnu", "/lib/x86_64-linux-gnu", "/usr/local/lib"].iter().map(std::path::PathBuf::from).collect();
+    for var in ["LD_LIBRARY_PATH", "APPDIR"] {
+        if let Some(v) = std::env::var_os(var) {
+            for d in std::env::split_paths(&v) {
+                dirs.push(d.join("usr/lib"));
+                dirs.push(d);
+            }
+        }
+    }
+    dirs.iter().any(|d| names.iter().any(|n| d.join(n).exists()))
+}
+
+impl Default for Background {
+    fn default() -> Self {
+        Background(AtomicBool::new(true))
+    }
+}
+
+/// Mostra la finestra principale (dall'icona, dal Dock o da un secondo avvio).
+pub fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// Icona vicino all'orologio (sul Mac nella barra dei menu) con il suo menu.
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    let open = MenuItem::with_id(app, "apri", "Apri Better-Look", true, None::<&str>)?;
+    let new = MenuItem::with_id(app, "nuovo", "Nuovo messaggio", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "esci", "Esci da Better-Look", true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(app, &[&open, &new, &sep, &quit])?;
+    // Sul Mac un'icona monocromatica, che il sistema colora come le altre della barra.
+    let icon = if cfg!(target_os = "macos") {
+        Image::from_bytes(include_bytes!("../icons/tray-template.png"))?
+    } else {
+        match app.default_window_icon() {
+            Some(i) => i.clone(),
+            None => Image::from_bytes(include_bytes!("../icons/32x32.png"))?,
+        }
+    };
+    TrayIconBuilder::with_id(TRAY_ID)
+        .icon(icon)
+        .icon_as_template(cfg!(target_os = "macos"))
+        .tooltip("Better-Look")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, e| match e.id().as_ref() {
+            "apri" => show_main(app),
+            "nuovo" => {
+                show_main(app);
+                let _ = app.emit("better-look://comando", "nuovo-messaggio");
+            }
+            "esci" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, e| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                show_main(tray.app_handle());
+            }
+        })
+        .build(app)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     net::install_crypto();
     tauri::Builder::default()
+        // Un secondo avvio (dal menu Start, dal Dock, dall'avvio automatico)
+        // non apre un altro programma sullo stesso archivio: mostra la finestra.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![BACKGROUND_ARG])))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -71,11 +167,36 @@ pub fn run() {
             app.manage(engine.clone());
             app.manage(commands::ComposeWindows::default());
             app.manage(commands::Speech::default());
+            app.manage(Background::default());
             tauri::async_runtime::spawn(async move { engine.start() });
+            let tray = tray_supported() && build_tray(app).map_err(|e| log::warn!("icona vicino all'orologio non disponibile: {e}")).is_ok();
+            app.manage(TrayReady(AtomicBool::new(tray)));
+            // All'accensione del computer parte senza finestra; altrimenti la mostra.
+            if !std::env::args().any(|a| a == BACKGROUND_ARG) {
+                show_main(app.handle());
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let app = window.app_handle();
+                let keep = app.state::<Background>().0.load(Ordering::Relaxed);
+                if window.label() == "main" && keep {
+                    api.prevent_close();
+                    if app.state::<TrayReady>().0.load(Ordering::Relaxed) {
+                        let _ = window.hide();
+                        let _ = app.emit("better-look://comando", "nascosta");
+                    } else {
+                        // Senza icona la finestra resta nella barra delle applicazioni.
+                        let _ = window.minimize();
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::quit_app,
+            commands::set_background,
+            commands::autostart,
             commands::accounts,
             commands::add_account,
             commands::update_account,
@@ -164,6 +285,13 @@ pub fn run() {
             pst::import_pst,
             pst::import_mbox,
         ])
-        .run(tauri::generate_context!())
-        .expect("errore durante l'avvio di Better-Look");
+        .build(tauri::generate_context!())
+        .expect("errore durante l'avvio di Better-Look")
+        .run(|_app, _event| {
+            // Sul Mac il clic sull'icona nel Dock riapre la finestra nascosta.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                show_main(_app);
+            }
+        });
 }

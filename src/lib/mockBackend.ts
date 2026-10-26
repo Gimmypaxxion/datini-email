@@ -168,6 +168,23 @@ export class MockBackend implements Backend {
     return () => this.listeners.delete(cb);
   }
 
+  onCommand() {
+    return () => {};
+  }
+
+  /** Nell'anteprima nel browser non c'è sottofondo né avvio automatico: si ricorda solo la scelta. */
+  background = true;
+  private autoOn = false;
+
+  async setBackground(on: boolean) {
+    this.background = on;
+  }
+
+  async autostart(on: boolean | null) {
+    if (on !== null) this.autoOn = on;
+    return this.autoOn;
+  }
+
   async accounts() {
     return this.accountsList.map((a) => ({ ...a }));
   }

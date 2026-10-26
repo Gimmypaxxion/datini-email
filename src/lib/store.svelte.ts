@@ -6,7 +6,7 @@
 import type { Backend, Tab } from './backend';
 import { TauriBackend } from './backend';
 import { MockBackend } from './mockBackend';
-import { inTauri } from './platform';
+import { inTauri, isMac } from './platform';
 import { DEFAULT_ACCENT, normalizeHex } from './accent';
 import { addPlainSignature, hasQuote, htmlToText, newMessageHtml, ownHtml, plainFromHtml, replaceSignature, replyHtml, textToHtml } from './compose-html';
 import { checkQuickSteps, emptyQuickStep, runOrder } from './quicksteps';
@@ -61,7 +61,7 @@ export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
 /** Parte del programma mostrata: posta, calendario, contatti, attività (Ctrl+1, 2, 3, 4). */
 export type AppModule = 'posta' | 'calendario' | 'contatti' | 'attivita';
-export type SettingsPage = 'aspetto' | 'account' | 'composizione' | 'modelli' | 'categorie' | 'regole' | 'azioni' | 'risposte' | 'pulizia' | 'info';
+export type SettingsPage = 'aspetto' | 'avvio' | 'account' | 'composizione' | 'modelli' | 'categorie' | 'regole' | 'azioni' | 'risposte' | 'pulizia' | 'info';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -98,6 +98,7 @@ export function sortFolders(list: Folder[]): Folder[] {
 }
 
 const PAGE = 300;
+const HIDDEN_HINT_KEY = 'better-look-avviso-sottofondo';
 const AUTOSAVE_MS = 2500;
 
 export interface Toast {
@@ -165,6 +166,8 @@ interface Saved {
   listH?: number;
   /** Elenco aperto nel modulo Attività. */
   tasksView?: string;
+  /** Chiudendo la finestra Better-Look resta attivo in sottofondo. */
+  background?: boolean;
 }
 
 /** Misure predefinite dell'elenco dei messaggi. */
@@ -237,6 +240,9 @@ export class MailStore {
   readingPane = $state<ReadingPanePos>('destra');
   /** Visualizza › Densità. */
   density = $state<Density>('media');
+  /** Chiudendo la finestra resta attivo in sottofondo; avvio all'accensione del computer. */
+  background = $state(true);
+  autoStart = $state(false);
   /** Misure dell'elenco, cambiate trascinando il separatore. */
   listW = $state(LIST_W);
   listH = $state(LIST_H);
@@ -336,6 +342,7 @@ export class MailStore {
         if (saved.density === 'ampia' || saved.density === 'media' || saved.density === 'compatta') this.density = saved.density;
         if (typeof saved.listW === 'number' && saved.listW >= 280 && saved.listW <= 1600) this.listW = Math.round(saved.listW);
         if (typeof saved.listH === 'number' && saved.listH >= 0.2 && saved.listH <= 0.75) this.listH = saved.listH;
+        if (typeof saved.background === 'boolean') this.background = saved.background;
         if (typeof saved.tasksView === 'string' && /^(giornata|importanti|pianificate|attivita|contrassegnati|elenco:[\w-]+)$/.test(saved.tasksView)) this.tasks.view = saved.tasksView as TaskView;
       }
     }
@@ -381,6 +388,7 @@ export class MailStore {
       listW: this.listW,
       listH: this.listH,
       tasksView: this.tasks.view,
+      background: this.background,
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -393,7 +401,16 @@ export class MailStore {
 
   async init() {
     this.unsubscribe?.();
-    this.unsubscribe = this.backend.onEvent((e) => this.onEvent(e));
+    const stopEvents = this.backend.onEvent((e) => this.onEvent(e));
+    const stopCommands = this.mode === 'principale' ? this.backend.onCommand((c) => void this.onCommand(c)) : () => {};
+    this.unsubscribe = () => {
+      stopEvents();
+      stopCommands();
+    };
+    if (this.mode === 'principale') {
+      void this.backend.setBackground(this.background).catch(() => undefined);
+      void this.backend.autostart(null).then((on) => (this.autoStart = on), () => undefined);
+    }
     await Promise.all([this.reloadAccounts(), this.reloadFolders(), this.reloadOutbox(), this.reloadSignatures(), this.reloadCategories(), this.reloadRules(), this.reloadQuickSteps(), this.reloadTemplates()]);
     if (this.mode === 'principale') {
       if (this.persist) {
@@ -1306,6 +1323,47 @@ export class MailStore {
   private bumpFolder(folderId: number, delta: number) {
     const f = this.folders.find((x) => x.id === folderId);
     if (f) f.unread = Math.max(0, f.unread + delta);
+  }
+
+  // ---------- Sottofondo e avvio ----------
+
+  /** Comandi dall'icona vicino all'orologio, e la finestra appena nascosta. */
+  private async onCommand(c: string) {
+    if (c === 'nuovo-messaggio') {
+      this.setModule('posta');
+      await this.openCompose('new');
+    } else if (c === 'nascosta') {
+      // La prima volta si spiega dove è finito il programma.
+      let told = false;
+      try {
+        told = globalThis.localStorage?.getItem(HIDDEN_HINT_KEY) === '1';
+        globalThis.localStorage?.setItem(HIDDEN_HINT_KEY, '1');
+      } catch {
+        /* senza archivio si avvisa ogni volta */
+      }
+      if (!told) {
+        const where = isMac ? 'nella barra dei menu in alto o nel Dock' : 'vicino all’orologio';
+        void this.backend.notify('Better-Look è ancora attivo', `Continua a ricevere la posta e a ricordarti gli appuntamenti. Lo riapri dall’icona ${where}; per chiuderlo davvero scegli Esci.`);
+      }
+    }
+  }
+
+  async setBackground(on: boolean) {
+    this.background = on;
+    this.save();
+    try {
+      await this.backend.setBackground(on);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  async setAutoStart(on: boolean) {
+    try {
+      this.autoStart = await this.backend.autostart(on);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
   }
 
   // ---------- Selezione multipla ----------
@@ -2765,6 +2823,12 @@ ${m.text}`.slice(0, 20_000);
       this.openSettings('azioni');
     } else if (v === 'modelli') {
       this.openSettings('modelli');
+    } else if (v === 'selezione') {
+      const ids = this.list.slice(1, 4).map((m) => m.id);
+      if (ids.length) {
+        await this.clickMsg(ids[0]);
+        await this.clickMsg(ids[ids.length - 1], { shift: true });
+      }
     } else if (v === 'lettura-basso' || v === 'lettura-nascosto') {
       this.readingPane = v === 'lettura-basso' ? 'basso' : 'nascosto';
     } else if (v === 'lettura-piena') {

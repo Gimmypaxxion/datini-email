@@ -14,6 +14,7 @@
   import { store, type Prefs, type ThemeChoice } from '../lib/store.svelte';
   import { EditorCtl, FONTS, SIZES, fontStack } from '../lib/editor.svelte';
   import { ACCENT_SWATCHES, DEFAULT_ACCENT, accentPalette, accentShift, normalizeHex, readableOn } from '../lib/accent';
+  import { isMac } from '../lib/platform';
   import { CATEGORY_COLORS, type Category, type CategoryColor, type ServerConfig, type Signature, type SyncOptions } from '../lib/types';
 
   interface Opt {
@@ -35,6 +36,12 @@
   function themeOpt(v: ThemeChoice, title: string, text: string): Opt {
     return { on: store.themeChoice === v, title, text, pick: () => store.setTheme(v) };
   }
+
+  const where = isMac ? 'dall’icona nella barra dei menu o dal Dock' : 'dall’icona vicino all’orologio';
+  const closeCards = $derived<Opt[]>([
+    { on: store.background, title: 'Resta attivo in sottofondo', text: `Ricevi la posta e restano attivi regole, risposte automatiche, invio programmato e promemoria. Lo riapri ${where}.`, pick: () => store.setBackground(true) },
+    { on: !store.background, title: 'Esci dal programma', text: 'Si chiude tutto: regole, risposte automatiche, invio programmato e promemoria riprendono alla prossima apertura.', pick: () => store.setBackground(false) },
+  ]);
 
   const presetCards = $derived<Opt[]>([
     { on: store.presetName === 'classico', title: 'Outlook classico', text: 'Barra estesa, menu File e nuovi messaggi in una finestra separata.', pick: () => store.applyPreset('classico') },
@@ -103,6 +110,7 @@
 
   const nav = [
     ['aspetto', 'Aspetto'],
+    ['avvio', 'Avvio e chiusura'],
     ['account', 'Account e sincronizzazione'],
     ['composizione', 'Composizione e risposta'],
     ['modelli', 'Modelli di messaggio'],
@@ -368,6 +376,24 @@
               <p class="custom">Nel tema {store.theme} questo colore è leggermente adattato, per tenere leggibili testi e icone.</p>
             {/if}
           </div>
+        {:else if store.setPage === 'avvio'}
+          <h3>Avvio e chiusura</h3>
+          <p class="intro">Cosa succede quando chiudi la finestra di Better-Look e quando accendi il computer.</p>
+          <div role="radiogroup" aria-labelledby="set-close" style="margin-top:26px">
+            <h4 id="set-close">Quando chiudi la finestra</h4>
+            <div class="two">
+              {#each closeCards as o (o.title)}{@render option(o, 'set-close')}{/each}
+            </div>
+          </div>
+          <div class="group">
+            <h4 id="set-start">All’accensione del computer</h4>
+            <label class="check">
+              <input type="checkbox" checked={store.autoStart} onchange={(e) => store.setAutoStart(e.currentTarget.checked)} />
+              Avvia Better-Look in sottofondo, senza aprire la finestra
+            </label>
+            <p class="hint sub">Così la posta arriva e i promemoria suonano anche se non apri il programma. {isMac ? 'Puoi toglierlo anche da Impostazioni di Sistema › Generali › Elementi login.' : 'Puoi toglierlo anche dalle app di avvio del sistema.'}</p>
+          </div>
+          <p class="hint" style="margin-top:22px">Per chiudere davvero Better-Look scegli Esci dal menu dell’icona{isMac ? ' o premi Cmd+Q' : ''}.</p>
         {:else if store.setPage === 'account'}
           <h3>Account e sincronizzazione</h3>
           <p class="intro">La posta viaggia direttamente tra questo computer e il server del tuo provider. Better-Look non usa server intermedi.</p>
@@ -694,6 +720,7 @@
   .srv .k { color: var(--ink-2); }
   .conn { display: flex; align-items: center; gap: 6px; }
   .hint { margin: 0 0 12px; max-width: 58ch; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+  .hint.sub { margin: 6px 0 0 28px; }
   .pills { display: flex; flex-wrap: wrap; gap: 8px; }
   .group-a { margin-top: 26px; }
   .state { display: flex; align-items: center; gap: 6px; }

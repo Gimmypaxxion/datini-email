@@ -159,6 +159,12 @@ export interface Backend {
   speaking(): Promise<boolean>;
   stopSpeaking(): Promise<void>;
   onEvent(cb: (e: EngineEvent) => void): () => void;
+  /** Comandi dall'icona vicino all'orologio ("nuovo-messaggio") e finestra nascosta ("nascosta"). */
+  onCommand(cb: (c: string) => void): () => void;
+  /** Chiudendo la finestra Better-Look resta attivo in sottofondo. */
+  setBackground(on: boolean): Promise<void>;
+  /** Avvio all'accensione del computer: con `on` lo cambia; restituisce lo stato. */
+  autostart(on: boolean | null): Promise<boolean>;
 }
 
 function baseName(path: string): string {
@@ -496,10 +502,16 @@ export class TauriBackend implements Backend {
     return this.call<void>('stop_speaking');
   }
   onEvent(cb: (e: EngineEvent) => void) {
+    return this.listenTo<EngineEvent>('better-look://evento', cb);
+  }
+  onCommand(cb: (c: string) => void) {
+    return this.listenTo<string>('better-look://comando', cb);
+  }
+  private listenTo<T>(name: string, cb: (v: T) => void) {
     let stop: (() => void) | null = null;
     let cancelled = false;
     import('@tauri-apps/api/event').then(({ listen }) =>
-      listen<EngineEvent>('better-look://evento', (ev) => cb(ev.payload)).then((un) => {
+      listen<T>(name, (ev) => cb(ev.payload)).then((un) => {
         if (cancelled) un();
         else stop = un;
       }),
@@ -508,5 +520,11 @@ export class TauriBackend implements Backend {
       cancelled = true;
       stop?.();
     };
+  }
+  setBackground(on: boolean) {
+    return this.call<void>('set_background', { on });
+  }
+  autostart(on: boolean | null) {
+    return this.call<boolean>('autostart', { on });
   }
 }

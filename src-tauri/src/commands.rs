@@ -21,6 +21,29 @@ pub fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// Chiudendo la finestra: resta attivo in sottofondo (con l'icona vicino all'orologio) o esce.
+#[tauri::command]
+pub fn set_background(app: AppHandle, on: bool) {
+    app.state::<crate::Background>().0.store(on, std::sync::atomic::Ordering::Relaxed);
+    if let Some(tray) = app.tray_by_id(crate::TRAY_ID) {
+        let _ = tray.set_visible(on);
+    }
+}
+
+/// Avvio all'accensione del computer: con `on` lo attiva o lo toglie; restituisce lo stato.
+#[tauri::command]
+pub fn autostart(app: AppHandle, on: Option<bool>) -> Result<bool> {
+    use tauri_plugin_autostart::ManagerExt;
+    let launcher = app.autolaunch();
+    let fail = |e: tauri_plugin_autostart::Error| Error::user(format!("Non riesco a cambiare l'avvio automatico: {e}"));
+    match on {
+        Some(true) => launcher.enable().map_err(fail)?,
+        Some(false) => launcher.disable().map_err(fail)?,
+        None => {}
+    }
+    launcher.is_enabled().map_err(fail)
+}
+
 #[tauri::command]
 pub async fn accounts(e: E<'_>) -> Result<Vec<AccountInfo>> {
     e.accounts()
