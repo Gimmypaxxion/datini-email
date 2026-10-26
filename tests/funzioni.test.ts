@@ -490,3 +490,41 @@ describe('cartelle di ricerca', () => {
     expect(s.list.some((m) => m.id === first)).toBe(false);
   });
 });
+
+describe('archiviazione automatica', () => {
+  it('impostazioni, cartelle escluse e Archivia ora', async () => {
+    const s = await fresh();
+    await s.reloadAutoArchive();
+    expect(s.autoArchive).toMatchObject({ enabled: false, everyDays: 14, olderMonths: 6, action: 'archivio' });
+    await s.setAutoArchive({ enabled: true, olderMonths: 1 });
+    expect(s.autoArchive!.enabled).toBe(true);
+    const clienti = s.folders.find((f) => f.path === 'Clienti')!;
+    s.toggleArchiveFolder(clienti.id, false);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.autoArchive!.excluded).toEqual([clienti.id]);
+    // I messaggi di esempio sono recenti: niente da archiviare.
+    await s.runAutoArchiveNow();
+    expect(s.toast?.text).toMatch(/Nessun messaggio da archiviare/);
+    expect(s.autoArchive!.lastRun).not.toBeNull();
+
+    // Con l'eliminazione definitiva chiede prima conferma.
+    await s.setAutoArchive({ action: 'elimina' });
+    let asked = false;
+    s.ask = async () => {
+      asked = true;
+      return false;
+    };
+    await s.runAutoArchiveNow();
+    expect(asked).toBe(true);
+  });
+
+  it('il risultato in parole', async () => {
+    const { archiveText, monthsText } = await import('../src/lib/store.svelte');
+    expect(monthsText(6)).toBe('6 mesi');
+    expect(monthsText(12)).toBe('1 anno');
+    expect(monthsText(24)).toBe('2 anni');
+    expect(archiveText(120, 0, 'archivio')).toBe('Archiviazione automatica: 120 messaggi vecchi spostati in Archivio.');
+    expect(archiveText(1, 3, 'computer')).toBe('Archiviazione automatica: 1 messaggio vecchio spostato nell’archivio sul computer; 3 messaggi tolti da Posta eliminata e Indesiderata.');
+    expect(archiveText(2, 0, 'elimina')).toBe('Archiviazione automatica: 2 messaggi vecchi eliminati.');
+  });
+});

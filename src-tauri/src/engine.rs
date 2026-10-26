@@ -25,6 +25,7 @@ use crate::smtp;
 use crate::utf7;
 
 mod agenda;
+mod autoarchive;
 mod conversations;
 mod quick;
 mod searchfolders;
@@ -64,6 +65,8 @@ pub struct Engine {
     workers: Mutex<HashMap<String, Worker>>,
     status: Mutex<HashMap<String, AccountStatus>>,
     outbox_wake: Arc<Notify>,
+    /// Archiviazione automatica in corso (una alla volta).
+    archiving: AtomicBool,
     pub data_dir: PathBuf,
     pub undo_secs: i64,
 }
@@ -156,6 +159,7 @@ impl Engine {
             workers: Mutex::new(HashMap::new()),
             status: Mutex::new(HashMap::new()),
             outbox_wake: Arc::new(Notify::new()),
+            archiving: AtomicBool::new(false),
             data_dir,
             undo_secs: UNDO_SECS,
         })
@@ -191,6 +195,7 @@ impl Engine {
         // Messaggi rimasti "in invio" per una chiusura improvvisa: si riprovano.
         let _ = self.db.conn().execute("UPDATE outbox SET state = 'attesa' WHERE state = 'invio'", []);
         self.spawn_outbox();
+        self.spawn_auto_archive();
     }
 
     /// Bozze salvate solo sul computer (programma chiuso mentre si scriveva):
@@ -2077,6 +2082,68 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Messaggio di una data precisa (secondi), già letto, nella cartella indicata.
+    fn old_msg(s: &Setup, folder: i64, uid: u32, date: i64, subject: &str) -> i64 {
+        s.eng.db.insert_message("a1", folder, &NewMessage { uid: Some(uid), message_id: Some(format!("v{uid}@example.test")), subject: subject.into(), date, raw: Some(format!("Subject: {subject}\r\nMessage-ID: <v{uid}@example.test>\r\n\r\nTesto.\r\n").into_bytes()), ..Default::default() }).unwrap().unwrap()
+    }
+
+    #[tokio::test]
+    async fn auto_archive_moves_old_mail() {
+        let s = setup();
+        let now = now_secs();
+        let year = 365 * 86_400;
+        let old = old_msg(&s, s.inbox, 40, now - year, "Vecchio");
+        let recent = old_msg(&s, s.inbox, 41, now - 10 * 86_400, "Recente");
+        let flagged = old_msg(&s, s.inbox, 42, now - year, "Contrassegnato");
+        s.eng.set_flags(&[flagged], None, Some(true), None).unwrap();
+        let kept = old_msg(&s, s.suppliers, 43, now - year, "Fornitore vecchio");
+
+        // Spenta: non succede nulla finché non la si accende (o si sceglie Archivia ora).
+        assert_eq!(s.eng.run_auto_archive(false).await.unwrap(), AutoArchiveResult::default());
+        let mut a = AutoArchive { enabled: true, excluded: vec![s.suppliers], ..Default::default() };
+        assert!(s.eng.set_auto_archive(AutoArchive { action: "boh".into(), ..a.clone() }).is_err());
+        assert!(s.eng.set_auto_archive(AutoArchive { older_months: 0, ..a.clone() }).is_err());
+        a = s.eng.set_auto_archive(a).unwrap();
+        // Appena accesa aspetta un'ora prima del primo giro.
+        assert_eq!(s.eng.run_auto_archive(false).await.unwrap(), AutoArchiveResult::default());
+
+        let r = s.eng.run_auto_archive(true).await.unwrap();
+        assert_eq!(r, AutoArchiveResult { archived: 1, deleted: 0 });
+        let archive = s.eng.db.folder_by_role("a1", "archive").unwrap().unwrap();
+        assert_eq!(s.eng.db.message(old).unwrap().folder_id, archive.id);
+        assert_eq!(s.eng.db.message(recent).unwrap().folder_id, s.inbox);
+        assert_eq!(s.eng.db.message(flagged).unwrap().folder_id, s.inbox, "i contrassegnati restano");
+        assert_eq!(s.eng.db.message(kept).unwrap().folder_id, s.suppliers, "cartella esclusa");
+        assert!(s.eng.auto_archive().unwrap().last_run.is_some());
+        // Il giro dopo non tocca l'Archivio e non riparte prima del tempo.
+        assert_eq!(s.eng.run_auto_archive(false).await.unwrap(), AutoArchiveResult::default());
+
+        // Sul computer: un file di dati con le cartelle dell'account.
+        let older = old_msg(&s, s.suppliers, 44, now - 2 * year, "Fornitore molto vecchio");
+        s.eng.set_auto_archive(AutoArchive { action: "computer".into(), excluded: vec![], ..a.clone() }).unwrap();
+        let r = s.eng.run_auto_archive(true).await.unwrap();
+        assert_eq!(r.archived, 2);
+        let local = s.eng.db.accounts().unwrap().into_iter().find(|x| x.kind == AccountKind::Local).unwrap();
+        assert_eq!(local.name, "Archivio sul computer");
+        let folders = s.eng.db.folders(&local.id).unwrap();
+        let paths: Vec<&str> = folders.iter().map(|f| f.path.as_str()).collect();
+        assert!(paths.contains(&"chiara.valli@valliarredi.it/Fornitori"), "{paths:?}");
+        assert!(s.eng.db.messages_by_ids(&[kept, older]).unwrap().is_empty(), "tolti dalla casella");
+        let f = folders.iter().find(|f| f.path.ends_with("/Fornitori")).unwrap();
+        assert_eq!(s.eng.db.folder_message_ids(f.id).unwrap().len(), 2);
+
+        // Posta eliminata: si svuota di quello che c'è da più di 30 giorni.
+        let trash = s.eng.role_folder(&s.eng.db.account("a1").unwrap(), "deleted").unwrap();
+        let gone = old_msg(&s, trash.id, 45, now - year, "Cestinato tanto tempo fa");
+        let fresh = old_msg(&s, trash.id, 46, now - year, "Cestinato oggi");
+        s.eng.db.conn().execute("UPDATE messages SET added_at = ?2 WHERE id = ?1", rusqlite::params![gone, now - 40 * 86_400]).unwrap();
+        s.eng.set_auto_archive(AutoArchive { action: "archivio".into(), empty_trash: true, ..a.clone() }).unwrap();
+        let r = s.eng.run_auto_archive(true).await.unwrap();
+        assert_eq!(r.deleted, 1);
+        assert!(s.eng.db.messages_by_ids(&[gone]).unwrap().is_empty());
+        assert_eq!(s.eng.db.message(fresh).unwrap().folder_id, trash.id, "cestinato da poco: resta");
     }
 
     #[tokio::test]

@@ -30,6 +30,8 @@ import type {
   Task,
   TaskList,
   SearchFolder,
+  AutoArchive,
+  AutoArchiveResult,
 } from './types';
 
 export type Tab = 'prio' | 'altre';
@@ -108,6 +110,10 @@ export interface Backend {
   quickSteps(): Promise<QuickStep[]>;
   saveQuickSteps(list: QuickStep[]): Promise<QuickStep[]>;
   templates(): Promise<MessageTemplate[]>;
+  autoArchive(): Promise<AutoArchive>;
+  setAutoArchive(settings: AutoArchive): Promise<AutoArchive>;
+  /** Archivia ora, senza aspettare il giro programmato. */
+  runAutoArchive(): Promise<AutoArchiveResult>;
   /** Cartelle di ricerca, con i conteggi. */
   searchFolders(): Promise<SearchFolder[]>;
   /** Crea (senza id) o aggiorna una cartella di ricerca. */
@@ -360,6 +366,15 @@ export class TauriBackend implements Backend {
   }
   templates() {
     return this.call<MessageTemplate[]>('templates');
+  }
+  autoArchive() {
+    return this.call<AutoArchive>('auto_archive');
+  }
+  setAutoArchive(settings: AutoArchive) {
+    return this.call<AutoArchive>('set_auto_archive', { settings });
+  }
+  runAutoArchive() {
+    return this.call<AutoArchiveResult>('run_auto_archive');
   }
   searchFolders() {
     return this.call<SearchFolder[]>('search_folders');

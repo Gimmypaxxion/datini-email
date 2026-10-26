@@ -460,6 +460,42 @@ async fn priorita_e_conferme() {
     eng.remove_account(&altro).unwrap();
 }
 
+/// Archiviazione automatica sul computer con posta vera: i messaggi vecchi
+/// di Posta in arrivo passano nel file di dati e spariscono dal server.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn archiviazione_sul_computer() {
+    if !enabled() {
+        return;
+    }
+    reseed();
+    let (eng, _) = engine();
+    let prova = eng
+        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@better-look.test".into(), password: "prova-123".into(), kind: None, incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    wait_for("prima sincronizzazione", 60, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        async move { eng.status(&prova).state == "pronto" && eng.folders().unwrap().iter().any(|f| f.account_id == prova && f.role.as_deref() == Some("inbox") && f.total == 48) }
+    })
+    .await;
+    let before = server_count("INBOX", "ALL").await;
+    eng.set_auto_archive(AutoArchive { enabled: true, older_months: 3, action: "computer".into(), ..Default::default() }).unwrap();
+    let r = eng.run_auto_archive(true).await.unwrap();
+    assert!(r.archived > 0, "nella casella di prova ci sono messaggi di più di 3 mesi");
+    wait_for("tolti dal server", 60, || async move { server_count("INBOX", "ALL").await == before - r.archived }).await;
+    let local = eng.accounts().unwrap().into_iter().find(|a| a.config.kind == AccountKind::Local).unwrap().config;
+    let dest = eng.folders().unwrap().into_iter().find(|f| f.account_id == local.id && f.path == "prova@better-look.test/Posta in arrivo").unwrap();
+    let msgs = eng.messages(dest.id, None, 0, 1000).unwrap();
+    assert_eq!(msgs.len(), r.archived);
+    let d = eng.detail(msgs[0].id, false).await.unwrap();
+    assert!(d.text.contains("aggiornamento numero"), "il testo intero è nel file di dati");
+    eng.remove_account(&prova).unwrap();
+    eng.remove_account(&local.id).unwrap();
+}
+
 /// Regole e risposta automatica con posta vera: un messaggio da "altro"
 /// arriva a "prova", la regola lo sposta in Clienti e "altro" riceve la
 /// risposta automatica, una sola volta.

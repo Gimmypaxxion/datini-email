@@ -6,6 +6,7 @@
   import RulesPage from './RulesPage.svelte';
   import AutoReplyPage from './AutoReplyPage.svelte';
   import CleanupPage from './CleanupPage.svelte';
+  import AutoArchivePage from './AutoArchivePage.svelte';
   import QuickStepsPage from './QuickStepsPage.svelte';
   import TemplatesPage from './TemplatesPage.svelte';
   import RichEditor from './RichEditor.svelte';
@@ -125,6 +126,7 @@
     ['azioni', 'Azioni rapide'],
     ['risposte', 'Risposte automatiche'],
     ['pulizia', 'Pulizia cassetta postale'],
+    ['archiviazione', 'Archiviazione automatica'],
     ['info', 'Informazioni su Better-Look'],
   ] as const;
 
@@ -685,6 +687,8 @@
           <AutoReplyPage />
         {:else if store.setPage === 'pulizia'}
           <CleanupPage />
+        {:else if store.setPage === 'archiviazione'}
+          <AutoArchivePage />
         {:else}
           <h3>Informazioni su Better-Look</h3>
           <div style="margin-top:30px"><About /></div>

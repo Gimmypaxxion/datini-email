@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS messages(
   in_reply_to TEXT NOT NULL DEFAULT '',
   pending TEXT,
   dirty INTEGER NOT NULL DEFAULT 0,
+  -- Quando il messaggio è entrato nella sua cartella (per svuotare Posta eliminata).
   added_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS msg_folder_date ON messages(folder_id, date DESC);
@@ -654,6 +655,27 @@ impl Db {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
+    /// Per l'archiviazione automatica: messaggi ricevuti prima della data,
+    /// esclusi bozze, contrassegnati (lavoro ancora da fare) e quelli che
+    /// stanno ancora andando al server.
+    pub fn archivable(&self, folder_id: i64, before: i64) -> Result<Vec<i64>> {
+        let c = self.conn();
+        let mut st = c.prepare(
+            "SELECT id FROM messages WHERE folder_id = ?1 AND date < ?2 AND draft = 0 AND flagged = 0
+               AND (pending IS NULL OR pending NOT IN ('sending', 'append', 'move'))",
+        )?;
+        let rows = st.query_map(params![folder_id, before], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
+    /// Messaggi entrati nella cartella prima della data (per svuotare Posta eliminata).
+    pub fn placed_before(&self, folder_id: i64, before: i64) -> Result<Vec<i64>> {
+        let c = self.conn();
+        let mut st = c.prepare("SELECT id FROM messages WHERE folder_id = ?1 AND added_at < ?2 AND (pending IS NULL OR pending NOT IN ('sending', 'append', 'move'))")?;
+        let rows = st.query_map(params![folder_id, before], |r| r.get(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     /// Tutti i messaggi di una cartella (solo gli identificativi).
     pub fn folder_message_ids(&self, folder_id: i64) -> Result<Vec<i64>> {
         let c = self.conn();
@@ -1115,11 +1137,11 @@ impl Db {
         for id in ids {
             if server_backed {
                 c.execute(
-                    "UPDATE messages SET folder_id = ?2, uid = NULL, pending = 'move', dirty = 0 WHERE id = ?1",
-                    params![id, dest],
+                    "UPDATE messages SET folder_id = ?2, uid = NULL, pending = 'move', dirty = 0, added_at = ?3 WHERE id = ?1",
+                    params![id, dest, now_secs()],
                 )?;
             } else {
-                c.execute("UPDATE messages SET folder_id = ?2 WHERE id = ?1", params![id, dest])?;
+                c.execute("UPDATE messages SET folder_id = ?2, added_at = ?3 WHERE id = ?1", params![id, dest, now_secs()])?;
             }
         }
         Ok(())

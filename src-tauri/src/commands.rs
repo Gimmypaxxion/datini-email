@@ -95,6 +95,22 @@ pub async fn quote_html(e: E<'_>, id: i64) -> Result<String> {
 }
 
 #[tauri::command]
+pub fn auto_archive(e: E<'_>) -> Result<AutoArchive> {
+    e.auto_archive()
+}
+
+#[tauri::command]
+pub fn set_auto_archive(e: E<'_>, settings: AutoArchive) -> Result<AutoArchive> {
+    e.set_auto_archive(settings)
+}
+
+/// Archivia ora, senza aspettare il giro programmato.
+#[tauri::command]
+pub async fn run_auto_archive(e: E<'_>) -> Result<AutoArchiveResult> {
+    e.run_auto_archive(true).await
+}
+
+#[tauri::command]
 pub fn search_folders(e: E<'_>) -> Result<Vec<SearchFolder>> {
     e.search_folders()
 }

@@ -39,6 +39,7 @@ import type {
   Task,
   TaskList,
   SearchFolder,
+  AutoArchive,
 } from './types';
 
 export const UNDO_MS = 7000;
@@ -782,6 +783,51 @@ export class MockBackend implements Backend {
 
   async templates() {
     return clone(this.tpls);
+  }
+
+  // ---------- Archiviazione automatica ----------
+
+  private archiveSettings: AutoArchive = { enabled: false, everyDays: 14, olderMonths: 6, action: 'archivio', emptyTrash: false, trashDays: 30, excluded: [], lastRun: null };
+
+  async autoArchive() {
+    return clone(this.archiveSettings);
+  }
+
+  async setAutoArchive(a: AutoArchive) {
+    if (!['archivio', 'computer', 'elimina'].includes(a.action)) throw err('utente', 'Scegli dove mettere i messaggi vecchi.');
+    this.archiveSettings = { ...clone(a), lastRun: this.archiveSettings.lastRun };
+    return clone(this.archiveSettings);
+  }
+
+  /** Versione semplice: Archivio, oppure i messaggi spariscono (computer ed elimina). */
+  async runAutoArchive() {
+    const a = this.archiveSettings;
+    const before = new Date();
+    before.setMonth(before.getMonth() - a.olderMonths);
+    let archived = 0;
+    let deleted = 0;
+    for (const acct of this.accountsList) {
+      const skip = new Set(this.folderList.filter((f) => f.accountId === acct.id && (!f.role ? a.excluded.includes(f.id) : ['archive', 'drafts', 'deleted', 'junk'].includes(f.role))).map((f) => f.id));
+      const old = this.msgs.filter((m) => m.accountId === acct.id && !skip.has(m.folderId) && !m.draft && !m.flagged && m.date < before.getTime());
+      const dest = this.folderList.find((f) => f.accountId === acct.id && f.role === 'archive');
+      for (const m of old) {
+        if (a.action === 'archivio' && dest) m.folderId = dest.id;
+        else this.msgs = this.msgs.filter((x) => x.id !== m.id);
+      }
+      archived += old.length;
+      if (a.emptyTrash) {
+        const bins = this.folderList.filter((f) => f.accountId === acct.id && (f.role === 'deleted' || f.role === 'junk')).map((f) => f.id);
+        const gone = this.msgs.filter((m) => bins.includes(m.folderId) && m.date < Date.now() - a.trashDays * 86_400_000);
+        this.msgs = this.msgs.filter((m) => !gone.includes(m));
+        deleted += gone.length;
+      }
+    }
+    this.archiveSettings.lastRun = Math.floor(Date.now() / 1000);
+    if (archived + deleted) {
+      this.emit({ type: 'autoArchive', archived, deleted, action: a.action });
+      this.changed('', []);
+    }
+    return { archived, deleted };
   }
 
   // ---------- Cartelle di ricerca ----------

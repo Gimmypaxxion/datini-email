@@ -52,6 +52,8 @@ import {
   type ReceiptReply,
   type SearchCriteria,
   type SearchFolder,
+  type AutoArchive,
+  type AutoArchiveAction,
 } from './types';
 import { emptyCriteria, presetOf, splitPeople, type SearchFolderKind } from './searchfolders';
 
@@ -66,7 +68,7 @@ export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
 /** Parte del programma mostrata: posta, calendario, contatti, attività (Ctrl+1, 2, 3, 4). */
 export type AppModule = 'posta' | 'calendario' | 'contatti' | 'attivita';
-export type SettingsPage = 'aspetto' | 'avvio' | 'account' | 'composizione' | 'modelli' | 'categorie' | 'regole' | 'azioni' | 'risposte' | 'pulizia' | 'info';
+export type SettingsPage = 'aspetto' | 'avvio' | 'account' | 'composizione' | 'modelli' | 'categorie' | 'regole' | 'azioni' | 'risposte' | 'pulizia' | 'archiviazione' | 'info';
 
 export interface Prefs {
   ribbon: RibbonMode;
@@ -119,6 +121,25 @@ interface LastSent {
 }
 
 /** Domanda di conferma prima di un'azione che non si può annullare. */
+/** "6 mesi", "1 anno", "2 anni". */
+export function monthsText(n: number): string {
+  if (n % 12 === 0) return n === 12 ? '1 anno' : `${n / 12} anni`;
+  return n === 1 ? '1 mese' : `${n} mesi`;
+}
+
+/** Il risultato dell'archiviazione automatica, in parole. */
+export function archiveText(archived: number, deleted: number, action: AutoArchiveAction): string {
+  const n = (x: number) => x.toLocaleString('it-IT');
+  const parts: string[] = [];
+  if (archived) {
+    const where = action === 'computer' ? 'nell’archivio sul computer' : action === 'elimina' ? '' : 'in Archivio';
+    const verb = action === 'elimina' ? (archived === 1 ? 'eliminato' : 'eliminati') : archived === 1 ? 'spostato' : 'spostati';
+    parts.push(`${archived === 1 ? '1 messaggio vecchio' : `${n(archived)} messaggi vecchi`} ${verb}${where ? ` ${where}` : ''}`);
+  }
+  if (deleted) parts.push(`${deleted === 1 ? '1 messaggio tolto' : `${n(deleted)} messaggi tolti`} da Posta eliminata e Indesiderata`);
+  return `Archiviazione automatica: ${parts.join('; ')}.`;
+}
+
 /** La finestra Nuova cartella di ricerca, mentre la si compila. */
 export interface SearchFolderEdit {
   /** Vuoto per una cartella nuova. */
@@ -235,6 +256,9 @@ export class MailStore {
   /** Cartelle di ricerca e quella aperta (con la vista 'ricerca'). */
   searchFolders = $state<SearchFolder[]>([]);
   searchFolderId = $state<string | null>(null);
+  /** Impostazioni dell'archiviazione automatica (lette quando si apre la pagina). */
+  autoArchive = $state<AutoArchive | null>(null);
+  archiving = $state(false);
   /** Finestra Nuova cartella di ricerca (o Modifica). */
   sfEdit = $state<SearchFolderEdit | null>(null);
   tab = $state<Tab>('prio');
@@ -513,6 +537,12 @@ export class MailStore {
         break;
       case 'searchFolders':
         void this.reloadSearchFolders();
+        break;
+      case 'autoArchive':
+        if (this.mode === 'principale') {
+          this.flash({ kind: 'info', text: archiveText(e.archived, e.deleted, e.action) }, 8000);
+          void this.reloadAutoArchive();
+        }
         break;
       case 'templates':
         void this.reloadTemplates();
@@ -897,6 +927,54 @@ export class MailStore {
   }
 
   // ---------- Modelli di messaggio ----------
+
+  async reloadAutoArchive() {
+    try {
+      this.autoArchive = await this.backend.autoArchive();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Cambia un'impostazione dell'archiviazione automatica e la salva subito. */
+  async setAutoArchive(patch: Partial<AutoArchive>) {
+    if (!this.autoArchive) return;
+    const next = { ...$state.snapshot(this.autoArchive), ...patch };
+    this.autoArchive = next;
+    try {
+      this.autoArchive = await this.backend.setAutoArchive(next);
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+      await this.reloadAutoArchive();
+    }
+  }
+
+  /** Includi o escludi una cartella dall'archiviazione automatica. */
+  toggleArchiveFolder(folderId: number, include: boolean) {
+    const ex = this.autoArchive?.excluded ?? [];
+    void this.setAutoArchive({ excluded: include ? ex.filter((x) => x !== folderId) : [...ex, folderId] });
+  }
+
+  /** Archivia ora: con l'eliminazione definitiva chiede prima conferma. */
+  async runAutoArchiveNow() {
+    const a = this.autoArchive;
+    if (!a || this.archiving) return;
+    if (a.action === 'elimina') {
+      const ok = await this.ask({ title: 'Eliminare i messaggi vecchi?', text: `I messaggi ricevuti più di ${monthsText(a.olderMonths)} fa spariscono per sempre, anche dal server. Bozze e messaggi contrassegnati restano.`, ok: 'Elimina', danger: true });
+      if (!ok) return;
+    }
+    this.archiving = true;
+    try {
+      const r = await this.backend.runAutoArchive();
+      if (!r.archived && !r.deleted) this.hint('Nessun messaggio da archiviare: le cartelle sono già in ordine.');
+      await this.reloadAutoArchive();
+      this.scheduleRefresh();
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    } finally {
+      this.archiving = false;
+    }
+  }
 
   async reloadSearchFolders() {
     if (this.mode !== 'principale') return;

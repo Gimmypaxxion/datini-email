@@ -322,7 +322,33 @@ export type EngineEvent =
   | { type: 'quickSteps' }
   | { type: 'templates' }
   | { type: 'tasks' }
-  | { type: 'searchFolders' };
+  | { type: 'searchFolders' }
+  | { type: 'autoArchive'; archived: number; deleted: number; action: AutoArchiveAction };
+
+// ---------- Archiviazione automatica ----------
+
+export type AutoArchiveAction = 'archivio' | 'computer' | 'elimina';
+
+export interface AutoArchive {
+  enabled: boolean;
+  /** Ogni quanti giorni controllare. */
+  everyDays: number;
+  /** Messaggi ricevuti da più di tanti mesi. */
+  olderMonths: number;
+  action: AutoArchiveAction;
+  /** Svuota Posta eliminata e Posta indesiderata dopo `trashDays` giorni. */
+  emptyTrash: boolean;
+  trashDays: number;
+  /** Cartelle da non toccare. */
+  excluded: number[];
+  /** Ultima esecuzione (secondi). */
+  lastRun: number | null;
+}
+
+export interface AutoArchiveResult {
+  archived: number;
+  deleted: number;
+}
 
 // ---------- Cartelle di ricerca ----------
 

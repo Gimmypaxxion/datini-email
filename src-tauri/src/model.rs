@@ -806,6 +806,44 @@ pub struct SearchCriteria {
     pub days: Option<i64>,
 }
 
+/// Archiviazione automatica, come in Outlook: ogni tanto i messaggi vecchi
+/// lasciano le cartelle di posta. Vale per tutti gli account di posta.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AutoArchive {
+    pub enabled: bool,
+    /// Ogni quanti giorni controllare.
+    pub every_days: i64,
+    /// Messaggi ricevuti da più di tanti mesi.
+    pub older_months: i64,
+    /// "archivio" (cartella Archivio dell'account), "computer" (file di dati
+    /// sul computer, libera spazio sul server) o "elimina" (definitivamente).
+    pub action: String,
+    /// Svuota Posta eliminata e Posta indesiderata dai messaggi che ci stanno
+    /// da più di `trash_days` giorni.
+    pub empty_trash: bool,
+    pub trash_days: i64,
+    /// Cartelle da non toccare.
+    pub excluded: Vec<i64>,
+    /// Ultima esecuzione (secondi).
+    pub last_run: Option<i64>,
+}
+
+impl Default for AutoArchive {
+    fn default() -> Self {
+        AutoArchive { enabled: false, every_days: 14, older_months: 6, action: "archivio".into(), empty_trash: false, trash_days: 30, excluded: Vec::new(), last_run: None }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoArchiveResult {
+    /// Messaggi spostati in Archivio o nel file di dati (o eliminati, con "elimina").
+    pub archived: usize,
+    /// Messaggi tolti da Posta eliminata e Posta indesiderata.
+    pub deleted: usize,
+}
+
 /// Notifiche dal motore all'interfaccia.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -841,6 +879,9 @@ pub enum Event {
     Tasks,
     /// Cartelle di ricerca aggiunte, cambiate o eliminate.
     SearchFolders,
+    /// L'archiviazione automatica ha spostato o eliminato dei messaggi.
+    #[serde(rename_all = "camelCase")]
+    AutoArchive { archived: usize, deleted: usize, action: String },
 }
 
 pub fn now_secs() -> i64 {

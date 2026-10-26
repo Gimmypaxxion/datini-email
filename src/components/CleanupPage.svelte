@@ -225,6 +225,7 @@
           {#if older.count > 0}<button class="primary-btn" onclick={archiveOlder}><Icon name="archive" size={16} />Archivia</button>{/if}
         {/if}
       </div>
+      <p class="hint auto">Per farlo da solo ogni tanto, in tutte le cartelle: <button class="lbtn" onclick={() => store.openSettings('archiviazione')}>Archiviazione automatica</button>.</p>
     </section>
   {/if}
 {/if}
@@ -235,6 +236,9 @@
   .intro { margin: 6px 0 0; max-width: 62ch; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
   .hint { margin: 0; max-width: 58ch; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
   .bad { margin: 14px 0 0; font-size: 13.5px; color: var(--danger); }
+  .auto { margin-top: 12px; }
+  .auto .lbtn { padding: 0; font: inherit; font-weight: 600; }
+  .auto .lbtn:hover { text-decoration: underline; }
   section { margin-top: 24px; padding-top: 20px; box-shadow: inset 0 1px 0 var(--rule); max-width: 680px; }
   .sum { margin: 0 0 12px; font-size: 14px; }
   .usage { width: 100%; max-width: 480px; border-collapse: collapse; font-size: 13.5px; }
