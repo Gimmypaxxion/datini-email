@@ -23,9 +23,12 @@
   };
 
   const noSel = $derived(!store.selected);
+  /** Nessun messaggio su cui agire (né uno aperto né più selezionati). */
+  const none = $derived(!store.selection.length);
+  /** Il primo dei selezionati, per i menu Sposta in e Categorizza. */
+  const first = $derived(store.selection.length ? store.findMsg(store.selection[0]) : null);
   const ext = $derived(store.prefs.ribbon === 'estesa');
   const rib = $derived(store.activeRibbon);
-  const sel = $derived(store.sel);
 
   let newAnchor = $state<HTMLElement | null>(null);
   const newItems = [
@@ -68,7 +71,7 @@
   ]);
 
   let quickAnchor = $state<HTMLElement | null>(null);
-  const quickMenu = $derived(quickItems(noSel));
+  const quickMenu = $derived(quickItems(none));
 
   let moveAnchor = $state<HTMLElement | null>(null);
   let catAnchor = $state<HTMLElement | null>(null);
@@ -175,18 +178,18 @@
         <div class="rs only-e">
           <RB showLabel={false} icon="mail-off" label="Ignora conversazione" title={store.threadIgnored ? 'Smetti di ignorare questa conversazione' : 'Ignora conversazione: questa e le risposte future vanno in Posta eliminata'} disabled={noSel} pressed={store.threadIgnored} onclick={() => store.ignoreConversation()} />
           <RB showLabel={false} menu icon="eraser" tone="c-amber" label="Pulisci" title="Pulisci: togli i messaggi già riportati nelle risposte" disabled={!store.currentFolder} pressed={!!cleanAnchor} onclick={(e) => (cleanAnchor = cleanAnchor ? null : (e.currentTarget as HTMLElement))} />
-          <RB showLabel={false} menu icon="ban" tone="c-red" label="Posta indesiderata" title="Segnala come posta indesiderata" disabled={noSel} onclick={() => store.moveMsg(sel, 'junk')} />
+          <RB showLabel={false} menu icon="ban" tone="c-red" label="Posta indesiderata" title="Segnala come posta indesiderata" disabled={none} onclick={() => store.moveSelected('junk')} />
         </div>
-        <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={noSel} onclick={() => store.deleteMsg(sel)} />
-        <RB big icon="archive" tone="c-green" label="Archivia" title="Archivia (Backspace)" disabled={noSel} onclick={() => store.moveMsg(sel, 'archive')} />
-        <RB iconOnly cls="only-c" icon="ban" tone="c-red" label="Segnala come posta indesiderata" disabled={noSel} onclick={() => store.moveMsg(sel, 'junk')} />
+        <RB big icon="trash" label="Elimina" title="Elimina (Canc)" disabled={none} onclick={() => store.deleteMany()} />
+        <RB big icon="archive" tone="c-green" label="Archivia" title="Archivia (Backspace)" disabled={none} onclick={() => store.moveSelected('archive')} />
+        <RB iconOnly cls="only-c" icon="ban" tone="c-red" label="Segnala come posta indesiderata" disabled={none} onclick={() => store.moveSelected('junk')} />
       </div><span class="rgl">Elimina</span></div>
 
       <div class="rg"><div class="rgb">
         <div class="rs">
           <RB icon="arrow-back-up" tone="c-brand" label="Rispondi" title="Rispondi (Ctrl+R)" disabled={noSel} onclick={() => store.openCompose('reply')} />
           <RB icon="arrow-back-up-double" tone="c-brand" label="Rispondi a tutti" title="Rispondi a tutti (Ctrl+Maiusc+R)" disabled={noSel} onclick={() => store.openCompose('replyAll')} />
-          <RB icon="arrow-forward-up" tone="c-brand" label="Inoltra" title="Inoltra (Ctrl+F)" disabled={noSel} onclick={() => store.openCompose('forward')} />
+          <RB icon="arrow-forward-up" tone="c-brand" label="Inoltra" title={store.isMulti ? 'Inoltra i messaggi selezionati come allegati (Ctrl+F)' : 'Inoltra (Ctrl+F)'} disabled={none} onclick={() => (store.isMulti ? store.forwardAsAttachment() : store.openCompose('forward'))} />
         </div>
         <div class="rs only-e">
           <RB showLabel={false} icon="calendar-plus" tone="c-brand" label="Rispondi con una riunione" disabled={noSel || !store.detail} onclick={() => store.meetingFrom()} />
@@ -198,7 +201,7 @@
         {#if store.quickSteps.length}
           <div class="rs only-e qs-gal">
             {#each store.quickSteps.slice(0, 3) as q (q.id)}
-              <RB icon={iconOr(q.icon, 'bolt')} tone="c-brand" label={q.name} title={q.shortcut ? `${q.name} (Ctrl+Maiusc+${q.shortcut})` : q.name} disabled={noSel} onclick={() => store.runQuickStep(q)} />
+              <RB icon={iconOr(q.icon, 'bolt')} tone="c-brand" label={q.name} title={q.shortcut ? `${q.name} (Ctrl+Maiusc+${q.shortcut})` : q.name} disabled={none} onclick={() => store.runQuickStep(q)} />
             {/each}
           </div>
         {/if}
@@ -206,14 +209,14 @@
       </div><span class="rgl">Azioni rapide</span></div>
 
       <div class="rg"><div class="rgb">
-        <RB big menu icon="folder-symlink" tone="c-brand" label="Sposta in" title="Sposta in (Ctrl+Maiusc+V)" disabled={noSel} pressed={!!moveAnchor} onclick={openMove} />
+        <RB big menu icon="folder-symlink" tone="c-brand" label="Sposta in" title="Sposta in (Ctrl+Maiusc+V)" disabled={none} pressed={!!moveAnchor} onclick={openMove} />
         <RB big menu cls="only-e" icon="list-check" tone="c-brand" label="Regole" title="Regole: sposta in automatico i messaggi" pressed={!!rulesAnchor} onclick={(e) => (rulesAnchor = rulesAnchor ? null : (e.currentTarget as HTMLElement))} />
       </div><span class="rgl">Sposta</span></div>
 
       <div class="rg"><div class="rgb"><div class="rs">
-        <RB icon="mail-opened" tone="c-brand" label="Letto/Non letto" title="Segna come letto (Ctrl+Q) o non letto (Ctrl+U)" disabled={noSel} onclick={() => store.toggleRead(sel)} />
-        <RB menu labelExtOnly icon="tag" tone="c-amber" label="Categorizza" disabled={noSel} pressed={!!catAnchor} onclick={openCats} />
-        <RB icon="flag" tone="c-red" label="Contrassegna" title="Contrassegna (Ins)" disabled={noSel} onclick={() => store.toggleFlag(sel)} />
+        <RB icon="mail-opened" tone="c-brand" label="Letto/Non letto" title="Segna come letto (Ctrl+Q) o non letto (Ctrl+U)" disabled={none} onclick={() => store.toggleReadSelected()} />
+        <RB menu labelExtOnly icon="tag" tone="c-amber" label="Categorizza" disabled={none} pressed={!!catAnchor} onclick={openCats} />
+        <RB icon="flag" tone="c-red" label="Contrassegna" title="Contrassegna (Ins)" disabled={none} onclick={() => store.toggleFlagSelected()} />
       </div></div><span class="rgl">Tag</span></div>
 
       <div class="rg only-e" data-drop="4"><div class="rgb">
@@ -268,8 +271,8 @@
     {#if newAnchor}
       <Menu anchor={newAnchor} items={newItems} label="Nuovi elementi" onclose={() => (newAnchor = null)} />
     {/if}
-    {#if moveAnchor && store.selected}
-      <Menu anchor={moveAnchor} items={moveItems(store.selected)} label="Sposta in" onclose={() => (moveAnchor = null)} />
+    {#if moveAnchor && first}
+      <Menu anchor={moveAnchor} items={moveItems(first, store.selection)} label="Sposta in" onclose={() => (moveAnchor = null)} />
     {/if}
     {#if quickAnchor}
       <Menu anchor={quickAnchor} items={quickMenu} label="Azioni rapide" onclose={() => (quickAnchor = null)} />
@@ -283,8 +286,8 @@
     {#if rulesAnchor}
       <Menu anchor={rulesAnchor} items={rulesItems} label="Regole" onclose={() => (rulesAnchor = null)} />
     {/if}
-    {#if catAnchor && store.selected}
-      <Menu anchor={catAnchor} items={categoryItems(store.selected)} label="Categorizza" onclose={() => (catAnchor = null)} />
+    {#if catAnchor && first}
+      <Menu anchor={catAnchor} items={categoryItems(first, store.selection)} label="Categorizza" onclose={() => (catAnchor = null)} />
     {/if}
     <button class="rb ico rib-tg" onclick={() => store.toggleRibbon()} aria-label={ext ? 'Passa alla barra compatta' : 'Passa alla barra estesa'} title={ext ? 'Passa alla barra compatta' : 'Passa alla barra estesa'}>
       <Icon name={ext ? 'chevron-up' : 'chevron-down'} />

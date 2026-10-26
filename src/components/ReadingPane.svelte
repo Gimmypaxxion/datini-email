@@ -10,6 +10,7 @@
   import Menu from './Menu.svelte';
   import { categoryItems, type MenuItem } from '../lib/menus';
   import { store } from '../lib/store.svelte';
+  import { isMac } from '../lib/platform';
   import { fileSize, initials, linkify, longDate, peopleText, personLabel, tint } from '../lib/format';
   import type { AttachmentInfo } from '../lib/types';
 
@@ -160,6 +161,23 @@
     {#if catsOpen && moreBtn}
       <Menu anchor={moreBtn} items={categoryItems(m)} label="Categorizza" onclose={() => (catsOpen = false)} />
     {/if}
+  {:else if store.isMulti}
+    {@const ms = store.multi.map((id) => store.findMsg(id)).filter((x) => !!x)}
+    {@const anyUnread = ms.some((x) => x!.unread)}
+    {@const anyUnflagged = ms.some((x) => !x!.flagged)}
+    <div class="sheet none multi" role="status" aria-live="polite">
+      <Icon name="checkbox" size={56} stroke={1.2} style="color:var(--brand-ink)" />
+      <p class="t">{store.multi.length} messaggi selezionati</p>
+      <p class="d">I comandi della barra valgono per tutti. {isMac ? 'Cmd' : 'Ctrl'}+clic aggiunge o toglie un messaggio, Maiusc+clic seleziona un intervallo.</p>
+      <div class="multi-acts">
+        <button class="sec-btn" onclick={() => store.moveSelected('archive')}><Icon name="archive" size={16} style="color:var(--green)" />Archivia</button>
+        <button class="sec-btn" onclick={() => store.deleteMany()}><Icon name="trash" size={16} />Elimina</button>
+        <button class="sec-btn" onclick={() => store.markRead(store.multi, anyUnread)}><Icon name={anyUnread ? 'mail-opened' : 'mail'} size={16} style="color:var(--brand-ink)" />{anyUnread ? 'Segna come letti' : 'Segna come da leggere'}</button>
+        <button class="sec-btn" onclick={() => store.setFlag(store.multi, anyUnflagged)}><Icon name="flag" size={16} style="color:var(--danger)" />{anyUnflagged ? 'Contrassegna' : 'Togli contrassegno'}</button>
+        <button class="sec-btn" onclick={() => store.forwardAsAttachment()}><Icon name="paperclip" size={16} style="color:var(--brand-ink)" />Inoltra come allegati</button>
+      </div>
+      <button class="lbtn clear" onclick={() => store.clearMulti()}>Annulla la selezione</button>
+    </div>
   {:else if store.sel !== null && store.detailError}
     <div class="sheet none" role="alert">
       <Icon name="alert-circle" size={56} stroke={1.2} style="color:var(--danger)" />
@@ -235,6 +253,9 @@
   .none { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 32px; }
   .none .t { margin: 16px 0 4px; font-size: 15px; font-weight: 600; }
   .none .d { margin: 0; max-width: 46ch; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+  .multi-acts { margin-top: 20px; max-width: 520px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .clear { margin-top: 14px; height: 30px; padding: 0 10px; font-size: 13.5px; }
+  .clear:hover { background: var(--hover); }
   @media (max-width: 1200px) { .body, .atts, .foot, .privacy, .speech { margin-left: 0; } }
   @media (max-width: 760px) { .pane-read { display: none; } }
 </style>

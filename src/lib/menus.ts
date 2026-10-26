@@ -21,52 +21,79 @@ export interface MenuItem {
   keys?: string;
 }
 
-/** Cartelle in cui spostare il messaggio: prima quelle del suo account, poi le altre. */
-export function moveItems(m: MessageSummary): MenuItem[] {
+/** Cartelle in cui spostare il messaggio (o i messaggi `ids`): prima quelle del suo account, poi le altre. */
+export function moveItems(m: MessageSummary, ids: number[] = [m.id]): MenuItem[] {
   const folders = store.foldersOf(m.accountId).filter((f) => f.id !== m.folderId && f.selectable);
   const items: MenuItem[] = folders.map((f) => ({
     label: folderLabel(f),
     icon: f.role === 'archive' ? 'archive' : f.role === 'deleted' ? 'trash' : f.role === 'junk' ? 'ban' : f.role === 'inbox' ? 'inbox' : 'folder',
     depth: f.role ? 0 : Math.max(0, f.depth - (/^inbox[./]/i.test(f.path) ? 1 : 0)),
-    onclick: () => store.moveToFolder(m.id, f.id),
+    onclick: () => store.moveToFolder(ids, f.id),
   }));
   for (const a of store.accounts.filter((x) => x.id !== m.accountId)) {
     const fs = store.foldersOf(a.id).filter((f) => f.selectable && f.role !== 'drafts' && f.role !== 'sent');
     if (!fs.length) continue;
     items.push({ kind: 'head', label: a.kind === 'local' ? a.name : a.email });
-    for (const f of fs) items.push({ label: folderLabel(f), icon: 'folder', onclick: () => store.moveToFolder(m.id, f.id) });
+    for (const f of fs) items.push({ label: folderLabel(f), icon: 'folder', onclick: () => store.moveToFolder(ids, f.id) });
   }
   return items;
 }
 
-/** Categorizza: le categorie con la spunta su quelle assegnate. */
-export function categoryItems(m: MessageSummary): MenuItem[] {
-  const items: MenuItem[] = store.categories.map((c) => ({
-    label: c.name,
-    swatch: `var(--cat-${c.color})`,
-    checked: m.categories.includes(c.id),
-    onclick: () => store.toggleCategory(m.id, c.id),
-  }));
+/** Categorizza: le categorie con la spunta su quelle assegnate (con più messaggi: assegnate a tutti). */
+export function categoryItems(m: MessageSummary, ids: number[] = [m.id]): MenuItem[] {
+  const ms = ids.map((id) => store.findMsg(id) ?? (id === m.id ? m : null)).filter((x): x is MessageSummary => !!x);
+  const items: MenuItem[] = store.categories.map((c) => {
+    const all = ms.length > 0 && ms.every((x) => x.categories.includes(c.id));
+    return {
+      label: c.name,
+      swatch: `var(--cat-${c.color})`,
+      checked: all,
+      onclick: () => store.setCategoryOn(ids, c.id, !all),
+    };
+  });
   if (items.length) items.push({ kind: 'sep', label: '' });
-  items.push({ label: 'Cancella tutte le categorie', icon: 'eraser', disabled: !m.categories.length, onclick: () => store.clearMsgCategories(m.id) });
+  items.push({ label: 'Cancella tutte le categorie', icon: 'eraser', disabled: !ms.some((x) => x.categories.length), onclick: () => store.clearCategoriesOf(ids) });
   items.push({ label: 'Tutte le categorie…', icon: 'tags', onclick: () => store.openSettings('categorie') });
   return items;
 }
 
 /** Azioni rapide: le voci per eseguirle, poi crea e gestisci. */
-export function quickItems(noSel: boolean, id: number | null = null): MenuItem[] {
+export function quickItems(noSel: boolean, id: number | number[] | null = null): MenuItem[] {
   const items: MenuItem[] = store.quickSteps.map((q) => ({
     label: q.name,
     icon: iconOr(q.icon, 'bolt'),
     keys: q.shortcut ? `Ctrl+Maiusc+${q.shortcut}` : undefined,
     disabled: noSel,
-    onclick: () => store.runQuickStep(q, id ?? store.sel),
+    onclick: () => store.runQuickStep(q, id),
   }));
   if (!items.length) items.push({ label: 'Nessuna azione rapida', disabled: true });
   items.push({ kind: 'sep', label: '' });
   items.push({ label: 'Nuova azione rapida…', icon: 'plus', onclick: () => store.newQuickStep() });
   items.push({ label: 'Gestisci azioni rapide…', icon: 'settings', onclick: () => store.manageQuickSteps() });
   return items;
+}
+
+/** Clic destro con più messaggi selezionati: i comandi che valgono per tutti. */
+export function multiItems(ids: number[], sub: (kind: 'categorie' | 'sposta' | 'azioni') => void): MenuItem[] {
+  const ms = ids.map((id) => store.findMsg(id)).filter((x): x is MessageSummary => !!x);
+  const anyUnread = ms.some((m) => m.unread);
+  const anyUnflagged = ms.some((m) => !m.flagged);
+  return [
+    { kind: 'head', label: `${ids.length} messaggi selezionati` },
+    { label: 'Inoltra come allegati', icon: 'paperclip', keys: 'Ctrl+F', onclick: () => store.forwardAsAttachment(ids) },
+    { kind: 'sep', label: '' },
+    anyUnread
+      ? { label: 'Segna come letti', icon: 'mail-opened', keys: 'Ctrl+Q', onclick: () => store.markRead(ids, true) }
+      : { label: 'Segna come da leggere', icon: 'mail', keys: 'Ctrl+U', onclick: () => store.markRead(ids, false) },
+    { label: anyUnflagged ? 'Contrassegna' : 'Rimuovi contrassegno', icon: 'flag', keys: 'Ins', onclick: () => store.setFlag(ids, anyUnflagged) },
+    { label: 'Categorizza…', icon: 'tag', onclick: () => sub('categorie') },
+    { label: 'Azioni rapide…', icon: 'bolt', onclick: () => sub('azioni') },
+    { kind: 'sep', label: '' },
+    { label: 'Sposta in…', icon: 'folder-symlink', keys: 'Ctrl+Maiusc+V', onclick: () => sub('sposta') },
+    { label: 'Archivia', icon: 'archive', keys: 'Backspace', onclick: () => store.moveMany(ids, 'archive') },
+    { label: 'Elimina', icon: 'trash', keys: 'Canc', onclick: () => store.deleteMany(ids) },
+    { label: 'Segnala come posta indesiderata', icon: 'ban', onclick: () => store.moveMany(ids, 'junk') },
+  ];
 }
 
 /**

@@ -22,6 +22,8 @@
       {:else}
         {tk.query.trim() ? 'Risultati' : 'Da fare'}: {tk.shown.open.length}{#if tk.shown.done.length}<span class="gap"></span>Completate: {tk.shown.done.length}{/if}
       {/if}
+    {:else if store.isMulti}
+      Selezionati: {store.multi.length} di {store.q.trim() ? store.list.length : (f?.total ?? store.list.length)}
     {:else if store.q.trim()}
       Risultati: {store.list.length}
     {:else if store.view === 'uscita'}

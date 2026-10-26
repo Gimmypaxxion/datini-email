@@ -33,6 +33,7 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
     else if (store.backstage) store.backstage = false;
     else if (store.fullRead && !typing && !store.confirm) store.closeFull();
     else if (store.module === 'attivita' && store.tasks.sel && !typing && !store.confirm) store.tasks.sel = null;
+    else if (store.module === 'posta' && store.isMulti && !typing && !store.confirm) store.clearMulti();
     return;
   }
   if (overlay) return;
@@ -168,30 +169,37 @@ export function handleShortcut(e: KeyboardEvent, ui: { focusSearch: () => void }
   } else if (ctrl && e.shiftKey && !e.altKey && /^Digit[1-9]$/.test(e.code)) {
     // Azioni rapide, come in Outlook.
     e.preventDefault();
-    if (store.module === 'posta' && store.sel !== null) store.runQuickShortcut(Number(e.code.slice(5)));
+    if (store.module === 'posta') store.runQuickShortcut(Number(e.code.slice(5)));
   } else if (ctrl && e.altKey && e.code === 'KeyF') {
     e.preventDefault();
     void store.forwardAsAttachment();
   } else if (ctrl && key === 'f') {
-    void store.openCompose('forward');
+    // Con più messaggi selezionati Inoltra li allega tutti, come Outlook.
+    if (store.isMulti) void store.forwardAsAttachment();
+    else void store.openCompose('forward');
+  } else if (ctrl && !e.shiftKey && !e.altKey && key === 'a' && !(e.target instanceof Element && e.target.closest('.pane-read'))) {
+    e.preventDefault();
+    void store.selectAll();
   } else if (ctrl && e.shiftKey && key === 'v') {
     e.preventDefault();
     document.querySelector<HTMLButtonElement>('.rib button[aria-label="Sposta in"]')?.click();
   } else if (ctrl && key === 'q') {
     e.preventDefault();
-    void store.setRead(store.sel, true);
+    void store.markRead(store.selection, true);
   } else if (ctrl && key === 'u') {
     e.preventDefault();
-    void store.setRead(store.sel, false);
+    void store.markRead(store.selection, false);
   } else if (!ctrl && e.key === 'Delete') {
-    void store.deleteMsg(store.sel);
+    void store.deleteMany();
   } else if (!ctrl && e.key === 'Backspace') {
     e.preventDefault();
-    void store.moveMsg(store.sel, 'archive');
+    void store.moveSelected('archive');
   } else if (!ctrl && e.key === 'Insert') {
-    void store.toggleFlag(store.sel);
+    void store.toggleFlagSelected();
   } else if (!ctrl && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
     e.preventDefault();
-    void store.moveSelection(e.key === 'ArrowDown' ? 1 : -1);
+    // Con Maiusc la selezione si allarga, come in Outlook.
+    if (e.shiftKey) void store.extendSelection(e.key === 'ArrowDown' ? 1 : -1);
+    else void store.moveSelection(e.key === 'ArrowDown' ? 1 : -1);
   }
 }

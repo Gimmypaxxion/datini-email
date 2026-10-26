@@ -291,3 +291,82 @@ describe('modelli di messaggio', () => {
     expect(s.templates.some((x) => x.id === saved.id)).toBe(false);
   });
 });
+
+describe('selezione di più messaggi', () => {
+  it('Ctrl+clic, Maiusc+clic, Ctrl+A e Maiusc+frecce', async () => {
+    const s = await fresh();
+    const ids = s.list.map((m) => m.id);
+    await s.clickMsg(ids[0]);
+    expect(s.sel).toBe(ids[0]);
+    await s.clickMsg(ids[2], { ctrl: true });
+    expect(s.isMulti).toBe(true);
+    expect(s.selection).toEqual([ids[0], ids[2]]);
+    expect(s.sel).toBeNull();
+    // Ctrl+clic di nuovo toglie: ne resta uno, che si apre.
+    await s.clickMsg(ids[2], { ctrl: true });
+    expect(s.isMulti).toBe(false);
+    expect(s.sel).toBe(ids[0]);
+    // Maiusc+clic: l'intervallo.
+    await s.clickMsg(ids[3], { shift: true });
+    expect(s.selection).toEqual(ids.slice(0, 4));
+    // Maiusc+freccia su: si restringe.
+    await s.extendSelection(-1);
+    expect(s.selection).toEqual(ids.slice(0, 3));
+    await s.selectAll();
+    expect(s.selection.length).toBe(ids.length);
+    // Un clic normale torna alla selezione singola.
+    await s.clickMsg(ids[1]);
+    expect(s.isMulti).toBe(false);
+    expect(s.selection).toEqual([ids[1]]);
+  });
+
+  it('i comandi valgono per tutti i selezionati', async () => {
+    const s = await fresh();
+    const [a, b, c] = s.list.slice(0, 3).map((m) => m.id);
+    await s.clickMsg(a);
+    await s.clickMsg(c, { shift: true });
+    await s.markRead(s.selection, true);
+    expect(s.list.slice(0, 3).every((m) => !m.unread)).toBe(true);
+    await s.toggleFlagSelected();
+    expect(s.list.slice(0, 3).every((m) => m.flagged)).toBe(true);
+    await s.setCategoryOn(s.selection, 'c5', true);
+    expect(s.list.slice(0, 3).every((m) => m.categories.includes('c5'))).toBe(true);
+
+    // Inoltra con più messaggi: tutti allegati, oggetto da scrivere.
+    await s.forwardAsAttachment();
+    expect(s.c?.attachments.map((x) => x.message)).toEqual([a, b, c]);
+    expect(s.c?.subject).toBe('');
+
+    // Archivia: spariscono tutti e si apre il messaggio che segue.
+    const after = s.list[3].id;
+    await s.clickMsg(a);
+    await s.clickMsg(c, { shift: true });
+    await s.moveSelected('archive');
+    expect(s.list.some((m) => [a, b, c].includes(m.id))).toBe(false);
+    expect(s.isMulti).toBe(false);
+    expect(s.sel).toBe(after);
+    const archive = s.roleFolder('valli', 'archive')!;
+    const archived = (await s.backend.messages(archive.id, null)).map((m) => m.id);
+    expect(archived).toEqual(expect.arrayContaining([a, b, c]));
+  });
+
+  it('azione rapida e spostamento su più messaggi', async () => {
+    const s = await fresh();
+    const [a, b] = s.list.slice(0, 2).map((m) => m.id);
+    await s.clickMsg(a);
+    await s.clickMsg(b, { ctrl: true });
+    // Rispondi ed elimina: niente risposta con più messaggi, ma l'eliminazione sì.
+    await s.runQuickStep(s.quickSteps[1]);
+    expect(s.c).toBeNull();
+    expect(s.toast?.text).toMatch(/un messaggio alla volta/);
+    const trash = s.roleFolder('valli', 'deleted')!;
+    expect((await s.backend.messages(trash.id, null)).map((m) => m.id)).toEqual(expect.arrayContaining([a, b]));
+
+    const clienti = s.folders.find((f) => f.path === 'Clienti')!;
+    const [c, d] = s.list.slice(0, 2).map((m) => m.id);
+    await s.clickMsg(c);
+    await s.clickMsg(d, { ctrl: true });
+    await s.moveToFolder(s.selection, clienti.id);
+    expect((await s.backend.messages(clienti.id, null)).map((m) => m.id)).toEqual(expect.arrayContaining([c, d]));
+  });
+});

@@ -293,6 +293,8 @@ export class MailStore {
   askNoSubject = $state(false);
   /** Passaggio a testo normale: la formattazione si perde, si chiede conferma. */
   askPlain = $state(false);
+  /** Messaggi selezionati insieme (Ctrl+clic, Maiusc+clic, Ctrl+A); vuoto con la selezione di uno solo. */
+  multi = $state<number[]>([]);
   /** Azioni rapide (Home › Azioni rapide) e quella in modifica nelle impostazioni. */
   quickSteps = $state<QuickStep[]>([]);
   quickDraft = $state<QuickStep | null>(null);
@@ -725,44 +727,57 @@ export class MailStore {
       this.openWizard(false);
       return null;
     }
-    if (kind === 'inoltra-allegato') return s ? this.attachmentDraft(s, acct) : null;
+    if (kind === 'inoltra-allegato') return s ? this.attachmentDraft([s], acct) : null;
     const m = this.detail && this.detail.id === id ? this.detail : await this.backend.message(id, false);
     const quote = await this.backend.quoteHtml(id).catch(() => undefined);
     return this.draftFrom(kind === 'rispondi' ? 'reply' : kind === 'rispondi-tutti' ? 'replyAll' : 'forward', m, acct, quote);
   }
 
   /**
-   * Esegue un'azione rapida sul messaggio: prima cambia lo stato (letto,
-   * contrassegno, categorie), poi prepara la risposta o l'inoltro, infine
-   * sposta il messaggio. La risposta si apre alla fine.
+   * Esegue un'azione rapida sui messaggi selezionati (o su quelli indicati):
+   * prima cambia lo stato (letto, contrassegno, categorie), poi prepara la
+   * risposta o l'inoltro, infine sposta. La risposta si apre alla fine. Con
+   * più messaggi l'inoltro li allega tutti; rispondere si fa uno alla volta.
    */
-  async runQuickStep(q: QuickStep, id: number | null = this.sel) {
-    if (id === null || !this.findMsg(id)) return;
+  async runQuickStep(q: QuickStep, target: number | number[] | null = null) {
+    const ids = (target === null ? this.selection : Array.isArray(target) ? target : [target]).filter((id) => this.findMsg(id));
+    if (!ids.length) return;
     let compose: Draft | null = null;
     let moved = false;
+    let skipped = false;
     try {
       for (const a of runOrder(q.actions)) {
-        const m = this.findMsg(id);
         switch (a.kind) {
           case 'letto':
           case 'da-leggere':
-            await this.setRead(id, a.kind === 'letto');
+            await this.markRead(ids, a.kind === 'letto');
             break;
           case 'contrassegna':
           case 'togli-contrassegno':
-            if (m && m.flagged !== (a.kind === 'contrassegna')) await this.toggleFlag(id);
+            await this.setFlag(ids, a.kind === 'contrassegna');
             break;
           case 'categoria':
-            if (m && a.category && !m.categories.includes(a.category)) await this.toggleCategory(id, a.category);
+            if (a.category) await this.setCategoryOn(ids, a.category, true);
             break;
           case 'togli-categorie':
-            await this.clearMsgCategories(id);
+            await this.clearCategoriesOf(ids);
             break;
           case 'rispondi':
           case 'rispondi-tutti':
           case 'inoltra':
           case 'inoltra-allegato': {
-            compose = await this.quickDraftFor(a.kind, id);
+            if (ids.length > 1 && (a.kind === 'rispondi' || a.kind === 'rispondi-tutti')) {
+              skipped = true;
+              break;
+            }
+            if (ids.length > 1) {
+              const acct = this.composeAccount(this.findMsg(ids[0])?.accountId);
+              if (!acct) {
+                this.openWizard(false);
+                return;
+              }
+              compose = this.attachmentDraft(this.msgsOf(ids), acct);
+            } else compose = await this.quickDraftFor(a.kind, ids[0]);
             if (!compose) return;
             if (a.to?.length && (a.kind === 'inoltra' || a.kind === 'inoltra-allegato')) compose.to = a.to.map((p) => ({ ...p }));
             if (a.text?.trim()) {
@@ -774,20 +789,20 @@ export class MailStore {
           }
           case 'sposta':
             if (a.folder !== null && a.folder !== undefined) {
-              await this.dropOnFolder([id], a.folder);
+              await this.dropOnFolder(ids, a.folder);
               moved = true;
             }
             break;
           case 'archivia':
-            await this.moveMsg(id, 'archive');
+            await this.moveMany(ids, 'archive');
             moved = true;
             break;
           case 'elimina':
-            await this.deleteMsg(id);
+            await this.deleteMany(ids);
             moved = true;
             break;
           case 'ignora':
-            await this.backend.ignoreThread(id, true);
+            for (const id of ids) await this.backend.ignoreThread(id, true);
             this.scheduleRefresh();
             moved = true;
             break;
@@ -801,12 +816,19 @@ export class MailStore {
       await this.stashDraft();
       await this.present(compose, this.prefs.compose === 'finestra' && this.prefs.replyWin);
     } else {
-      this.flash({ kind: 'info', text: moved ? `Azione rapida «${q.name}» eseguita: il messaggio è stato spostato.` : `Azione rapida «${q.name}» eseguita.` }, 3500);
+      const what = ids.length > 1 ? `${ids.length} messaggi` : 'il messaggio';
+      const text = skipped
+        ? `Azione rapida «${q.name}» eseguita su ${what}. Per rispondere scegli un messaggio alla volta.`
+        : moved
+          ? `Azione rapida «${q.name}» eseguita: ${ids.length > 1 ? `${ids.length} messaggi spostati` : 'il messaggio è stato spostato'}.`
+          : `Azione rapida «${q.name}» eseguita${ids.length > 1 ? ` su ${what}` : ''}.`;
+      this.flash({ kind: 'info', text }, 3500);
     }
   }
 
   /** Ctrl+Maiusc+1..9. */
   runQuickShortcut(n: number) {
+    if (!this.selection.length) return;
     const q = this.quickSteps.find((x) => x.shortcut === n);
     if (q) void this.runQuickStep(q);
     else this.flash({ kind: 'info', text: `Nessuna azione rapida usa Ctrl+Maiusc+${n}. Puoi assegnarla in Azioni rapide.` }, 4000);
@@ -1135,6 +1157,7 @@ export class MailStore {
 
   async pickOutbox(selId: string) {
     await this.stashPaneDraft();
+    this.multi = [];
     this.fullRead = false;
     this.view = 'uscita';
     this.folderSel = selId;
@@ -1205,6 +1228,11 @@ export class MailStore {
       if (token !== this.listToken) return;
       this.list = items;
       this.listEnd = !!q || items.length < limit;
+      if (reset) this.multi = [];
+      else if (this.multi.length) {
+        const left = this.multi.filter((id) => items.some((m) => m.id === id));
+        if (left.length !== this.multi.length) this.multi = left.length > 1 ? left : [];
+      }
       if (this.sel !== null && !items.some((m) => m.id === this.sel) && !reset) {
         this.sel = null;
         this.detail = null;
@@ -1234,6 +1262,7 @@ export class MailStore {
   async pickMsg(id: number, markRead = true) {
     const m = this.findMsg(id);
     if (!m) return;
+    if (this.multi.length) this.multi = [];
     if (this.speech !== 'off' && this.sel !== id) this.stopSpeech();
     if (m.draft && this.currentFolder?.role === 'drafts' && !this.q.trim()) {
       await this.reopenDraft(m.id);
@@ -1279,6 +1308,173 @@ export class MailStore {
     if (f) f.unread = Math.max(0, f.unread + delta);
   }
 
+  // ---------- Selezione multipla ----------
+
+  /** Punto di partenza di Maiusc+clic e Maiusc+frecce, e ultimo raggiunto. */
+  private anchor: number | null = null;
+  private cursor: number | null = null;
+
+  get isMulti(): boolean {
+    return this.multi.length > 1;
+  }
+
+  /** I messaggi su cui agiscono i comandi: quelli selezionati insieme, o quello aperto. */
+  get selection(): number[] {
+    return this.isMulti ? this.multi : this.sel !== null ? [this.sel] : [];
+  }
+
+  isSelected(id: number): boolean {
+    return this.isMulti ? this.multi.includes(id) : this.sel === id;
+  }
+
+  /** Clic su un messaggio: con Ctrl (Cmd sul Mac) lo aggiunge o lo toglie, con Maiusc seleziona l'intervallo. */
+  async clickMsg(id: number, mods: { ctrl?: boolean; shift?: boolean } = {}) {
+    const from = this.anchor ?? this.sel;
+    if (mods.shift && from !== null) return this.selectRange(from, id);
+    if (mods.ctrl) return this.toggleSelect(id);
+    this.anchor = id;
+    this.cursor = id;
+    await this.pickMsg(id);
+  }
+
+  /** Ctrl+clic, o la casella al posto della foto. */
+  async toggleSelect(id: number) {
+    const base = [...this.selection];
+    const i = base.indexOf(id);
+    if (i >= 0) base.splice(i, 1);
+    else base.push(id);
+    this.anchor = id;
+    this.cursor = id;
+    await this.setMulti(base);
+  }
+
+  /** Maiusc+clic: tutti i messaggi dell'elenco fra i due. */
+  async selectRange(from: number, to: number) {
+    const ids = this.list.map((m) => m.id);
+    const a = ids.indexOf(from);
+    const b = ids.indexOf(to);
+    if (a < 0 || b < 0) return this.toggleSelect(to);
+    this.anchor = from;
+    this.cursor = to;
+    await this.setMulti(ids.slice(Math.min(a, b), Math.max(a, b) + 1));
+  }
+
+  /** Ctrl+A nell'elenco. */
+  async selectAll() {
+    const ids = this.list.map((m) => m.id);
+    if (!ids.length) return;
+    this.anchor = ids[0];
+    this.cursor = ids[ids.length - 1];
+    await this.setMulti(ids);
+  }
+
+  /** Maiusc+frecce: allarga o restringe la selezione dal messaggio di partenza. */
+  async extendSelection(step: 1 | -1) {
+    const ids = this.list.map((m) => m.id);
+    const from = this.anchor !== null && ids.includes(this.anchor) ? this.anchor : this.sel;
+    if (from === null) return this.moveSelection(step);
+    const i = ids.indexOf(this.cursor ?? from);
+    if (i < 0) return;
+    await this.selectRange(from, ids[Math.min(Math.max(i + step, 0), ids.length - 1)]);
+  }
+
+  /** Togli la selezione multipla: nessun messaggio aperto. */
+  clearMulti() {
+    this.multi = [];
+    this.sel = null;
+    this.detail = null;
+  }
+
+  /** Uno solo torna la selezione normale (si apre); nessuno svuota il riquadro. */
+  private async setMulti(ids: number[]) {
+    const unique = [...new Set(ids)].filter((id) => this.findMsg(id));
+    if (unique.length > 1) {
+      if (this.speech !== 'off') this.stopSpeech();
+      await this.stashPaneDraft();
+      this.multi = unique;
+      this.sel = null;
+      this.detail = null;
+      this.fullRead = false;
+      return;
+    }
+    this.multi = [];
+    if (unique.length === 1) {
+      // Ne resta uno: da lì riparte Maiusc+clic.
+      this.anchor = unique[0];
+      this.cursor = unique[0];
+      await this.pickMsg(unique[0], false);
+    } else {
+      this.sel = null;
+      this.detail = null;
+    }
+  }
+
+  private msgsOf(ids: number[]): MessageSummary[] {
+    return ids.map((id) => this.findMsg(id)).filter((m): m is MessageSummary => !!m);
+  }
+
+  /** Elimina più messaggi insieme. */
+  async deleteMany(ids: number[] = this.selection) {
+    if (!ids.length) return;
+    this.dropFromList(ids);
+    await this.act(() => this.backend.deleteMessages(ids));
+  }
+
+  /** Archivia, posta indesiderata...: più messaggi insieme. */
+  async moveMany(ids: number[], role: Role) {
+    if (!ids.length || (this.currentFolder?.role === role && !this.q.trim())) return;
+    this.dropFromList(ids);
+    await this.act(() => this.backend.moveToRole(ids, role));
+  }
+
+  async moveSelected(role: Role) {
+    await this.moveMany(this.selection, role);
+  }
+
+  /** Letti o da leggere, più messaggi insieme. */
+  async markRead(ids: number[], read: boolean) {
+    const ms = this.msgsOf(ids).filter((m) => m.unread === read);
+    if (!ms.length) return;
+    for (const m of ms) {
+      this.eachCopy(m.id, (x) => (x.unread = !read));
+      this.bumpFolder(m.folderId, read ? -1 : 1);
+    }
+    await this.act(() => this.backend.setFlags(ms.map((m) => m.id), read, null));
+  }
+
+  /** Letto/Non letto: se ce n'è uno da leggere li segna tutti letti, altrimenti tutti da leggere. */
+  async toggleReadSelected() {
+    const ms = this.msgsOf(this.selection);
+    if (ms.length) await this.markRead(ms.map((m) => m.id), ms.some((m) => m.unread));
+  }
+
+  async setFlag(ids: number[], flagged: boolean) {
+    const ms = this.msgsOf(ids).filter((m) => m.flagged !== flagged);
+    if (!ms.length) return;
+    for (const m of ms) this.eachCopy(m.id, (x) => (x.flagged = flagged));
+    await this.act(() => this.backend.setFlags(ms.map((m) => m.id), null, flagged));
+  }
+
+  /** Contrassegna: se ce n'è uno senza contrassegno li contrassegna tutti, altrimenti toglie. */
+  async toggleFlagSelected() {
+    const ms = this.msgsOf(this.selection);
+    if (ms.length) await this.setFlag(ms.map((m) => m.id), ms.some((m) => !m.flagged));
+  }
+
+  async setCategoryOn(ids: number[], catId: string, on: boolean) {
+    const ms = this.msgsOf(ids).filter((m) => m.categories.includes(catId) !== on);
+    if (!ms.length) return;
+    for (const m of ms) this.eachCopy(m.id, (x) => (x.categories = on ? [...x.categories, catId] : x.categories.filter((c) => c !== catId)));
+    await this.act(() => this.backend.setCategory(ms.map((m) => m.id), catId, on));
+  }
+
+  async clearCategoriesOf(ids: number[]) {
+    const ms = this.msgsOf(ids).filter((m) => m.categories.length);
+    if (!ms.length) return;
+    for (const m of ms) this.eachCopy(m.id, (x) => (x.categories = []));
+    await this.act(() => this.backend.clearCategories(ms.map((m) => m.id)));
+  }
+
   /** Sposta la selezione al messaggio precedente o successivo dell'elenco (frecce). */
   async moveSelection(step: 1 | -1) {
     const l = this.list;
@@ -1291,11 +1487,20 @@ export class MailStore {
   /** Toglie un messaggio dall'elenco e seleziona il successivo, come Outlook. */
   private dropFromList(ids: number[]) {
     const l = this.list;
-    const i = l.findIndex((m) => m.id === this.sel);
     const gone = new Set(ids);
+    // Con più messaggi selezionati si riparte dal primo tolto, come Outlook.
+    const i = this.multi.length ? l.findIndex((m) => gone.has(m.id)) : l.findIndex((m) => m.id === this.sel);
     for (const m of l) if (gone.has(m.id) && m.unread) this.bumpFolder(m.folderId, -1);
     this.list = l.filter((m) => !gone.has(m.id));
     for (const k of Object.keys(this.threadOpen)) this.threadOpen[k] = this.threadOpen[k].filter((m) => !gone.has(m.id));
+    if (this.multi.length) {
+      const left = this.multi.filter((id) => !gone.has(id));
+      if (left.length !== this.multi.length) {
+        this.multi = left.length > 1 ? left : [];
+        const next = left.length === 1 ? this.findMsg(left[0]) : this.list.length ? this.list[Math.min(Math.max(i, 0), this.list.length - 1)] : null;
+        if (left.length <= 1 && next && !next.draft) void this.pickMsg(next.id, left.length === 1 ? false : true);
+      }
+    }
     if (this.sel !== null && gone.has(this.sel)) {
       const rest = this.list;
       const next = rest.length ? rest[Math.min(Math.max(i, 0), rest.length - 1)] : null;
@@ -1322,10 +1527,11 @@ export class MailStore {
     await this.act(() => this.backend.moveToRole([id], role));
   }
 
-  async moveToFolder(id: number | null, folderId: number) {
-    if (id === null || folderId === this.folderId) return;
-    this.dropFromList([id]);
-    await this.act(() => this.backend.moveMessages([id], folderId));
+  async moveToFolder(id: number | number[] | null, folderId: number) {
+    const ids = id === null ? [] : Array.isArray(id) ? id : [id];
+    if (!ids.length || folderId === this.folderId) return;
+    this.dropFromList(ids);
+    await this.act(() => this.backend.moveMessages(ids, folderId));
   }
 
   async deleteMsg(id: number | null) {
@@ -1789,26 +1995,31 @@ export class MailStore {
     await this.present(d, inWindow);
   }
 
-  /** Bozza con il messaggio intero allegato come file .eml. */
-  private attachmentDraft(m: MessageSummary, acct: Account): Draft {
+  /** Bozza con i messaggi interi allegati come file .eml (con più messaggi l'oggetto resta da scrivere, come in Outlook). */
+  private attachmentDraft(ms: MessageSummary[], acct: Account): Draft {
     const d = this.emptyDraft(acct.id);
-    const subject = cleanSubject(m.subject) || 'Messaggio';
-    d.subject = `I: ${subject}`;
-    const file = subject.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Messaggio';
-    d.attachments = [{ name: `${file}.eml`, size: m.size, mime: 'message/rfc822', path: null, source: null, message: m.id }];
+    const name = (m: MessageSummary) => (cleanSubject(m.subject) || 'Messaggio').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Messaggio';
+    if (ms.length === 1) d.subject = `I: ${cleanSubject(ms[0].subject) || 'Messaggio'}`;
+    const used = new Map<string, number>();
+    d.attachments = ms.map((m) => {
+      const base = name(m);
+      const n = (used.get(base) ?? 0) + 1;
+      used.set(base, n);
+      return { name: n > 1 ? `${base} (${n}).eml` : `${base}.eml`, size: m.size, mime: 'message/rfc822', path: null, source: null, message: m.id };
+    });
     return d;
   }
 
-  /** Inoltra come allegato: il messaggio intero viaggia come file .eml. */
-  async forwardAsAttachment(id: number | null = this.sel) {
-    const m = id === null ? null : this.findMsg(id);
-    if (!m) return;
-    const acct = this.composeAccount(m.accountId);
+  /** Inoltra come allegato: i messaggi interi viaggiano come file .eml (Ctrl+Alt+F, o Inoltra con più messaggi). */
+  async forwardAsAttachment(ids: number | number[] | null = this.selection) {
+    const ms = this.msgsOf(ids === null ? [] : Array.isArray(ids) ? ids : [ids]);
+    if (!ms.length) return;
+    const acct = this.composeAccount(ms[0].accountId);
     if (!acct) {
       this.openWizard(false);
       return;
     }
-    const d = this.attachmentDraft(m, acct);
+    const d = this.attachmentDraft(ms, acct);
     await this.stashDraft();
     await this.present(d, this.prefs.compose === 'finestra' && this.prefs.replyWin);
   }

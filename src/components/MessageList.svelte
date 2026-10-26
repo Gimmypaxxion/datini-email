@@ -7,7 +7,8 @@
   import Menu from './Menu.svelte';
   import Toast from './Toast.svelte';
   import { store, folderLabel, DRAG_TYPE } from '../lib/store.svelte';
-  import { categoryItems, messageItems, moveItems, quickItems, type MenuItem } from '../lib/menus';
+  import { categoryItems, messageItems, moveItems, multiItems, quickItems, type MenuItem } from '../lib/menus';
+  import { isMac } from '../lib/platform';
   import { GROUP_ORDER, groupLabel, initials, listTime, peopleText, personLabel, tint, whenText } from '../lib/format';
   import type { MessageSummary, Role } from '../lib/types';
 
@@ -98,18 +99,20 @@
     e.preventDefault();
     const el = e.currentTarget as HTMLElement;
     const at = { x: e.clientX, y: e.clientY };
+    // Sul messaggio di una selezione multipla il menu vale per tutti i selezionati.
+    const ids = store.isMulti && store.multi.includes(m.id) ? [...store.multi] : [m.id];
     const sub = (kind: 'categorie' | 'sposta' | 'azioni') => {
       // Il secondo menu si apre nello stesso punto, appena chiuso il primo.
       setTimeout(() => {
         ctx =
           kind === 'categorie'
-            ? { el, ...at, items: categoryItems(m), label: 'Categorizza' }
+            ? { el, ...at, items: categoryItems(m, ids), label: 'Categorizza' }
             : kind === 'azioni'
-              ? { el, ...at, items: quickItems(false, m.id), label: 'Azioni rapide' }
-              : { el, ...at, items: moveItems(m), label: 'Sposta in' };
+              ? { el, ...at, items: quickItems(false, ids), label: 'Azioni rapide' }
+              : { el, ...at, items: moveItems(m, ids), label: 'Sposta in' };
       }, 0);
     };
-    ctx = { el, ...at, items: messageItems(m, sub), label: 'Azioni sul messaggio' };
+    ctx = ids.length > 1 ? { el, ...at, items: multiItems(ids, sub), label: `${ids.length} messaggi selezionati` } : { el, ...at, items: messageItems(m, sub), label: 'Azioni sul messaggio' };
   }
 
   function menuKey(e: KeyboardEvent, m: MessageSummary) {
@@ -120,12 +123,23 @@
     }
   }
 
-  /** Trascinare un messaggio su una cartella lo sposta lì. */
+  /** Trascinare un messaggio (o quelli selezionati insieme) su una cartella lo sposta lì. */
   function dragStart(e: DragEvent, m: MessageSummary) {
     if (!e.dataTransfer) return;
+    const ids = store.isMulti && store.multi.includes(m.id) ? [...store.multi] : [m.id];
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData(DRAG_TYPE, JSON.stringify([m.id]));
-    e.dataTransfer.setData('text/plain', m.subject || '(nessun oggetto)');
+    e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(ids));
+    e.dataTransfer.setData('text/plain', ids.length > 1 ? `${ids.length} messaggi` : m.subject || '(nessun oggetto)');
+  }
+
+  /** Clic con Ctrl (Cmd sul Mac) o Maiusc: selezione di più messaggi. */
+  function click(e: MouseEvent, id: number) {
+    void store.clickMsg(id, { ctrl: isMac ? e.metaKey : e.ctrlKey, shift: e.shiftKey });
+  }
+
+  /** Maiusc+clic non deve selezionare il testo della pagina. */
+  function noTextSelect(e: MouseEvent) {
+    if (e.shiftKey || (isMac ? e.metaKey : e.ctrlKey)) e.preventDefault();
   }
 
   function onscroll(e: Event) {
@@ -142,24 +156,25 @@
 {/snippet}
 
 {#snippet msgRow(m: MessageSummary, conv: Row['conv'])}
-  {@const on = m.id === store.sel}
+  {@const on = store.isSelected(m.id)}
   {@const name = who(m)}
   {@const t = tint(name)}
   {@const unread = conv ? conv.unread : m.unread}
   {@const strong = unread && !on}
   {@const open = !!(conv && store.threadOpen[conv.key])}
   {@const many = !!conv && conv.count > 1}
-  <div class="row" class:conv={convMode} data-sel={on ? 'si' : 'no'}>
+  <div class="row" class:conv={convMode} data-sel={on ? 'si' : 'no'} data-multi={store.isMulti ? '' : undefined}>
     <button
       class="row-main"
       draggable="true"
       ondragstart={(e) => dragStart(e, m)}
       oncontextmenu={(e) => openMenu(e, m)}
       onkeydown={(e) => menuKey(e, m)}
-      onclick={() => store.pickMsg(m.id)}
+      onmousedown={noTextSelect}
+      onclick={(e) => click(e, m.id)}
       ondblclick={() => store.readingPane === 'nascosto' && store.openFull(m.id)}
       aria-current={on ? 'true' : undefined}
-      aria-label={`${unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${many ? `Conversazione di ${conv!.count} messaggi. ` : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
+      aria-label={`${store.isMulti && on ? 'Selezionato. ' : ''}${unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${many ? `Conversazione di ${conv!.count} messaggi. ` : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
     >
       <span class="bar" aria-hidden="true" style:background={unread ? 'var(--brand)' : 'transparent'}></span>
       <span class="avatar pic" aria-hidden="true" style="background:{t.bg};color:{t.fg}">{initials(name)}</span>
@@ -184,6 +199,9 @@
         </span>
       </span>
     </button>
+    <button class="pick" role="checkbox" aria-checked={store.isMulti && on} aria-label="Seleziona: {m.subject || 'nessun oggetto'}" title={store.isMulti && on ? 'Togli dalla selezione' : 'Seleziona più messaggi'} onclick={() => store.toggleSelect(m.id)}>
+      <Icon name={store.isMulti && on ? 'circle-check-filled' : 'circle'} size={20} />
+    </button>
     {#if many}
       <button class="ibtn btn tog" aria-expanded={open} onclick={() => store.toggleThread(m)} aria-label={open ? 'Chiudi la conversazione' : `Mostra i ${conv!.count} messaggi della conversazione`} title={open ? 'Chiudi la conversazione' : 'Mostra la conversazione'}>
         <Icon name={open ? 'chevron-down' : 'chevron-right'} size={16} stroke={1.8} />
@@ -200,7 +218,7 @@
 {/snippet}
 
 {#snippet childRow(k: MessageSummary)}
-  {@const on = k.id === store.sel}
+  {@const on = store.isSelected(k.id)}
   {@const elsewhere = k.folderId !== store.folderId}
   <div class="row kid" data-sel={on ? 'si' : 'no'}>
     <button
@@ -209,7 +227,8 @@
       ondragstart={(e) => dragStart(e, k)}
       oncontextmenu={(e) => openMenu(e, k)}
       onkeydown={(e) => menuKey(e, k)}
-      onclick={() => store.pickMsg(k.id)}
+      onmousedown={noTextSelect}
+      onclick={(e) => click(e, k.id)}
       ondblclick={() => store.readingPane === 'nascosto' && store.openFull(k.id)}
       aria-current={on ? 'true' : undefined}
       aria-label={`${k.unread ? 'Non letto. ' : ''}${personLabel(k.from)}, ${listTime(k.date, now)}${elsewhere ? `, in ${folderOf(k)}` : ''}`}
@@ -393,6 +412,15 @@
   .pane-list[data-density="compatta"] .group { margin-top: 8px; }
   .pane-list[data-density="compatta"] .tog { top: 9px; }
   .pic { width: 36px; height: 36px; font-size: 13px; }
+  /* Casella al posto della foto: compare passando sopra al messaggio o con più messaggi selezionati, come nel nuovo Outlook. */
+  .pick { position: absolute; left: 14px; top: 10px; z-index: 1; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--sheet); color: var(--ink-2); opacity: 0; transition: opacity .12s ease-out; }
+  .row[data-sel="si"] .pick { background: var(--brand-sel); }
+  .row:not([data-sel="si"]):hover .pick { background: linear-gradient(var(--hover), var(--hover)) var(--sheet); }
+  .row:hover .pick, .row[data-multi] .pick, .pick:focus-visible { opacity: 1; }
+  .pick[aria-checked="true"] { color: var(--brand-ink); }
+  .row.conv .pick { left: 32px; }
+  .pane-list[data-density="compatta"] .pick { display: none; }
+  .pane-list[data-density="ampia"] .pick { top: 14px; }
   /* Elenco largo (riquadro in basso o nascosto): una riga per messaggio, come in Outlook. */
   @container lista (min-width: 780px) {
     .row:not(.kid) :global(.row-main) { grid-template-columns: 28px minmax(0, 1fr); align-items: center; padding-top: 7px; padding-bottom: 7px; }
@@ -406,6 +434,8 @@
     .bar { top: 8px; bottom: 8px; }
     .tog { top: 9px; }
     .row-acts { top: 3px; }
+    .pick { top: 50%; width: 28px; height: 28px; transform: translateY(-50%); }
+    .pane-list[data-density="ampia"] .pick { top: 50%; }
     .row.kid :global(.row-main) { padding-left: 54px; }
     .row.kid .bar { left: 42px; }
     .pane-list[data-density="ampia"] :global(.row-main) { padding-top: 10px; padding-bottom: 10px; }
