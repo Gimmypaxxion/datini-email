@@ -208,6 +208,8 @@ export interface MessageSummary {
   size: number;
   /** Messaggi della stessa conversazione nell'account (escluse eliminata e indesiderata). */
   threadCount: number;
+  /** Priorità: 1 alta, 0 normale, -1 bassa. */
+  importance?: number;
 }
 
 export interface AttachmentInfo {
@@ -232,6 +234,8 @@ export interface MessageDetail extends MessageSummary {
   remoteAllowed: boolean;
   /** Invito a una riunione contenuto nel messaggio. */
   invite?: Invite | null;
+  /** Il mittente chiede la conferma di lettura (e non è ancora stata data). */
+  receiptTo?: Person | null;
 }
 
 export interface AttachmentRef {
@@ -266,7 +270,18 @@ export interface Draft {
   inReplyTo: string | null;
   references: string[];
   replyToMessage: number | null;
+  /** Priorità: 'high', 'low' o normale (null). */
+  importance?: Importance | null;
+  /** Richiedi conferma di lettura. */
+  readReceipt?: boolean;
+  /** Richiedi conferma di recapito. */
+  deliveryReceipt?: boolean;
 }
+
+export type Importance = 'high' | 'low';
+
+/** Risposta alle richieste di conferma di lettura: chiedi ogni volta, sempre, mai. */
+export type ReceiptReply = 'chiedi' | 'sempre' | 'mai';
 
 export interface SavedDraft {
   id: number;

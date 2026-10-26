@@ -348,6 +348,8 @@ pub struct MessageSummary {
     pub size: i64,
     /// Messaggi della stessa conversazione nell'account.
     pub thread_count: i64,
+    /// Priorità: 1 alta, 0 normale, -1 bassa.
+    pub importance: i8,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -379,6 +381,8 @@ pub struct MessageDetail {
     pub remote_allowed: bool,
     /// Invito a una riunione, da accettare o rifiutare.
     pub invite: Option<Invite>,
+    /// Il mittente chiede una conferma di lettura a questo indirizzo (non ancora mandata).
+    pub receipt_to: Option<Person>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -407,7 +411,7 @@ pub struct DraftAttachment {
     pub message: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Draft {
     /// Identifica la bozza tra un salvataggio e l'altro.
@@ -441,6 +445,18 @@ pub struct Draft {
     /// Messaggio a cui si risponde: dopo l'invio riceve il segno "risposto".
     #[serde(default)]
     pub reply_to_message: Option<i64>,
+    /// Priorità: "high" (alta) o "low" (bassa); senza, normale.
+    #[serde(default)]
+    pub importance: Option<String>,
+    /// Richiedi conferma di lettura (Disposition-Notification-To).
+    #[serde(default)]
+    pub read_receipt: bool,
+    /// Richiedi conferma di recapito (DSN, se il server la offre).
+    #[serde(default)]
+    pub delivery_receipt: bool,
+    /// Conferma di lettura mandata da Better-Look: non si copia in Posta inviata.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mdn: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

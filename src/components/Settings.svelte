@@ -15,7 +15,13 @@
   import { EditorCtl, FONTS, SIZES, fontStack } from '../lib/editor.svelte';
   import { ACCENT_SWATCHES, DEFAULT_ACCENT, accentPalette, accentShift, normalizeHex, readableOn } from '../lib/accent';
   import { isMac } from '../lib/platform';
-  import { CATEGORY_COLORS, type Category, type CategoryColor, type ServerConfig, type Signature, type SyncOptions } from '../lib/types';
+  import { CATEGORY_COLORS, type Category, type CategoryColor, type ReceiptReply, type ServerConfig, type Signature, type SyncOptions } from '../lib/types';
+
+  const RECEIPT_CHOICES: [ReceiptReply, string][] = [
+    ['chiedi', 'Chiedi ogni volta se inviarla'],
+    ['sempre', 'Inviala sempre'],
+    ['mai', 'Non inviarla mai'],
+  ];
 
   interface Opt {
     on: boolean;
@@ -492,7 +498,7 @@
           </div>
         {:else if store.setPage === 'composizione'}
           <h3>Composizione e risposta</h3>
-          <p class="intro">La firma in fondo ai messaggi e il carattere del testo che scrivi.</p>
+          <p class="intro">La firma in fondo ai messaggi, il carattere del testo che scrivi e le conferme di lettura.</p>
 
           <div class="group-a">
             <h4 class="tight">Firma e-mail</h4>
@@ -609,6 +615,30 @@
             </div>
             <p class="preview" style:font-family={fontStack(store.font.family)} style:font-size="{store.font.size}pt">Gentile cliente, le invio il preventivo aggiornato.</p>
           </div>
+
+          <div class="group-a">
+            <h4 class="tight">Conferme di recapito e di lettura</h4>
+            <p class="hint">Per sapere se un messaggio è arrivato e se è stato aperto. La conferma di lettura la manda chi riceve, solo se è d’accordo; quella di recapito arriva dal suo server, se la offre.</p>
+            <p class="rc-h">Per tutti i messaggi che invii, richiedi:</p>
+            <label class="check rc">
+              <input type="checkbox" checked={store.trackDelivery} onchange={(e) => store.setTracking({ trackDelivery: e.currentTarget.checked })} />
+              La conferma di recapito
+            </label>
+            <label class="check rc">
+              <input type="checkbox" checked={store.trackRead} onchange={(e) => store.setTracking({ trackRead: e.currentTarget.checked })} />
+              La conferma di lettura
+            </label>
+            <p class="hint sub">Per un solo messaggio usa la scheda Opzioni, mentre lo scrivi.</p>
+            <p class="rc-h" id="set-rcpt">Quando qualcuno ti chiede una conferma di lettura:</p>
+            <div role="radiogroup" aria-labelledby="set-rcpt">
+              {#each RECEIPT_CHOICES as [v, label] (v)}
+                <label class="check rc">
+                  <input type="radio" name="set-rcpt" checked={store.receiptReply === v} onchange={() => store.setTracking({ receiptReply: v })} />
+                  {label}
+                </label>
+              {/each}
+            </div>
+          </div>
         {:else if store.setPage === 'categorie'}
           <h3>Categorie</h3>
           <p class="intro">Le categorie colorano i messaggi per ritrovarli a colpo d’occhio. Assegnale con Categorizza o con il clic destro su un messaggio.</p>
@@ -723,6 +753,8 @@
   .hint.sub { margin: 6px 0 0 28px; }
   .pills { display: flex; flex-wrap: wrap; gap: 8px; }
   .group-a { margin-top: 26px; }
+  .rc-h { margin: 18px 0 0; font-size: 14px; font-weight: 600; }
+  .check.rc { margin-top: 10px; }
   .state { display: flex; align-items: center; gap: 6px; }
   .state[data-s="pronto"] :global(svg), .state[data-s="sincronizzazione"] :global(svg) { color: var(--green); }
   .state[data-s="offline"] :global(svg), .state[data-s="errore"] :global(svg) { color: var(--warn); }

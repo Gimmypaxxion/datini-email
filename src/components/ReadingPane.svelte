@@ -102,6 +102,22 @@
 
       {#if m.invite}<InviteCard invite={m.invite} />{/if}
 
+      {#if m.importance === 1 || m.importance === -1}
+        <div class="note-bar info prio" role="note">
+          <Icon name={m.importance === 1 ? 'exclamation-mark' : 'arrow-narrow-down'} style="color:{m.importance === 1 ? 'var(--danger)' : 'var(--brand-ink)'}" />
+          <span class="t">Il messaggio è stato inviato con priorità {m.importance === 1 ? 'alta' : 'bassa'}.</span>
+        </div>
+      {/if}
+
+      {#if m.receiptTo && store.receiptReply === 'chiedi'}
+        <div class="note-bar info receipt" role="note">
+          <Icon name="mail-opened" style="color:var(--brand-ink)" />
+          <span class="t">{personLabel(m.receiptTo) || m.receiptTo.email} chiede una conferma di lettura.</span>
+          <button class="act" onclick={() => store.answerReceipt(true)}>Invia conferma</button>
+          <button class="act" onclick={() => store.answerReceipt(false)}>Non inviare</button>
+        </div>
+      {/if}
+
       {#if store.speech !== 'off'}
         <div class="note-bar info speech" role="status">
           <Icon name="volume" style="color:var(--brand-ink)" />
@@ -236,7 +252,8 @@
   .acts { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   .row-btns { display: flex; gap: 2px; }
   .date { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .privacy, .speech { margin: 16px 0 0 58px; border-radius: 4px; }
+  .privacy, .speech, .prio, .receipt { margin: 16px 0 0 58px; border-radius: 4px; }
+  .note-bar + .note-bar { margin-top: 6px; }
   .speech .act { display: inline-flex; align-items: center; gap: 6px; }
   .atts { margin: 14px 0 0 58px; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
   .att { position: relative; display: flex; align-items: center; max-width: 300px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--rule-2); }
@@ -256,6 +273,6 @@
   .multi-acts { margin-top: 20px; max-width: 520px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
   .clear { margin-top: 14px; height: 30px; padding: 0 10px; font-size: 13.5px; }
   .clear:hover { background: var(--hover); }
-  @media (max-width: 1200px) { .body, .atts, .foot, .privacy, .speech { margin-left: 0; } }
+  @media (max-width: 1200px) { .body, .atts, .foot, .privacy, .speech, .prio, .receipt { margin-left: 0; } }
   @media (max-width: 760px) { .pane-read { display: none; } }
 </style>

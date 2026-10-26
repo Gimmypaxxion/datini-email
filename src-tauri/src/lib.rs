@@ -207,6 +207,8 @@ pub fn run() {
             commands::search,
             commands::message,
             commands::quote_html,
+            commands::send_read_receipt,
+            commands::skip_read_receipt,
             commands::signatures,
             commands::save_signature,
             commands::delete_signature,

@@ -370,3 +370,52 @@ describe('selezione di più messaggi', () => {
     expect((await s.backend.messages(clienti.id, null)).map((m) => m.id)).toEqual(expect.arrayContaining([c, d]));
   });
 });
+
+describe('priorità e conferme', () => {
+  it('priorità e conferme del messaggio in scrittura', async () => {
+    const s = await fresh();
+    await s.openCompose('new');
+    expect(s.c!.importance ?? null).toBeNull();
+    s.setImportance('high');
+    expect(s.c!.importance).toBe('high');
+    s.setImportance('low');
+    expect(s.c!.importance).toBe('low');
+    s.setImportance('low');
+    expect(s.c!.importance).toBeNull();
+    s.toggleReceipt('lettura');
+    s.toggleReceipt('recapito');
+    expect(s.c!.readReceipt && s.c!.deliveryReceipt).toBe(true);
+
+    // Richiesta per tutti i messaggi: vale per i nuovi.
+    s.setTracking({ trackRead: true });
+    await s.discard();
+    await s.openCompose('new');
+    expect(s.c!.readReceipt).toBe(true);
+    expect(s.c!.deliveryReceipt).toBeFalsy();
+  });
+
+  it('la conferma di lettura chiesta dal mittente', async () => {
+    const s = await fresh();
+    const mock = s.backend as MockBackend;
+    expect(s.list.find((m) => m.id === 4)!.importance).toBe(1);
+    expect(s.list.find((m) => m.id === 12)?.importance ?? -1).toBe(-1);
+
+    await s.pickMsg(4);
+    expect(s.detail!.receiptTo?.email).toBe('prestampa@tipografiagualtieri.it');
+    await s.answerReceipt(false);
+    expect(s.detail!.receiptTo).toBeNull();
+    expect(mock.receiptsSent).toEqual([]);
+    await s.loadDetail(4);
+    expect(s.detail!.receiptTo).toBeNull();
+
+    // Con "Inviala sempre" parte da sola, una volta.
+    mock.receiptsDone.clear();
+    s.setTracking({ receiptReply: 'sempre' });
+    await s.loadDetail(4);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mock.receiptsSent).toEqual([{ id: 4, automatic: true }]);
+    expect(s.detail!.receiptTo).toBeNull();
+    await s.loadDetail(4);
+    expect(mock.receiptsSent.length).toBe(1);
+  });
+});

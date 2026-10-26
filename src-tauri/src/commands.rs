@@ -94,6 +94,17 @@ pub async fn quote_html(e: E<'_>, id: i64) -> Result<String> {
     e.quote_html(id).await
 }
 
+/// Invia la conferma di lettura chiesta dal mittente.
+#[tauri::command]
+pub async fn send_read_receipt(e: E<'_>, id: i64, automatic: bool) -> Result<bool> {
+    e.send_read_receipt(id, automatic).await
+}
+
+#[tauri::command]
+pub fn skip_read_receipt(e: E<'_>, id: i64) -> Result<()> {
+    e.skip_read_receipt(id)
+}
+
 #[tauri::command]
 pub async fn signatures(e: E<'_>) -> Result<Vec<Signature>> {
     e.signatures()

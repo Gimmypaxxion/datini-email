@@ -47,6 +47,10 @@ export interface Backend {
   message(id: number, allowRemote: boolean): Promise<MessageDetail>;
   /** Testo del messaggio da citare in una risposta (frammento HTML ripulito). */
   quoteHtml(id: number): Promise<string>;
+  /** Invia la conferma di lettura chiesta dal mittente; false se non serve più. */
+  sendReadReceipt(id: number, automatic: boolean): Promise<boolean>;
+  /** Non inviare la conferma di lettura (e non chiederla più). */
+  skipReadReceipt(id: number): Promise<void>;
   signatures(): Promise<Signature[]>;
   saveSignature(s: Signature): Promise<Signature>;
   deleteSignature(id: string): Promise<void>;
@@ -209,6 +213,12 @@ export class TauriBackend implements Backend {
   }
   quoteHtml(id: number) {
     return this.call<string>('quote_html', { id });
+  }
+  sendReadReceipt(id: number, automatic: boolean) {
+    return this.call<boolean>('send_read_receipt', { id, automatic });
+  }
+  skipReadReceipt(id: number) {
+    return this.call<void>('skip_read_receipt', { id });
   }
   signatures() {
     return this.call<Signature[]>('signatures');

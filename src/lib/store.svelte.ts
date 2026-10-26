@@ -48,6 +48,8 @@ import {
   type SyncOptions,
   type QuickStep,
   type MessageTemplate,
+  type Importance,
+  type ReceiptReply,
 } from './types';
 
 export type RibbonMode = 'estesa' | 'compatta';
@@ -55,8 +57,8 @@ export type EntryMode = 'file' | 'ingranaggio';
 export type ComposeMode = 'finestra' | 'pannello';
 export type ThemeChoice = 'sistema' | 'chiaro' | 'scuro';
 export type StyleName = 'classico' | 'nuovo';
-export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inserisci' | 'formato';
-export type WinTab = 'messaggio' | 'inserisci' | 'formato';
+export type RibbonTab = 'home' | 'visualizza' | 'aiuto' | 'messaggio' | 'inserisci' | 'opzioni' | 'formato';
+export type WinTab = 'messaggio' | 'inserisci' | 'opzioni' | 'formato';
 export type ComposeKind = 'new' | 'reply' | 'replyAll' | 'forward';
 export type RecipientField = 'to' | 'cc' | 'bcc';
 /** Parte del programma mostrata: posta, calendario, contatti, attività (Ctrl+1, 2, 3, 4). */
@@ -168,6 +170,11 @@ interface Saved {
   tasksView?: string;
   /** Chiudendo la finestra Better-Look resta attivo in sottofondo. */
   background?: boolean;
+  /** Richieste di conferma di lettura: chiedi, sempre, mai. */
+  receiptReply?: ReceiptReply;
+  /** Per tutti i messaggi inviati, richiedi la conferma di lettura e di recapito. */
+  trackRead?: boolean;
+  trackDelivery?: boolean;
 }
 
 /** Misure predefinite dell'elenco dei messaggi. */
@@ -243,6 +250,10 @@ export class MailStore {
   /** Chiudendo la finestra resta attivo in sottofondo; avvio all'accensione del computer. */
   background = $state(true);
   autoStart = $state(false);
+  /** Rilevamento: risposta alle richieste di conferma e richieste per tutti i messaggi inviati. */
+  receiptReply = $state<ReceiptReply>('chiedi');
+  trackRead = $state(false);
+  trackDelivery = $state(false);
   /** Misure dell'elenco, cambiate trascinando il separatore. */
   listW = $state(LIST_W);
   listH = $state(LIST_H);
@@ -343,6 +354,9 @@ export class MailStore {
         if (typeof saved.listW === 'number' && saved.listW >= 280 && saved.listW <= 1600) this.listW = Math.round(saved.listW);
         if (typeof saved.listH === 'number' && saved.listH >= 0.2 && saved.listH <= 0.75) this.listH = saved.listH;
         if (typeof saved.background === 'boolean') this.background = saved.background;
+        if (saved.receiptReply === 'chiedi' || saved.receiptReply === 'sempre' || saved.receiptReply === 'mai') this.receiptReply = saved.receiptReply;
+        this.trackRead = saved.trackRead === true;
+        this.trackDelivery = saved.trackDelivery === true;
         if (typeof saved.tasksView === 'string' && /^(giornata|importanti|pianificate|attivita|contrassegnati|elenco:[\w-]+)$/.test(saved.tasksView)) this.tasks.view = saved.tasksView as TaskView;
       }
     }
@@ -389,6 +403,9 @@ export class MailStore {
       listH: this.listH,
       tasksView: this.tasks.view,
       background: this.background,
+      receiptReply: this.receiptReply,
+      trackRead: this.trackRead,
+      trackDelivery: this.trackDelivery,
     };
     try {
       globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1115,7 +1132,7 @@ export class MailStore {
 
   get ribbonTabs(): RibbonTab[] {
     if (this.module !== 'posta') return ['home', 'aiuto'];
-    return this.paneCompose ? ['home', 'visualizza', 'aiuto', 'messaggio', 'inserisci', 'formato'] : ['home', 'visualizza', 'aiuto'];
+    return this.paneCompose ? ['home', 'visualizza', 'aiuto', 'messaggio', 'inserisci', 'opzioni', 'formato'] : ['home', 'visualizza', 'aiuto'];
   }
   get activeRibbon(): RibbonTab {
     return this.ribbonTabs.includes(this.ribbonTab) ? this.ribbonTab : 'home';
@@ -1306,6 +1323,7 @@ export class MailStore {
       if (token !== this.detailToken) return;
       const s = this.findMsg(id);
       this.detail = s ? { ...d, unread: s.unread, flagged: s.flagged } : d;
+      this.autoReceipt(this.detail);
       this.threadIgnored = await this.backend.threadIgnored(id).catch(() => false);
     } catch (e) {
       if (token === this.detailToken) this.detailError = errorMessage(e);
@@ -1885,7 +1903,10 @@ export class MailStore {
   private emptyDraft(accountId: string): Draft {
     const sig = this.signatureFor(accountId, 'new');
     const html = newMessageHtml(sig?.html);
-    return { key: randomKey(), accountId, to: [], cc: [], bcc: [], subject: '', body: htmlToText(html), html, attachments: [], inReplyTo: null, references: [], replyToMessage: null };
+    const d: Draft = { key: randomKey(), accountId, to: [], cc: [], bcc: [], subject: '', body: htmlToText(html), html, attachments: [], inReplyTo: null, references: [], replyToMessage: null };
+    if (this.trackRead) d.readReceipt = true;
+    if (this.trackDelivery) d.deliveryReceipt = true;
+    return d;
   }
 
   /** Firma da aggiungere da sola per questo account, se l'utente l'ha scelta. */
@@ -2166,6 +2187,52 @@ export class MailStore {
     c.html = null;
     c.plain = true;
     this.touch();
+  }
+
+  /** Priorità alta o bassa (Messaggio › Tag): un secondo clic torna a normale. */
+  setImportance(v: Importance) {
+    if (!this.c) return;
+    this.c.importance = this.c.importance === v ? null : v;
+    this.touch();
+  }
+
+  /** Opzioni › Rilevamento: conferma di recapito e di lettura per questo messaggio. */
+  toggleReceipt(kind: 'lettura' | 'recapito') {
+    if (!this.c) return;
+    if (kind === 'lettura') this.c.readReceipt = !this.c.readReceipt;
+    else this.c.deliveryReceipt = !this.c.deliveryReceipt;
+    this.touch();
+  }
+
+  setTracking(patch: { receiptReply?: ReceiptReply; trackRead?: boolean; trackDelivery?: boolean }) {
+    if (patch.receiptReply) this.receiptReply = patch.receiptReply;
+    if (typeof patch.trackRead === 'boolean') this.trackRead = patch.trackRead;
+    if (typeof patch.trackDelivery === 'boolean') this.trackDelivery = patch.trackDelivery;
+    this.save();
+  }
+
+  /** Conferma di lettura chiesta dal mittente del messaggio aperto: Invia o Non inviare. */
+  async answerReceipt(send: boolean) {
+    const d = this.detail;
+    if (!d?.receiptTo) return;
+    const id = d.id;
+    d.receiptTo = null;
+    try {
+      if (send) {
+        if (await this.backend.sendReadReceipt(id, false)) this.flash({ kind: 'info', text: 'Conferma di lettura inviata.' }, 3000);
+      } else {
+        await this.backend.skipReadReceipt(id);
+      }
+    } catch (e) {
+      this.flash({ kind: 'error', text: errorMessage(e) });
+    }
+  }
+
+  /** Con "Invia sempre" la conferma parte da sola appena il messaggio si apre. */
+  private autoReceipt(d: MessageDetail) {
+    if (!d.receiptTo || this.receiptReply !== 'sempre' || this.mode !== 'principale') return;
+    d.receiptTo = null;
+    void this.backend.sendReadReceipt(d.id, true).catch(() => {});
   }
 
   private composeKind(): 'new' | 'reply' {
@@ -2754,7 +2821,7 @@ ${m.text}`.slice(0, 20_000);
     }
     const v = opts.view;
     const acct = this.composeAccount();
-    if ((v === 'composizione' || v === 'inviato') && acct) {
+    if ((v === 'composizione' || v === 'composizione-opzioni' || v === 'inviato') && acct) {
       const win = this.prefs.compose === 'finestra';
       const d = this.emptyDraft(acct.id);
       d.to = [{ name: 'Davide Orlandi', email: 'd.orlandi@studiorlandi.it' }];
@@ -2767,9 +2834,17 @@ ${m.text}`.slice(0, 20_000);
         d.html = textToHtml('Ciao Davide,\n\ngrazie, la revisione va bene. Il cliente vuole però vedere i campioni del rovere prima di firmare: riesci a portarli giovedì in sede?\n\nA presto,\nChiara') + d.html;
       }
       d.body = htmlToText(d.html ?? '');
-      if (v === 'composizione') {
+      if (v === 'composizione-opzioni') {
+        d.importance = 'high';
+        d.readReceipt = true;
+      }
+      if (v !== 'inviato') {
         this.startCompose(d, win);
         this.savedAt = '09:04';
+        if (v === 'composizione-opzioni') {
+          this.winTab = 'opzioni';
+          if (!win) this.ribbonTab = 'opzioni';
+        }
       } else {
         this.lastSent = { key: d.key, win };
         await this.backend.send(d);
@@ -2799,6 +2874,8 @@ ${m.text}`.slice(0, 20_000);
       const o = this.cal.occs.find((x) => x.ev.id === 'ev3');
       if (v === 'riunione' && o) this.cal.edit = { ev: JSON.parse(JSON.stringify(o.ev)), meeting: true, series: false, original: o.ev, occ: o };
       else this.cal.newEvent({ start: this.cal.range.days[1] + 11 * 3_600_000 });
+    } else if (v === 'priorita') {
+      if (this.list.some((m) => m.id === 4)) await this.pickMsg(4);
     } else if (v === 'invito') {
       if (this.list.some((m) => m.id === 14)) await this.pickMsg(14);
     } else if (v === 'promemoria') {

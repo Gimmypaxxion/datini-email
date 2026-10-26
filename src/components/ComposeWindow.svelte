@@ -33,7 +33,7 @@
     </div>
     <div class="cmds">
       <nav class="tabs-row" style="height:36px" aria-label="Schede del messaggio">
-        {#each [['messaggio', 'Messaggio'], ['inserisci', 'Inserisci'], ['formato', 'Formato testo']] as [id, label] (id)}
+        {#each [['messaggio', 'Messaggio'], ['inserisci', 'Inserisci'], ['opzioni', 'Opzioni'], ['formato', 'Formato testo']] as [id, label] (id)}
           <button class="tab-btn btn" aria-pressed={store.winTab === id} onclick={() => (store.winTab = id as WinTab)}>{label}</button>
         {/each}
       </nav>

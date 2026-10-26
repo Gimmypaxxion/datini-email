@@ -148,12 +148,14 @@ CREATE TABLE IF NOT EXISTS tasks(
 
 /// Colonne aggiunte dopo la prima versione dell'archivio: si aggiungono agli
 /// archivi esistenti all'apertura.
-const ADDED_COLUMNS: [(&str, &str, &str); 2] = [
+const ADDED_COLUMNS: [(&str, &str, &str); 3] = [
     // Conversazione: Message-ID del primo messaggio della discussione.
     ("messages", "thread", "TEXT"),
     // Regole già applicate (1) o da applicare (0). I messaggi già presenti
     // quando la colonna nasce non vanno toccati dalle regole.
     ("messages", "ruled", "INTEGER NOT NULL DEFAULT 1"),
+    // Priorità: 1 alta, 0 normale, -1 bassa.
+    ("messages", "importance", "INTEGER NOT NULL DEFAULT 0"),
 ];
 
 /// Conversazione di un messaggio: il primo riferimento, oppure il messaggio a
@@ -258,6 +260,8 @@ pub struct MsgRow {
     pub categories: Vec<String>,
     /// Messaggi della stessa conversazione nell'account (escluse eliminata e indesiderata).
     pub thread_count: i64,
+    /// Priorità: 1 alta, 0 normale, -1 bassa.
+    pub importance: i8,
 }
 
 impl MsgRow {
@@ -283,6 +287,7 @@ impl MsgRow {
             categories: self.categories.clone(),
             size: self.size,
             thread_count: self.thread_count,
+            importance: self.importance,
         }
     }
 
@@ -324,6 +329,8 @@ pub struct NewMessage {
     /// Appena arrivato nella posta in arrivo: deve passare dalle regole, dalla
     /// risposta automatica e dall'avviso sul desktop.
     pub arrival: bool,
+    /// Priorità: 1 alta, 0 normale, -1 bassa.
+    pub importance: i8,
 }
 
 #[derive(Debug, Clone)]
@@ -353,7 +360,8 @@ const MSG_COLS: &str = "id, account_id, folder_id, uid, message_id, draft_key, d
       WHERE mkey = CASE WHEN message_id IS NOT NULL AND message_id != '' THEN 'm:' || message_id ELSE 'l:' || id END), \
     (SELECT COUNT(*) FROM messages t WHERE t.account_id = messages.account_id AND t.thread = messages.thread \
       AND (t.pending IS NULL OR t.pending != 'sending') \
-      AND t.folder_id NOT IN (SELECT id FROM folders WHERE role IN ('deleted', 'junk')))";
+      AND t.folder_id NOT IN (SELECT id FROM folders WHERE role IN ('deleted', 'junk'))), \
+    importance";
 
 fn msg_from_row(r: &Row) -> rusqlite::Result<MsgRow> {
     let recipients: String = r.get(9)?;
@@ -383,6 +391,7 @@ fn msg_from_row(r: &Row) -> rusqlite::Result<MsgRow> {
         thread: r.get(23)?,
         categories: r.get::<_, Option<String>>(24)?.map(|s| s.split('\u{1f}').map(String::from).collect()).unwrap_or_default(),
         thread_count: r.get(25)?,
+        importance: r.get(26)?,
     })
 }
 
@@ -830,8 +839,8 @@ impl Db {
         c.execute(
             "INSERT INTO messages(account_id, folder_id, uid, message_id, draft_key, pop_uidl, date, from_name, from_email,
                recipients, subject, preview, unread, flagged, answered, draft, has_atts, focused, size, has_body, refs,
-               in_reply_to, pending, added_at, thread, ruled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26)",
+               in_reply_to, pending, added_at, thread, ruled, importance)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27)",
             params![
                 account_id,
                 folder_id,
@@ -858,7 +867,8 @@ impl Db {
                 m.pending,
                 now_secs(),
                 thread,
-                !m.arrival
+                !m.arrival,
+                m.importance
             ],
         )?;
         let id = c.last_insert_rowid();
@@ -1347,6 +1357,7 @@ impl Db {
                 in_reply_to: None,
                 references: vec![],
                 reply_to_message: None,
+                ..Default::default()
             }),
             send_after: r.get(5)?,
             state: r.get(6)?,
@@ -1563,6 +1574,7 @@ mod tests {
             in_reply_to: None,
             references: vec![],
             reply_to_message: None,
+            ..Default::default()
         };
         let env = Envelope { from: "prova@better-look.test".into(), to: vec!["x@y.it".into()] };
         let id = db.outbox_add(&a, b"raw", b"copy", &env, &draft, 0).unwrap();

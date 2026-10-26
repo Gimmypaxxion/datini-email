@@ -211,6 +211,7 @@ async fn ciclo_completo_imap() {
         in_reply_to: None,
         references: vec![],
         reply_to_message: None,
+        ..Default::default()
     };
     eng.close_draft(&draft).await.unwrap();
     wait_for("bozza sul server", 30, || async { server_count("Drafts", "SUBJECT \"Campioni del rovere\"").await == 1 }).await;
@@ -348,6 +349,7 @@ async fn account_pop3() {
         in_reply_to: None,
         references: vec![],
         reply_to_message: None,
+        ..Default::default()
     };
     eng.send(&draft).await.unwrap();
     let subject = draft.subject.clone();
@@ -366,6 +368,96 @@ async fn account_pop3() {
     let m = find(&eng, inbox.id, &subject).unwrap();
     assert!(eng.detail(m.id, false).await.unwrap().text.contains("Prova POP"));
     eng.remove_account(&a).unwrap();
+}
+
+/// Priorità e conferme con posta vera: "altro" scrive a "prova" con priorità
+/// alta e chiede le due conferme; il server riceve la richiesta di recapito
+/// (DSN), "prova" vede la priorità e manda la conferma di lettura, che arriva
+/// ad "altro" senza finire in Posta inviata.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn priorita_e_conferme() {
+    if !enabled() {
+        return;
+    }
+    reseed();
+    let (eng, _) = engine();
+    let prova = eng
+        .add_account(NewAccount { name: "Chiara Valli".into(), email: "prova@better-look.test".into(), password: "prova-123".into(), kind: None, incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    wait_for("prima sincronizzazione", 60, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        async move { eng.status(&prova).state == "pronto" && eng.folders().unwrap().iter().any(|f| f.account_id == prova && f.role.as_deref() == Some("inbox") && f.total == 48) }
+    })
+    .await;
+    let altro = eng
+        .add_account(NewAccount { name: "Altro".into(), email: "altro@better-look.test".into(), password: "altro-456".into(), kind: Some(AccountKind::Pop3), incoming: None, outgoing: None })
+        .await
+        .unwrap()
+        .config
+        .id;
+    let subject = format!("Conferme-{}", &better_look_lib::mime::random_id()[..8]);
+    eng.send(&Draft {
+        key: better_look_lib::mime::random_id(),
+        account_id: altro.clone(),
+        to: vec![Person::new("Chiara Valli", "prova@better-look.test")],
+        subject: subject.clone(),
+        body: "Mi confermi di averlo ricevuto?".into(),
+        importance: Some("high".into()),
+        read_receipt: true,
+        delivery_receipt: true,
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+    let q = format!("SUBJECT \"{subject}\"");
+    wait_for("arrivato sul server", 60, || {
+        let q = q.clone();
+        async move { server_count("INBOX", &q).await == 1 }
+    })
+    .await;
+    assert_eq!(server_count("INBOX", &format!("{q} HEADER X-Prova-DSN \"NOTIFY=SUCCESS,FAILURE\" HEADER X-Prova-DSN \"RET=HDRS\"")).await, 1, "richiesta di recapito arrivata al server");
+
+    let inbox = folder(&eng, &prova, "inbox");
+    wait_for("sincronizzato", 60, || {
+        let eng = eng.clone();
+        let prova = prova.clone();
+        let subject = subject.clone();
+        async move {
+            eng.sync_now(Some(&prova));
+            find(&eng, inbox.id, &subject).is_some()
+        }
+    })
+    .await;
+    let m = find(&eng, inbox.id, &subject).unwrap();
+    assert_eq!(m.importance, 1);
+    let d = eng.detail(m.id, false).await.unwrap();
+    assert_eq!(d.receipt_to.map(|p| p.email), Some("altro@better-look.test".to_string()));
+    assert!(eng.send_read_receipt(m.id, false).await.unwrap());
+    assert!(eng.detail(m.id, false).await.unwrap().receipt_to.is_none());
+
+    let altro_inbox = folder(&eng, &altro, "inbox");
+    let letto = format!("Letto: {subject}");
+    wait_for("conferma di lettura arrivata", 60, || {
+        let eng = eng.clone();
+        let altro = altro.clone();
+        let letto = letto.clone();
+        async move {
+            eng.sync_now(Some(&altro));
+            find(&eng, altro_inbox.id, &letto).is_some()
+        }
+    })
+    .await;
+    let r = find(&eng, altro_inbox.id, &letto).unwrap();
+    assert!(eng.detail(r.id, false).await.unwrap().text.contains("è stato letto il"));
+    let sent = folder(&eng, &prova, "sent");
+    assert!(find(&eng, sent.id, &letto).is_none(), "la conferma non va in Posta inviata");
+    assert_eq!(server_count("Sent", &format!("SUBJECT \"{letto}\"")).await, 0);
+    eng.remove_account(&prova).unwrap();
+    eng.remove_account(&altro).unwrap();
 }
 
 /// Regole e risposta automatica con posta vera: un messaggio da "altro"
@@ -427,6 +519,7 @@ async fn regole_e_risposta_automatica() {
                 in_reply_to: None,
                 references: vec![],
                 reply_to_message: None,
+                ..Default::default()
             })
             .await
             .unwrap();

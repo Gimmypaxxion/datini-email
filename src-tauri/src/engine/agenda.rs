@@ -82,6 +82,7 @@ impl Engine {
             in_reply_to: None,
             references: vec![],
             reply_to_message: None,
+            ..Default::default()
         };
         let built = mime::build_calendar(acct, &d, method, &ics)?;
         self.db.outbox_add(&acct.id, &built.wire, &built.copy, &built.envelope, &d, now_secs())?;

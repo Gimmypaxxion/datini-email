@@ -174,7 +174,7 @@
       onclick={(e) => click(e, m.id)}
       ondblclick={() => store.readingPane === 'nascosto' && store.openFull(m.id)}
       aria-current={on ? 'true' : undefined}
-      aria-label={`${store.isMulti && on ? 'Selezionato. ' : ''}${unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${many ? `Conversazione di ${conv!.count} messaggi. ` : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
+      aria-label={`${store.isMulti && on ? 'Selezionato. ' : ''}${unread ? 'Non letto. ' : ''}${m.draft ? 'Bozza. ' : ''}${m.importance === 1 ? 'Priorità alta. ' : m.importance === -1 ? 'Priorità bassa. ' : ''}${many ? `Conversazione di ${conv!.count} messaggi. ` : ''}${name}, ${m.subject || 'nessun oggetto'}, ${listTime(m.date, now)}`}
     >
       <span class="bar" aria-hidden="true" style:background={unread ? 'var(--brand)' : 'transparent'}></span>
       <span class="avatar pic" aria-hidden="true" style="background:{t.bg};color:{t.fg}">{initials(name)}</span>
@@ -187,6 +187,7 @@
         </span>
         <span class="l2">
           <span class="subj" style:font-weight={unread ? 600 : 400} style:color={strong ? 'var(--brand-ink)' : 'var(--ink)'}>{m.subject || '(nessun oggetto)'}</span>
+          {#if m.importance === 1}<span class="prio" title="Priorità alta"><Icon name="exclamation-mark" size={15} stroke={2.2} style="color:var(--danger)" /></span>{:else if m.importance === -1}<span class="prio" title="Priorità bassa"><Icon name="arrow-narrow-down" size={15} stroke={1.9} style="color:var(--brand-ink)" /></span>{/if}
           {#if m.hasAttachments}<Icon name="paperclip" size={15} stroke={1.7} style="color:var(--ink-3)" />{/if}
           {#if m.flagged}<Icon name="flag-filled" size={15} style="color:var(--danger)" />{/if}
         </span>
@@ -382,6 +383,7 @@
   .time { flex: none; font-size: 12.5px; font-variant-numeric: tabular-nums; }
   .l2 { display: flex; align-items: center; gap: 6px; }
   .subj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+  .prio { display: inline-flex; flex: none; }
   .l3 { display: flex; align-items: center; gap: 5px; min-width: 0; }
   .prev { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--ink-3); }
   .l3 .cat { height: 18px; font-size: 11.5px; max-width: 120px; }

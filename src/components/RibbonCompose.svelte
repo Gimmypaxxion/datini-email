@@ -2,8 +2,9 @@
   // Schede "Messaggio", "Inserisci" e "Formato testo" del messaggio in
   // scrittura, usate sia nella barra principale (scrittura nel riquadro) sia
   // nelle finestre del messaggio. Gruppi e posizioni come in Outlook: Appunti,
-  // Testo base, Includi; nella scheda Inserisci tabelle, immagini,
-  // collegamenti; in Formato testo il formato del messaggio, Carattere e Paragrafo.
+  // Testo base, Includi, Tag; nella scheda Inserisci tabelle, immagini,
+  // collegamenti; in Opzioni i campi, le conferme (Rilevamento) e l'invio
+  // programmato; in Formato testo il formato del messaggio, Carattere e Paragrafo.
   // I pulsanti di formato non prendono il fuoco: il cursore resta nel testo.
   import RB from './RB.svelte';
   import Icon from '../lib/Icon.svelte';
@@ -15,7 +16,7 @@
   import { store } from '../lib/store.svelte';
   import { FONTS, HIGHLIGHTS, SIZES, STANDARD_COLORS, THEME_COLORS, composeEditor as ed, fontStack } from '../lib/editor.svelte';
 
-  let { tab }: { tab: 'messaggio' | 'inserisci' | 'formato' } = $props();
+  let { tab }: { tab: 'messaggio' | 'inserisci' | 'opzioni' | 'formato' } = $props();
 
   type PopKind = 'font' | 'size' | 'color' | 'hl' | 'table' | 'sig' | 'tpl' | 'case' | 'spacing';
   let pop = $state<{ kind: PopKind; anchor: HTMLElement } | null>(null);
@@ -56,6 +57,7 @@
     onclick: () => ed.setSpacing(n),
   }));
   const plain = $derived(!!store.c?.plain);
+  const importance = $derived(store.c?.importance ?? null);
 
   async function paste() {
     try {
@@ -129,6 +131,12 @@
   </div><span class="rgl">Appunti</span></div>
 {/snippet}
 
+{#snippet scheduleButton(drop: number, group: string)}
+  <div class="rg only-e" data-drop={drop}><div class="rgb">
+    <RB big menu icon="clock" tone="c-brand" label="Invio programmato" title="Ritarda il recapito: scegli quando inviare" disabled={!store.c} pressed={schedOpen} onclick={(e) => { schedEl = e.currentTarget as HTMLElement; schedOpen = !schedOpen; }} />
+  </div><span class="rgl">{group}</span></div>
+{/snippet}
+
 {#if tab === 'messaggio'}
   {@render clipboardGroup()}
 
@@ -162,9 +170,23 @@
     <RB big menu icon="template" tone="c-brand" label="Modelli" title="I miei modelli: testi da riusare" disabled={!store.c} pressed={pop?.kind === 'tpl'} onclick={(e) => open('tpl', e)} />
   </div><span class="rgl">Includi</span></div>
 
-  <div class="rg only-e" data-drop="1"><div class="rgb">
-    <RB big menu icon="clock" tone="c-brand" label="Invio programmato" title="Ritarda il recapito: scegli quando inviare" disabled={!store.c} pressed={schedOpen} onclick={(e) => { schedEl = e.currentTarget as HTMLElement; schedOpen = !schedOpen; }} />
-  </div><span class="rgl">Invio</span></div>
+  <div class="rg" data-drop="2"><div class="rgb"><div class="rs">
+    <button class="rb" aria-pressed={importance === 'high'} title="Priorità alta: chi lo riceve vede che è importante" onclick={() => store.setImportance('high')} disabled={!store.c}><Icon name="exclamation-mark" class="c-red" />Priorità alta</button>
+    <button class="rb" aria-pressed={importance === 'low'} title="Priorità bassa: chi lo riceve vede che può aspettare" onclick={() => store.setImportance('low')} disabled={!store.c}><Icon name="arrow-narrow-down" class="c-brand" />Priorità bassa</button>
+  </div></div><span class="rgl">Tag</span></div>
+
+  {@render scheduleButton(1, 'Invio')}
+{:else if tab === 'opzioni'}
+  <div class="rg"><div class="rgb">
+    <RB big icon="user-plus" tone="c-brand" label="Ccn" title="Mostra il campo Ccn: destinatari che gli altri non vedono" pressed={store.showBcc} onclick={() => (store.showBcc = !store.showBcc)} disabled={!store.c || (store.showBcc && !!store.c?.bcc.length)} />
+  </div><span class="rgl">Mostra campi</span></div>
+
+  <div class="rg"><div class="rgb"><div class="rs">
+    <button class="rb" aria-pressed={!!store.c?.deliveryReceipt} title="Il server di posta del destinatario ti avvisa quando il messaggio gli è stato consegnato" onclick={() => store.toggleReceipt('recapito')} disabled={!store.c}><Icon name="mail-check" class="c-green" />Richiedi conferma di recapito</button>
+    <button class="rb" aria-pressed={!!store.c?.readReceipt} title="Chi riceve il messaggio può mandarti una conferma quando lo apre" onclick={() => store.toggleReceipt('lettura')} disabled={!store.c}><Icon name="mail-opened" class="c-brand" />Richiedi conferma di lettura</button>
+  </div></div><span class="rgl">Rilevamento</span></div>
+
+  {@render scheduleButton(2, 'Altre opzioni')}
 {:else if tab === 'formato'}
   {@render clipboardGroup()}
 

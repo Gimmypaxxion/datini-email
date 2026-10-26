@@ -77,6 +77,7 @@ function summary(m: MockMessage): MessageSummary {
     categories: [...m.categories],
     size: m.size,
     threadCount: 1,
+    importance: m.importance ?? 0,
   };
 }
 
@@ -324,6 +325,23 @@ export class MockBackend implements Backend {
       .map((m) => ({ ...this.withCount(m), folderName: this.folderList.find((f) => f.id === m.folderId)?.name ?? null }));
   }
 
+  /** Messaggi a cui si è già data (o negata) la conferma di lettura. */
+  receiptsDone = new Set<number>();
+  /** Conferme di lettura inviate, per le prove. */
+  receiptsSent: { id: number; automatic: boolean }[] = [];
+
+  async sendReadReceipt(id: number, automatic: boolean) {
+    const m = this.find(id);
+    if (!m.receiptTo || this.receiptsDone.has(id)) return false;
+    this.receiptsDone.add(id);
+    this.receiptsSent.push({ id, automatic });
+    return true;
+  }
+
+  async skipReadReceipt(id: number) {
+    this.receiptsDone.add(id);
+  }
+
   async quoteHtml(id: number) {
     const m = this.find(id);
     return m.html ?? textToHtml(m.text);
@@ -373,6 +391,7 @@ export class MockBackend implements Backend {
       const local = this.cal.find((e) => e.uid === ev.uid && e.recurrenceId === ev.recurrenceId) ?? null;
       detail.invite = { ...clone(m.invite), local: local ? clone(local) : null, outdated: !!local && local.sequence > ev.sequence, forMe: ev.attendees.some((a) => this.mine().includes(a.email.toLowerCase())) };
     }
+    if (this.receiptsDone.has(id)) detail.receiptTo = null;
     return { ...detail, html: html ? `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:system-ui,sans-serif;font-size:14.5px;line-height:1.5;color:#242424;background:#fff}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>${html}</body></html>` : null, remoteImages: remote, remoteAllowed: allowRemote };
   }
 
@@ -492,6 +511,7 @@ export class MockBackend implements Backend {
       categories: [],
       size: d.body.length * 2 + 3000,
       threadCount: 1,
+      importance: d.importance === 'high' ? 1 : d.importance === 'low' ? -1 : 0,
       messageId: `${d.key}@bozza`,
       references: d.references,
       html: d.html ?? null,

@@ -124,6 +124,33 @@ fn part_name(p: &mail_parser::MessagePart, index: usize) -> String {
     format!("allegato-{}.{ext}", index + 1)
 }
 
+/// Priorità da X-Priority ("1 (Highest)"), Importance ("High") o Priority ("urgent").
+pub fn importance_of(x_priority: Option<&str>, importance: Option<&str>, priority: Option<&str>) -> i8 {
+    if let Some(n) = x_priority.and_then(|v| v.trim().chars().next()).and_then(|c| c.to_digit(10)) {
+        return match n {
+            1 | 2 => 1,
+            4 | 5 => -1,
+            _ => 0,
+        };
+    }
+    let v = importance.or(priority).map(|v| v.trim().to_ascii_lowercase()).unwrap_or_default();
+    match v.as_str() {
+        "high" | "urgent" => 1,
+        "low" | "non-urgent" => -1,
+        _ => 0,
+    }
+}
+
+/// Il primo indirizzo email in un'intestazione ("Nome <a@b.it>" o "a@b.it").
+fn extract_email(v: &str) -> Option<String> {
+    let inner = match (v.find('<'), v.find('>')) {
+        (Some(a), Some(b)) if b > a => &v[a + 1..b],
+        _ => v,
+    };
+    let e = inner.trim().trim_matches(|c: char| c == '"' || c == ',' || c == ';').trim();
+    (e.contains('@') && !e.contains(char::is_whitespace)).then(|| e.to_string())
+}
+
 pub struct Parsed<'a> {
     pub msg: Message<'a>,
 }
@@ -261,6 +288,19 @@ impl Parsed<'_> {
         self.msg.subject().map(clean_ws).unwrap_or_default()
     }
 
+    /// Priorità dalle intestazioni (X-Priority, Importance, Priority): 1 alta, 0 normale, -1 bassa.
+    pub fn importance(&self) -> i8 {
+        importance_of(self.msg.header_raw("X-Priority"), self.msg.header_raw("Importance"), self.msg.header_raw("Priority"))
+    }
+
+    /// Chi chiede la conferma di lettura (Disposition-Notification-To), se c'è.
+    pub fn receipt_to(&self) -> Option<Person> {
+        let raw = self.msg.header_raw("Disposition-Notification-To")?;
+        let email = extract_email(raw)?;
+        let name = raw.split('<').next().map(|n| n.trim().trim_matches('"').trim().to_string()).filter(|n| !n.is_empty() && !n.contains('@')).unwrap_or_default();
+        Some(Person::new(name, email))
+    }
+
     pub fn message_id(&self) -> Option<String> {
         self.msg.message_id().map(|m| m.to_string())
     }
@@ -301,6 +341,7 @@ impl Parsed<'_> {
             refs: self.references().join(" "),
             in_reply_to: self.in_reply_to().join(" "),
             body_text,
+            importance: self.importance(),
             ..Default::default()
         }
     }
@@ -354,6 +395,14 @@ impl Parsed<'_> {
             in_reply_to: self.in_reply_to().into_iter().next(),
             references: self.references(),
             reply_to_message: None,
+            importance: match self.importance() {
+                1 => Some("high".into()),
+                -1 => Some("low".into()),
+                _ => None,
+            },
+            read_receipt: self.msg.header_raw("Disposition-Notification-To").is_some(),
+            delivery_receipt: self.msg.header_raw(DELIVERY_HEADER).is_some(),
+            ..Default::default()
         }
     }
 }
@@ -414,6 +463,32 @@ fixed_header!(AutoResponseSuppress, "X-Auto-Response-Suppress", "All");
 
 #[derive(Clone)]
 struct XMailer;
+
+/// Intestazione semplice con nome e valore fissi (priorità, conferma di lettura).
+macro_rules! simple_header {
+    ($t:ident, $name:expr) => {
+        #[derive(Clone)]
+        struct $t(String);
+        impl lettre::message::header::Header for $t {
+            fn name() -> HeaderName {
+                HeaderName::new_from_ascii_str($name)
+            }
+            fn parse(s: &str) -> std::result::Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+                Ok($t(s.to_string()))
+            }
+            fn display(&self) -> HeaderValue {
+                HeaderValue::new(Self::name(), self.0.clone())
+            }
+        }
+    };
+}
+simple_header!(XPriority, "X-Priority");
+simple_header!(ImportanceHeader, "Importance");
+simple_header!(DispositionNotificationTo, "Disposition-Notification-To");
+simple_header!(DeliveryReceiptHeader, DELIVERY_HEADER);
+
+/// Solo nelle bozze: ricorda la richiesta di conferma di recapito, che non è un'intestazione.
+const DELIVERY_HEADER: &str = "X-Better-Look-Conferma-Recapito";
 
 impl lettre::message::header::Header for XMailer {
     fn name() -> HeaderName {
@@ -650,6 +725,18 @@ fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as
         if auto_reply {
             b = b.header(AutoSubmitted).header(AutoResponseSuppress);
         }
+        // Priorità come la scrive Outlook.
+        match d.importance.as_deref() {
+            Some("high") => b = b.header(XPriority("1 (Highest)".into())).header(ImportanceHeader("High".into())),
+            Some("low") => b = b.header(XPriority("5 (Lowest)".into())).header(ImportanceHeader("Low".into())),
+            _ => {}
+        }
+        if d.read_receipt {
+            b = b.header(DispositionNotificationTo(from.to_string()));
+        }
+        if d.delivery_receipt && as_draft {
+            b = b.header(DeliveryReceiptHeader("1".into()));
+        }
         let text = d.body.replace("\r\n", "\n");
         let with_atts = |mut mixed: MultiPart| {
             for a in atts {
@@ -706,6 +793,69 @@ fn build_message(account: &AccountConfig, d: &Draft, atts: &[AttachmentData], as
     })
 }
 
+/// Il messaggio letto, per la conferma di lettura.
+pub struct ReadOriginal {
+    pub message_id: Option<String>,
+    pub subject: String,
+    /// Data del messaggio originale (secondi).
+    pub sent: i64,
+}
+
+fn local_text(secs: i64) -> String {
+    use chrono::TimeZone;
+    chrono::Local.timestamp_opt(secs, 0).single().map(|d| d.format("%d/%m/%Y %H:%M").to_string()).unwrap_or_default()
+}
+
+/// Conferma di lettura (MDN, RFC 8098): un testo per le persone e la parte
+/// message/disposition-notification per i programmi, in un multipart/report.
+pub fn build_mdn(account: &AccountConfig, d: &Draft, orig: &ReadOriginal, automatic: bool) -> Result<BuiltMessage> {
+    let from = mailbox(&Person::new(account.name.clone(), account.email.clone()))?;
+    let to = d.to.first().ok_or_else(|| Error::user("Manca il destinatario della conferma."))?;
+    let rcpt = mailbox(to)?;
+    let domain = account.email.split('@').nth(1).unwrap_or("better-look.local").to_string();
+    let message_id = format!("{}@{}", random_id(), domain);
+    let boundary = format!("=_conferma_{}", random_id());
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or_default();
+
+    let human = format!(
+        "Il messaggio\r\n\r\n  A: {}\r\n  Oggetto: {}\r\n  Inviato: {}\r\n\r\nè stato letto il {}.\r\n",
+        account.email,
+        orig.subject,
+        local_text(orig.sent),
+        local_text(now)
+    );
+    let encoded = base64::engine::general_purpose::STANDARD.encode(human.as_bytes());
+    let wrapped: Vec<&str> = encoded.as_bytes().chunks(76).map(|c| std::str::from_utf8(c).unwrap_or_default()).collect();
+    let mode = if automatic { "automatic-action/MDN-sent-automatically" } else { "manual-action/MDN-sent-manually" };
+    let mut body = format!("--{boundary}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n{}\r\n", wrapped.join("\r\n"));
+    body.push_str(&format!("--{boundary}\r\nContent-Type: message/disposition-notification\r\n\r\nReporting-UA: Better-Look\r\nFinal-Recipient: rfc822; {}\r\n", account.email));
+    if let Some(id) = &orig.message_id {
+        body.push_str(&format!("Original-Message-ID: <{}>\r\n", id.trim_matches(|c| c == '<' || c == '>')));
+    }
+    body.push_str(&format!("Disposition: {mode}; displayed\r\n\r\n--{boundary}--\r\n"));
+
+    let ct = ContentType::parse(&format!("multipart/report; report-type=disposition-notification; boundary=\"{boundary}\"")).map_err(|e| Error::user(format!("Impossibile preparare la conferma: {e}")))?;
+    let mut b = lettre::Message::builder()
+        .from(from)
+        .to(rcpt)
+        .subject(d.subject.clone())
+        .message_id(Some(format!("<{message_id}>")))
+        .date(SystemTime::now())
+        .header(XMailer)
+        .header(ct);
+    if automatic {
+        b = b.header(AutoSubmitted);
+    }
+    if let Some(irt) = &orig.message_id {
+        let id = format!("<{}>", irt.trim_matches(|c| c == '<' || c == '>'));
+        b = b.in_reply_to(id.clone()).references(id);
+    }
+    // Il corpo è già tutto ASCII a righe corte (il testo per le persone è in base64).
+    let body = lettre::message::Body::dangerous_pre_encoded(body.into_bytes(), ContentTransferEncoding::SevenBit);
+    let raw = b.body(body).map_err(|e| Error::user(format!("Impossibile preparare la conferma: {e}")))?.formatted();
+    Ok(BuiltMessage { wire: raw.clone(), copy: raw, envelope: Envelope { from: account.email.clone(), to: vec![to.email.trim().to_string()] }, message_id })
+}
+
 /// Una singola parte di testo, usata nei test e per i messaggi di sistema.
 #[allow(dead_code)]
 pub fn plain_part(text: &str) -> SinglePart {
@@ -748,6 +898,7 @@ mod tests {
             in_reply_to: Some("orig@studiorlandi.it".into()),
             references: vec!["orig@studiorlandi.it".into()],
             reply_to_message: None,
+            ..Default::default()
         }
     }
 
@@ -774,6 +925,62 @@ mod tests {
         let nm = p.to_new_message(0, true, b.copy.len() as i64);
         assert!(nm.has_atts && nm.focused);
         assert!(nm.preview.starts_with("Ciao Davide"));
+    }
+
+    #[test]
+    fn priority_and_receipts() {
+        assert_eq!(importance_of(Some("1 (Highest)"), None, None), 1);
+        assert_eq!(importance_of(Some("2"), None, None), 1);
+        assert_eq!(importance_of(Some("3 (Normal)"), Some("High"), None), 0);
+        assert_eq!(importance_of(Some("5"), None, None), -1);
+        assert_eq!(importance_of(None, Some("low"), None), -1);
+        assert_eq!(importance_of(None, None, Some("urgent")), 1);
+        assert_eq!(importance_of(None, Some("normal"), None), 0);
+
+        let mut d = draft();
+        d.importance = Some("high".into());
+        d.read_receipt = true;
+        d.delivery_receipt = true;
+        let b = build(&account(), &d, &[], false).unwrap();
+        let wire = String::from_utf8_lossy(&b.wire);
+        assert!(wire.contains("X-Priority: 1 (Highest)") && wire.contains("Importance: High"));
+        assert!(!wire.contains(DELIVERY_HEADER), "la richiesta di recapito non viaggia come intestazione");
+        let p = parse(&b.wire).unwrap();
+        assert_eq!(p.importance(), 1);
+        assert_eq!(p.to_new_message(0, true, 0).importance, 1);
+        assert_eq!(p.receipt_to().unwrap().email, "chiara@valliarredi.it");
+
+        // La bozza ricorda tutte e tre le scelte.
+        let back = parse(&build(&account(), &d, &[], true).unwrap().copy).unwrap().to_draft("a", 1);
+        assert_eq!(back.importance.as_deref(), Some("high"));
+        assert!(back.read_receipt && back.delivery_receipt);
+
+        d.importance = Some("low".into());
+        d.read_receipt = false;
+        let p = build(&account(), &d, &[], false).unwrap();
+        let p = parse(&p.wire).unwrap();
+        assert_eq!(p.importance(), -1);
+        assert!(p.receipt_to().is_none());
+    }
+
+    #[test]
+    fn read_receipt_is_a_report() {
+        let d = Draft { key: "m".into(), account_id: "a".into(), to: vec![Person::new("Davide Orlandi", "d.orlandi@studiorlandi.it")], subject: "Letto: Campioni".into(), mdn: true, ..Default::default() };
+        let orig = ReadOriginal { message_id: Some("orig@studiorlandi.it".into()), subject: "Campioni".into(), sent: 1_790_000_000 };
+        let b = build_mdn(&account(), &d, &orig, false).unwrap();
+        assert_eq!(b.envelope.to, vec!["d.orlandi@studiorlandi.it".to_string()]);
+        let raw = String::from_utf8_lossy(&b.wire);
+        assert!(raw.contains("multipart/report; report-type=disposition-notification"));
+        assert!(raw.contains("Disposition: manual-action/MDN-sent-manually; displayed"));
+        assert!(raw.contains("Original-Message-ID: <orig@studiorlandi.it>"));
+        assert!(raw.contains("Final-Recipient: rfc822; chiara@valliarredi.it"));
+        assert!(!raw.contains("Auto-Submitted"));
+        let p = parse(&b.wire).unwrap();
+        assert_eq!(p.msg.subject(), Some("Letto: Campioni"));
+        assert!(p.text().contains("è stato letto il"), "{}", p.text());
+        assert_eq!(p.in_reply_to(), vec!["orig@studiorlandi.it".to_string()]);
+        let auto = String::from_utf8_lossy(&build_mdn(&account(), &d, &orig, true).unwrap().wire).to_string();
+        assert!(auto.contains("automatic-action/MDN-sent-automatically") && auto.contains("Auto-Submitted: auto-replied"));
     }
 
     #[test]

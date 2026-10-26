@@ -19,6 +19,7 @@
     aiuto: 'Aiuto',
     messaggio: 'Messaggio',
     inserisci: 'Inserisci',
+    opzioni: 'Opzioni',
     formato: 'Formato testo',
   };
 

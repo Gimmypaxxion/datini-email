@@ -135,7 +135,6 @@ import Trash from '@tabler/icons-svelte/icons/trash';
 import TrashX from '@tabler/icons-svelte/icons/trash-x';
 import Underline from '@tabler/icons-svelte/icons/underline';
 import UserCog from '@tabler/icons-svelte/icons/user-cog';
-import UserPlus from '@tabler/icons-svelte/icons/user-plus';
 import Users from '@tabler/icons-svelte/icons/users';
 import Volume from '@tabler/icons-svelte/icons/volume';
 import WifiOff from '@tabler/icons-svelte/icons/wifi-off';
@@ -201,6 +200,10 @@ import InfoCircle from '@tabler/icons-svelte/icons/info-circle';
 import DoorExit from '@tabler/icons-svelte/icons/door-exit';
 import Plane from '@tabler/icons-svelte/icons/plane';
 import Sparkles from '@tabler/icons-svelte/icons/sparkles';
+import ExclamationMark from '@tabler/icons-svelte/icons/exclamation-mark';
+import ArrowNarrowDown from '@tabler/icons-svelte/icons/arrow-narrow-down';
+import MailCheck from '@tabler/icons-svelte/icons/mail-check';
+import UserPlus from '@tabler/icons-svelte/icons/user-plus';
 export const icons = {
   highlight: Highlight,
   palette: Palette,
@@ -401,6 +404,9 @@ export const icons = {
   'door-exit': DoorExit,
   plane: Plane,
   sparkles: Sparkles,
+  'exclamation-mark': ExclamationMark,
+  'arrow-narrow-down': ArrowNarrowDown,
+  'mail-check': MailCheck,
 } as const;
 
 export type IconName = keyof typeof icons;

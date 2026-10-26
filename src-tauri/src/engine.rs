@@ -43,6 +43,9 @@ struct Worker {
 
 /// Chiave dell'archivio in cui stanno le firme.
 const SIGNATURES_KEY: &str = "firme";
+const READ_RECEIPTS_KEY: &str = "conferme-lettura";
+/// Quante conferme già gestite ricordare (le più vecchie si dimenticano).
+const MAX_RECEIPTS_HANDLED: usize = 5000;
 /// Chiave dell'archivio in cui stanno le categorie colorate.
 const CATEGORIES_KEY: &str = "categorie";
 /// Chiave dell'archivio in cui stanno le regole.
@@ -439,7 +442,7 @@ impl Engine {
             let cfg = acct.outgoing.clone().ok_or_else(|| Error::user("Mancano i dati del server di posta in uscita."))?;
             let pw = self.password(&acct.id)?;
             emit("invio", None);
-            smtp::send(&cfg, &pw, &item.envelope, &item.raw).await?;
+            smtp::send(&cfg, &pw, &item.envelope, &item.raw, item.draft.delivery_receipt).await?;
             Ok::<AccountConfig, Error>(acct)
         }
         .await;
@@ -463,6 +466,10 @@ impl Engine {
     }
 
     fn after_sent(&self, acct: &AccountConfig, item: &OutboxRow) -> Result<()> {
+        // Le conferme di lettura non finiscono in Posta inviata (come in Outlook).
+        if item.draft.mdn {
+            return Ok(());
+        }
         let sent = self.role_folder(acct, "sent")?;
         let imap = acct.kind == AccountKind::Imap;
         let mut nm = mime::parse(&item.copy).map(|p| p.to_new_message(now_secs(), true, item.copy.len() as i64)).unwrap_or_default();
@@ -867,7 +874,85 @@ impl Engine {
             remote_images: remote,
             remote_allowed: allow_remote,
             invite: self.invite_info(&parsed),
+            receipt_to: self.receipt_request(&row, &parsed).unwrap_or(None),
         })
+    }
+
+    // ------------------------------------------------------------------
+    // Conferme di lettura
+    // ------------------------------------------------------------------
+
+    fn receipt_key(row: &MsgRow) -> String {
+        row.message_id.clone().filter(|m| !m.is_empty()).unwrap_or_else(|| format!("{}:{}", row.account_id, row.id))
+    }
+
+    fn receipts_handled(&self) -> Result<Vec<String>> {
+        Ok(self.db.meta(READ_RECEIPTS_KEY)?.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default())
+    }
+
+    fn mark_receipt_handled(&self, row: &MsgRow) -> Result<()> {
+        let key = Self::receipt_key(row);
+        let mut all = self.receipts_handled()?;
+        if !all.contains(&key) {
+            all.push(key);
+            let skip = all.len().saturating_sub(MAX_RECEIPTS_HANDLED);
+            all.drain(..skip);
+            self.db.set_meta(READ_RECEIPTS_KEY, &serde_json::to_string(&all)?)?;
+        }
+        Ok(())
+    }
+
+    /// Chi aspetta la conferma di lettura di questo messaggio, se va ancora chiesto
+    /// all'utente: non per i propri messaggi, le bozze, la posta inviata o indesiderata,
+    /// né per quelli a cui si è già risposto (con l'invio o con un no).
+    fn receipt_request(&self, row: &MsgRow, p: &mime::Parsed) -> Result<Option<Person>> {
+        let Some(to) = p.receipt_to() else { return Ok(None) };
+        let acct = self.db.account(&row.account_id)?;
+        if acct.kind == AccountKind::Local || acct.outgoing.is_none() {
+            return Ok(None);
+        }
+        if to.email.eq_ignore_ascii_case(&acct.email) || row.from.email.eq_ignore_ascii_case(&acct.email) || row.draft {
+            return Ok(None);
+        }
+        let folder = self.db.folder(row.folder_id)?;
+        if matches!(folder.role.as_deref(), Some("drafts" | "sent" | "junk" | "outbox")) {
+            return Ok(None);
+        }
+        if self.receipts_handled()?.contains(&Self::receipt_key(row)) {
+            return Ok(None);
+        }
+        Ok(Some(to))
+    }
+
+    /// Invia la conferma di lettura chiesta dal mittente (una volta sola).
+    pub async fn send_read_receipt(&self, id: i64, automatic: bool) -> Result<bool> {
+        let row = self.db.message(id)?;
+        let raw = self.raw(&row).await?;
+        let p = mime::parse(&raw).ok_or_else(|| Error::user("Il messaggio non è leggibile."))?;
+        let Some(to) = self.receipt_request(&row, &p)? else { return Ok(false) };
+        let acct = self.db.account(&row.account_id)?;
+        let subject = p.subject();
+        let d = Draft {
+            key: mime::random_id(),
+            account_id: acct.id.clone(),
+            to: vec![to],
+            subject: if subject.is_empty() { "Letto".into() } else { format!("Letto: {subject}") },
+            in_reply_to: p.message_id(),
+            mdn: true,
+            ..Default::default()
+        };
+        let orig = mime::ReadOriginal { message_id: p.message_id(), subject, sent: row.date };
+        let built = mime::build_mdn(&acct, &d, &orig, automatic)?;
+        self.db.outbox_add(&acct.id, &built.wire, &built.copy, &built.envelope, &d, now_secs())?;
+        self.mark_receipt_handled(&row)?;
+        self.outbox_wake.notify_one();
+        Ok(true)
+    }
+
+    /// L'utente non vuole inviare la conferma: non la si chiede più.
+    pub fn skip_read_receipt(&self, id: i64) -> Result<()> {
+        let row = self.db.message(id)?;
+        self.mark_receipt_handled(&row)
     }
 
     /// Testo di un messaggio da citare in una risposta o in un inoltro.
@@ -1417,6 +1502,7 @@ impl Engine {
             in_reply_to: mid,
             references,
             reply_to_message: None,
+            ..Default::default()
         };
         let built = mime::build_auto_reply(acct, &d)?;
         self.db.outbox_add(&acct.id, &built.wire, &built.copy, &built.envelope, &d, now_secs())?;
@@ -1990,6 +2076,46 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    #[tokio::test]
+    async fn priority_and_read_receipts() {
+        let s = setup();
+        let ask = "Disposition-Notification-To: Davide Orlandi <d.orlandi@studiorlandi.it>\r\nX-Priority: 1 (Highest)\r\n";
+        let a = arrive(&s, 20, "Davide Orlandi <d.orlandi@studiorlandi.it>", "Preventivo firmato", ask);
+        let b = arrive(&s, 21, "Davide Orlandi <d.orlandi@studiorlandi.it>", "Campioni", ask);
+        let own = arrive(&s, 22, "Chiara Valli <chiara.valli@valliarredi.it>", "Promemoria", "Disposition-Notification-To: chiara.valli@valliarredi.it\r\n");
+        let plain = arrive(&s, 23, "Studio Bassi <amministrazione@studiobassi.it>", "Fattura", "Importance: low\r\n");
+
+        let d = s.eng.detail(a, false).await.unwrap();
+        assert_eq!(d.summary.importance, 1);
+        assert_eq!(d.receipt_to.unwrap().email, "d.orlandi@studiorlandi.it");
+        assert!(s.eng.detail(own, false).await.unwrap().receipt_to.is_none(), "mai per i propri messaggi");
+        let p = s.eng.detail(plain, false).await.unwrap();
+        assert!(p.receipt_to.is_none());
+        assert_eq!(p.summary.importance, -1);
+
+        // Invio: una sola volta, poi non si chiede più.
+        assert!(s.eng.send_read_receipt(a, false).await.unwrap());
+        assert!(!s.eng.send_read_receipt(a, false).await.unwrap());
+        assert!(s.eng.detail(a, false).await.unwrap().receipt_to.is_none());
+        let out = s.eng.db.outbox_due(now_secs() + 1).unwrap();
+        assert_eq!(out.len(), 1);
+        assert!(out[0].draft.mdn);
+        assert_eq!(out[0].envelope.to, vec!["d.orlandi@studiorlandi.it".to_string()]);
+        let wire = String::from_utf8_lossy(&out[0].raw).to_string();
+        assert!(wire.contains("Subject: Letto: Preventivo firmato") && wire.contains("Original-Message-ID: <m20@example.test>"), "{wire}");
+
+        // Dopo l'invio la conferma non va in Posta inviata.
+        let acct = s.eng.db.account("a1").unwrap();
+        s.eng.after_sent(&acct, &out[0]).unwrap();
+        let sent = s.eng.db.folder_by_role("a1", "sent").unwrap();
+        assert!(sent.map_or(true, |f| s.eng.db.list_messages(f.id, None, 10, 0).unwrap().is_empty()));
+
+        // "No": non la si chiede più, e non parte nulla.
+        s.eng.skip_read_receipt(b).unwrap();
+        assert!(s.eng.detail(b, false).await.unwrap().receipt_to.is_none());
+        assert_eq!(s.eng.db.outbox_due(now_secs() + 1).unwrap().len(), 1);
     }
 
     #[tokio::test]
